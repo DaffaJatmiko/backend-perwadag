@@ -1,214 +1,268 @@
-"""Authentication service with password security features and session management."""
+"""Authentication service for government project (revised)."""
 
-from datetime import timedelta, datetime
-from fastapi import HTTPException, status, Request
+from datetime import datetime, timedelta
 from typing import Optional
+from fastapi import HTTPException, status
 
+from src.repositories.user import UserRepository
 from src.services.user import UserService
-from src.schemas.user import UserLogin, Token, PasswordReset, PasswordResetConfirm
-from src.auth.jwt import create_access_token, create_refresh_token
-from src.auth.mfa import MFAService
-from src.core.config import settings
+from src.schemas.user import (
+    UserLogin, Token, PasswordReset, PasswordResetConfirm, 
+    MessageResponse, UserResponse
+)
+from src.auth.jwt import create_access_token, create_refresh_token, verify_token
 from src.utils.password import generate_password_reset_token
-from src.utils.sessions import device_session_manager
+from src.core.config import settings
 
 
 class AuthService:
-    def __init__(self, user_service: UserService, session):
+    """Service for authentication operations with government-specific features."""
+    
+    def __init__(self, user_service: UserService, user_repo: UserRepository):
         self.user_service = user_service
-        self.session = session
-        self.mfa_service = MFAService(session)
-
-    async def login(self, login_data: UserLogin, request: Optional[Request] = None) -> Token:
-        """Login user and return tokens with security checks and MFA support."""
+        self.user_repo = user_repo
+    
+    async def login(self, login_data: UserLogin) -> Token:
+        """Login user with username and password."""
+        # Authenticate user
         user = await self.user_service.authenticate_user(
-            login_data.email, 
+            login_data.username,
             login_data.password
         )
         
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password",
+                detail="Incorrect username or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-
-        if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Inactive user"
-            )
-
-        # Check if user needs to change password
-        if user.force_password_change:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Password change required. Please change your password before logging in."
-            )
-
-        # Handle MFA verification if enabled
-        mfa_verified = True
-        requires_mfa = user.mfa_enabled
         
-        if user.mfa_enabled:
-            if not login_data.mfa_code:
-                # User has MFA enabled but didn't provide code
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="MFA code required. Please provide your TOTP code or backup code."
-                )
-            
-            # Verify MFA code
-            mfa_verified = await self.mfa_service.verify_mfa_code(user.id, login_data.mfa_code)
-            
-            if not mfa_verified:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid MFA code"
-                )
-
-        # Create token data with MFA verification status
-        token_data = {"sub": str(user.id)}
-        if user.mfa_enabled:
-            token_data["mfa_verified"] = mfa_verified
-
+        # Get user roles for token
+        user_roles = [role.role.name for role in user.roles]
+        
+        # Create token data
+        token_data = {
+            "sub": str(user.id),
+            "username": user.username,
+            "nama": user.nama,
+            "roles": user_roles,
+            "type": "access"
+        }
+        
+        refresh_token_data = {
+            "sub": str(user.id),
+            "type": "refresh"
+        }
+        
+        # Generate tokens
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
-            data=token_data, 
+            data=token_data,
             expires_delta=access_token_expires
         )
         
-        refresh_token = create_refresh_token(data=token_data)
-
-        # Create session with device tracking
-        session_info = None
-        if request:
-            user_agent = request.headers.get("user-agent", "unknown")
-            ip_address = self._get_client_ip(request)
-            
-            session_info = await device_session_manager.create_session(
-                user_id=user.id,
-                user_agent=user_agent,
-                ip_address=ip_address,
-                data={
-                    "login_time": datetime.utcnow().isoformat(),
-                    "mfa_verified": mfa_verified,
-                    "requires_mfa": requires_mfa
-                }
-            )
-
+        refresh_token = create_refresh_token(data=refresh_token_data)
+        
+        # Build user response
+        user_response = self.user_service._build_user_response(user)
+        
         return Token(
             access_token=access_token,
             refresh_token=refresh_token,
-            mfa_verified=mfa_verified,
-            requires_mfa=requires_mfa,
-            session_id=session_info["session_id"] if session_info else None,
-            device_fingerprint=session_info["device_fingerprint"] if session_info else None
+            token_type="bearer",
+            expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert to seconds
+            user=user_response
         )
-
-    async def request_password_reset(self, reset_data: PasswordReset) -> dict:
-        """Request password reset token."""
-        from src.repositories.user import UserRepository
-        from src.core.database import get_db
-        
-        # Get database session (this would be injected in real implementation)
-        async for session in get_db():
-            user_repo = UserRepository(session)
+    
+    async def refresh_token(self, refresh_token: str) -> Token:
+        """Refresh access token using refresh token."""
+        try:
+            # Verify refresh token
+            payload = verify_token(refresh_token)
             
-            user = await user_repo.get_by_email(reset_data.email)
-            if not user:
-                # Don't reveal if email exists or not
-                return {"message": "If the email exists, a reset link has been sent"}
-
-            # Generate reset token
-            token = generate_password_reset_token()
-            expires_at = datetime.utcnow() + timedelta(hours=1)  # 1 hour expiry
-            
-            # Save token to database
-            await user_repo.create_password_reset_token(user.id, token, expires_at)
-            
-            # TODO: Send email with reset link (Step 5 implementation)
-            # For now, we'll just return the token (remove this in production)
-            return {
-                "message": "Password reset token generated",
-                "token": token  # Remove this in production
-            }
-
-    async def confirm_password_reset(self, reset_data: PasswordResetConfirm) -> dict:
-        """Confirm password reset with token."""
-        from src.repositories.user import UserRepository
-        from src.core.database import get_db
-        from src.auth.jwt import get_password_hash
-        
-        # Get database session (this would be injected in real implementation)
-        async for session in get_db():
-            user_repo = UserRepository(session)
-            
-            # Get and validate token
-            reset_token = await user_repo.get_password_reset_token(reset_data.token)
-            if not reset_token or not reset_token.is_valid():
+            # Check token type
+            if payload.get("type") != "refresh":
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid or expired reset token"
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token type"
                 )
-
+            
+            user_id = payload.get("sub")
+            if not user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token payload"
+                )
+            
             # Get user
-            user = await user_repo.get_by_id(reset_token.user_id)
-            if not user:
+            user = await self.user_repo.get_by_id(user_id)
+            if not user or not user.is_active:
                 raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="User not found"
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User not found or inactive"
                 )
-
-            # Check password history
-            from src.utils.validators import validate_password_history
-            if not validate_password_history(reset_data.new_password, user.password_history):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot reuse any of your last 5 passwords"
-                )
-
-            # Update password
-            new_hashed_password = get_password_hash(reset_data.new_password)
-            await user_repo.update_password(user.id, new_hashed_password)
             
-            # Mark token as used
-            await user_repo.use_password_reset_token(reset_data.token)
+            # Get user roles
+            user_roles = [role.role.name for role in user.roles]
             
-            return {"message": "Password reset successful"}
+            # Create new access token
+            token_data = {
+                "sub": str(user.id),
+                "username": user.username,
+                "nama": user.nama,
+                "roles": user_roles,
+                "type": "access"
+            }
+            
+            access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            access_token = create_access_token(
+                data=token_data,
+                expires_delta=access_token_expires
+            )
+            
+            # Build user response
+            user_response = self.user_service._build_user_response(user)
+            
+            return Token(
+                access_token=access_token,
+                refresh_token=refresh_token,  # Keep the same refresh token
+                token_type="bearer",
+                expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                user=user_response
+            )
+            
+        except Exception as e:
+            if isinstance(e, HTTPException):
+                raise e
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token"
+            )
     
-    def _get_client_ip(self, request: Request) -> str:
-        """Extract client IP address from request."""
-        # Check for forwarded IP addresses (behind proxy/load balancer)
-        forwarded_for = request.headers.get("X-Forwarded-For")
-        if forwarded_for:
-            return forwarded_for.split(",")[0].strip()
+    async def request_password_reset(self, reset_data: PasswordReset) -> MessageResponse:
+        """Request password reset token - requires user to have email set."""
+        user = await self.user_repo.get_by_email(reset_data.email)
         
-        real_ip = request.headers.get("X-Real-IP")
-        if real_ip:
-            return real_ip
+        # Always return success message to prevent email enumeration
+        success_message = "If the email exists and is associated with an account, a password reset link has been sent"
         
-        # Fallback to direct client IP
-        return request.client.host if request.client else "unknown"
+        if not user or not user.is_active:
+            return MessageResponse(message=success_message)
+        
+        # Check if user has email set (should always be true if we found user by email)
+        if not user.has_email():
+            return MessageResponse(
+                message="User account does not have email configured. Please contact administrator."
+            )
+        
+        # Generate reset token
+        token = generate_password_reset_token()
+        expires_at = datetime.utcnow() + timedelta(hours=1)  # 1 hour expiry
+        
+        # Save token to database
+        await self.user_repo.create_password_reset_token(
+            user.id,
+            token,
+            expires_at
+        )
+        
+        # TODO: Send email with reset link
+        # For now, just log the token (remove in production)
+        print(f"Password reset token for {user.nama} ({user.email}): {token}")
+        print(f"Reset link: https://gov-app.pemda.go.id/reset-password?token={token}")
+        
+        return MessageResponse(message=success_message)
     
-    async def logout(self, session_id: str) -> dict:
-        """Logout user and invalidate session."""
-        success = await device_session_manager.delete_session(session_id)
-        if success:
-            return {"message": "Logged out successfully"}
-        return {"message": "Session not found or already expired"}
+    async def confirm_password_reset(self, reset_data: PasswordResetConfirm) -> MessageResponse:
+        """Confirm password reset with token."""
+        # Get and validate token
+        reset_token = await self.user_repo.get_password_reset_token(reset_data.token)
+        
+        if not reset_token or not reset_token.is_valid():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired reset token"
+            )
+        
+        # Get user
+        user = await self.user_repo.get_by_id(reset_token.user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Check if new password is different from current
+        from src.auth.jwt import verify_password, get_password_hash
+        if verify_password(reset_data.new_password, user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="New password must be different from current password"
+            )
+        
+        # Update password
+        new_hashed_password = get_password_hash(reset_data.new_password)
+        await self.user_repo.update_password(user.id, new_hashed_password)
+        
+        # Mark token as used
+        await self.user_repo.use_password_reset_token(reset_data.token)
+        
+        return MessageResponse(message="Password reset successful")
     
-    async def logout_all_devices(self, user_id: int) -> dict:
-        """Logout user from all devices."""
-        deleted_count = await device_session_manager.delete_user_sessions(user_id)
+    async def logout(self) -> MessageResponse:
+        """Logout user (simple version without session management)."""
+        # In a simple JWT implementation, logout is handled client-side
+        # by discarding the token. In more advanced implementations,
+        # you might want to blacklist the token.
+        return MessageResponse(message="Logged out successfully")
+    
+    async def get_current_user_info(self, user_id: str) -> UserResponse:
+        """Get current user information."""
+        user = await self.user_service.get_user(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        return user
+    
+    async def validate_user_access(self, user_id: str, required_roles: Optional[list] = None) -> bool:
+        """Validate if user has required access."""
+        user = await self.user_repo.get_by_id(user_id)
+        
+        if not user or not user.is_active:
+            return False
+        
+        if required_roles:
+            user_roles = [role.role.name for role in user.roles]
+            return any(role in user_roles for role in required_roles)
+        
+        return True
+    
+    async def check_password_reset_eligibility(self, user_id: str) -> dict:
+        """Check if user is eligible for password reset."""
+        user = await self.user_repo.get_by_id(user_id)
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        has_email = user.has_email()
+        
         return {
-            "message": f"Logged out from {deleted_count} devices successfully",
-            "sessions_terminated": deleted_count
+            "eligible": has_email,
+            "has_email": has_email,
+            "email": user.email if has_email else None,
+            "message": "User can request password reset" if has_email else "User must set email first before requesting password reset"
         }
     
-    async def revoke_session(self, session_id: str, reason: str = "manual_revocation") -> dict:
-        """Revoke a specific session."""
-        success = await device_session_manager.revoke_session(session_id, reason)
-        if success:
-            return {"message": "Session revoked successfully"}
-        return {"message": "Session not found or already revoked"}
+    async def get_default_password_info(self) -> dict:
+        """Get information about default password (for admin reference)."""
+        return {
+            "default_password": "@Kemendag123",
+            "description": "Default password for all new users",
+            "recommendation": "Users should change this password after first login",
+            "policy": "Password must be changed if user wants to use password reset feature"
+        }

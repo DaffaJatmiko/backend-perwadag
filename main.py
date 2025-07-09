@@ -1,4 +1,4 @@
-"""FastAPI application with authentication and session management."""
+"""FastAPI application for government project (simplified)."""
 
 import logging
 from contextlib import asynccontextmanager
@@ -7,13 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.core.config import settings
 from src.core.database import init_db
-from src.core.redis import init_redis, close_redis
 from src.api.router import api_router
 from src.middleware.error_handler import add_error_handlers
 from src.middleware.rate_limiting import add_rate_limiting
 from src.utils.logging import setup_logging
 
-# Setup logging
+# Setup logging first
 setup_logging()
 logger = logging.getLogger(__name__)
 
@@ -22,24 +21,30 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup
-    logger.info("🚀 Starting FastAPI application...")
+    logger.info("🚀 Starting Government Auth API...")
     
     # Initialize database
-    await init_db()
-    logger.info("✅ Database initialized")
+    try:
+        await init_db()
+        logger.info("✅ Database initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ Database initialization failed: {e}")
+        raise
     
-    # Initialize Redis
-    await init_redis()
-    logger.info("✅ Redis initialized")
+    # Log configuration
+    logger.info(f"📊 Configuration loaded:")
+    logger.info(f"   - Environment: {'Development' if settings.DEBUG else 'Production'}")
+    logger.info(f"   - Database: PostgreSQL")
+    logger.info(f"   - Rate Limiting: {settings.RATE_LIMIT_CALLS} calls/{settings.RATE_LIMIT_PERIOD}s")
+    logger.info(f"   - Auth Rate Limiting: {settings.AUTH_RATE_LIMIT_CALLS} calls/{settings.AUTH_RATE_LIMIT_PERIOD}s")
+    
+    logger.info("🎯 Government Auth API started successfully!")
     
     yield
     
     # Shutdown
-    logger.info("🛑 Shutting down FastAPI application...")
-    
-    # Close Redis connection
-    await close_redis()
-    logger.info("✅ Redis connection closed")
+    logger.info("🛑 Shutting down Government Auth API...")
+    logger.info("✅ Shutdown completed")
 
 
 def create_application() -> FastAPI:
@@ -47,13 +52,49 @@ def create_application() -> FastAPI:
     app = FastAPI(
         title=settings.PROJECT_NAME,
         version=settings.VERSION,
+        description="""
+        **Government Authentication API**
+        
+        A secure authentication system for government applications with:
+        
+        * **JWT-based authentication** with refresh tokens
+        * **Role-based access control (RBAC)** for different government units
+        * **User management** with government-specific fields (NIP, unit kerja, jabatan)
+        * **Password reset** functionality
+        * **Rate limiting** for security
+        * **Comprehensive validation** and error handling
+        
+        ## Default Roles
+        
+        * `admin` - System Administrator
+        * `inspektorat_1` to `inspektorat_4` - Inspektorat regional offices
+        * `perwadag` - Perdagangan department
+        * `bappeda` - Regional Planning Agency
+        * `dinas_kesehatan` - Health Department
+        * `dinas_pendidikan` - Education Department
+        * `dinas_sosial` - Social Affairs Department
+        
+        ## Authentication
+        
+        1. **Login**: POST `/api/v1/auth/login` with email/username and password
+        2. **Use Bearer token**: Include `Authorization: Bearer <token>` in headers
+        3. **Refresh token**: POST `/api/v1/auth/refresh` when token expires
+        
+        ## Access Levels
+        
+        * **Public**: Login, password reset
+        * **Authenticated**: View own profile, change password
+        * **Admin**: Full user and role management
+        * **Inspektorat**: View users and some management functions
+        """,
         debug=settings.DEBUG,
         lifespan=lifespan,
         docs_url="/docs" if settings.DEBUG else None,
         redoc_url="/redoc" if settings.DEBUG else None,
+        openapi_url="/openapi.json" if settings.DEBUG else None,
     )
 
-    # CORS middleware
+    # CORS middleware (configure appropriately for production)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS_LIST,
@@ -71,22 +112,51 @@ def create_application() -> FastAPI:
     # Include API router
     app.include_router(api_router, prefix=settings.API_V1_STR)
 
-    @app.get("/")
+    # Root endpoint
+    @app.get("/", tags=["System"])
     async def root():
-        """Root endpoint."""
+        """Root endpoint with API information."""
         return {
             "message": f"Welcome to {settings.PROJECT_NAME}",
             "version": settings.VERSION,
-            "docs": "/docs" if settings.DEBUG else "Documentation disabled in production"
+            "status": "operational",
+            "documentation": "/docs" if settings.DEBUG else "Documentation disabled in production",
+            "environment": "development" if settings.DEBUG else "production"
         }
 
-    @app.get("/health")
+    # Health check endpoint
+    @app.get("/health", tags=["System"])
     async def health_check():
-        """Health check endpoint."""
+        """Health check endpoint for monitoring."""
         return {
             "status": "healthy",
             "service": settings.PROJECT_NAME,
-            "version": settings.VERSION
+            "version": settings.VERSION,
+            "environment": "development" if settings.DEBUG else "production"
+        }
+
+    # API info endpoint
+    @app.get("/api/v1/info", tags=["System"])
+    async def api_info():
+        """API information and available endpoints."""
+        return {
+            "name": settings.PROJECT_NAME,
+            "version": settings.VERSION,
+            "description": "Government Authentication API",
+            "features": [
+                "JWT Authentication",
+                "Role-based Access Control",
+                "User Management",
+                "Password Reset",
+                "Rate Limiting",
+                "Government-specific Fields"
+            ],
+            "endpoints": {
+                "authentication": "/api/v1/auth/",
+                "user_management": "/api/v1/users/",
+                "role_management": "/api/v1/roles/"
+            },
+            "documentation": "/docs" if settings.DEBUG else None
         }
 
     return app
@@ -99,10 +169,12 @@ app = create_application()
 if __name__ == "__main__":
     import uvicorn
     
+    # Run with uvicorn
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=8000,
         reload=settings.DEBUG,
-        log_level="info"
+        log_level="info" if not settings.DEBUG else "debug",
+        access_log=True
     )

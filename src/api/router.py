@@ -1,13 +1,44 @@
-"""API router configuration."""
+"""API router configuration for government project."""
 
 from fastapi import APIRouter
 
-from src.api.endpoints import auth, users, mfa, files
+from src.api.endpoints import auth, users, roles
 
+# Create main API router
 api_router = APIRouter()
 
-# Include endpoint routers
-api_router.include_router(auth.router, prefix="/auth", tags=["authentication"])
-api_router.include_router(users.router, prefix="/users", tags=["users"])
-api_router.include_router(mfa.router, prefix="/mfa", tags=["multi-factor-authentication"])
-api_router.include_router(files.router, prefix="/files", tags=["files"])
+# Include endpoint routers with proper tags and descriptions
+api_router.include_router(
+    auth.router, 
+    prefix="/auth", 
+    tags=["Authentication"],
+    responses={
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden"},
+        422: {"description": "Validation Error"},
+    }
+)
+
+api_router.include_router(
+    users.router, 
+    prefix="/users", 
+    tags=["User Management"],
+    responses={
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden"},
+        404: {"description": "User not found"},
+        422: {"description": "Validation Error"},
+    }
+)
+
+api_router.include_router(
+    roles.router, 
+    prefix="/roles", 
+    tags=["Role Management"],
+    responses={
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden - Admin only"},
+        404: {"description": "Role not found"},
+        422: {"description": "Validation Error"},
+    }
+)
