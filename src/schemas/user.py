@@ -1,4 +1,4 @@
-"""User schemas final with clean filter schemas."""
+"""Complete user schemas - fixed and clean."""
 
 from typing import List, Optional
 from pydantic import BaseModel, EmailStr, ConfigDict, field_validator, Field
@@ -6,67 +6,40 @@ from datetime import datetime, date
 import re
 
 
-# Filter schemas (import from the filter module)
-from src.schemas.filters import UserFilterParams, UsernameGenerationPreview, UsernameGenerationResponse
+# ===== BASE SCHEMAS =====
 
-
-# Base schemas
 class UserBase(BaseModel):
     """Base user schema with common fields."""
-    full_name: str = Field(..., min_length=1, max_length=200, description="Nama lengkap tanpa gelar")
+    nama: str = Field(..., min_length=1, max_length=200, description="Nama lengkap tanpa gelar")
     tempat_lahir: str = Field(..., min_length=1, max_length=100)
     tanggal_lahir: date
     pangkat: str = Field(..., min_length=1, max_length=100)
     jabatan: str = Field(..., min_length=1, max_length=200)
     email: Optional[EmailStr] = Field(None, description="Email is optional")
     is_active: bool = True
-
-
-# Request schemas
-class UserCreate(UserBase):
-    """Schema for creating a user."""
-    role_names: List[str] = Field(..., min_items=1, description="List of role names to assign")
     
-    @field_validator('name')
+    @field_validator('nama')
     @classmethod
-    def validate_role_name(cls, name: str) -> str:
-        """Validate role name format."""
-        if not name.islower():
-            raise ValueError("Role name must be lowercase")
-        return name
-
-
-class RoleUpdate(BaseModel):
-    """Schema for updating a role."""
-    description: Optional[str] = Field(None, max_length=255)
-    is_active: Optional[bool] = None
-
-
-class RoleListResponse(BaseModel):
-    """Schema for role list response."""
-    roles: List[RoleResponse]
-    total: intfield_validator('full_name')
-    @classmethod
-    def validate_full_name(cls, full_name: str) -> str:
-        """Validate full name format."""
-        full_name = full_name.strip()
-        if not full_name:
-            raise ValueError("Full name cannot be empty")
+    def validate_nama(cls, nama: str) -> str:
+        """Validate nama format."""
+        nama = nama.strip()
+        if not nama:
+            raise ValueError("Nama cannot be empty")
         
         # Allow Indonesian names with common characters, no titles
-        if not re.match(r"^[a-zA-Z\s.,'-]+$", full_name):
-            raise ValueError("Full name can only contain letters, spaces, and common punctuation")
+        if not re.match(r"^[a-zA-Z\s.,'-]+$", nama):
+            raise ValueError("Nama can only contain letters, spaces, and common punctuation")
         
         # Check for titles that should be removed
         titles = ['dr.', 'dr', 'prof.', 'ir.', 'drs.', 'dra.', 's.pd', 's.kom', 's.si', 's.t', 's.h', 's.e']
-        words = full_name.lower().split()
+        words = nama.lower().split()
         
         for word in words:
             clean_word = word.replace('.', '')
             if clean_word in titles:
-                raise ValueError("Please remove titles/degrees from full name")
+                raise ValueError("Please remove titles/degrees from nama")
         
-        return full_name
+        return nama
     
     @field_validator('tempat_lahir')
     @classmethod
@@ -99,9 +72,16 @@ class RoleListResponse(BaseModel):
         return tanggal_lahir
 
 
+# ===== REQUEST SCHEMAS =====
+
+class UserCreate(UserBase):
+    """Schema for creating a user."""
+    role_names: List[str] = Field(..., min_items=1, description="List of role names to assign")
+
+
 class UserUpdate(BaseModel):
     """Schema for updating a user."""
-    full_name: Optional[str] = Field(None, min_length=1, max_length=200)
+    nama: Optional[str] = Field(None, min_length=1, max_length=200)
     tempat_lahir: Optional[str] = Field(None, min_length=1, max_length=100)
     tanggal_lahir: Optional[date] = None
     pangkat: Optional[str] = Field(None, min_length=1, max_length=100)
@@ -109,17 +89,17 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     is_active: Optional[bool] = None
     
-    @field_validator('full_name')
+    @field_validator('nama')
     @classmethod
-    def validate_full_name(cls, full_name: Optional[str]) -> Optional[str]:
-        """Validate full name if provided."""
-        if full_name is not None:
-            full_name = full_name.strip()
-            if not full_name:
-                raise ValueError("Full name cannot be empty")
-            if not re.match(r"^[a-zA-Z\s.,'-]+$", full_name):
-                raise ValueError("Full name can only contain letters, spaces, and common punctuation")
-        return full_name
+    def validate_nama(cls, nama: Optional[str]) -> Optional[str]:
+        """Validate nama if provided."""
+        if nama is not None:
+            nama = nama.strip()
+            if not nama:
+                raise ValueError("Nama cannot be empty")
+            if not re.match(r"^[a-zA-Z\s.,'-]+$", nama):
+                raise ValueError("Nama can only contain letters, spaces, and common punctuation")
+        return nama
     
     @field_validator('tanggal_lahir')
     @classmethod
@@ -161,7 +141,8 @@ class UserChangePassword(BaseModel):
         return password
 
 
-# Response schemas
+# ===== RESPONSE SCHEMAS =====
+
 class RoleResponse(BaseModel):
     """Schema for role response."""
     id: str
@@ -177,7 +158,6 @@ class UserResponse(UserBase):
     id: str
     username: str
     display_name: str
-    first_name: str
     age: int
     has_email: bool
     last_login: Optional[datetime] = None
@@ -210,7 +190,7 @@ class UserListResponse(BaseModel):
 class UserSummary(BaseModel):
     """Schema for user summary (lighter response)."""
     id: str
-    full_name: str
+    nama: str
     username: str
     pangkat: str
     jabatan: str
@@ -221,7 +201,8 @@ class UserSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# Auth schemas
+# ===== AUTH SCHEMAS =====
+
 class UserLogin(BaseModel):
     """Schema for user login."""
     username: str = Field(..., description="Username for login (format: nama_depan + ddmmyyyy)")
@@ -261,7 +242,8 @@ class PasswordResetConfirm(BaseModel):
         return password
 
 
-# Common response schemas
+# ===== COMMON RESPONSE SCHEMAS =====
+
 class MessageResponse(BaseModel):
     """Standard message response."""
     message: str
@@ -273,18 +255,21 @@ class ErrorResponse(BaseModel):
     detail: str
     error_code: Optional[str] = None
 
-# Role schemas
+
+# ===== ROLE SCHEMAS =====
+
 class RoleCreate(BaseModel):
     """Schema for creating a role."""
-    name: str = Field(..., min_length=1, max_length=50, pattern="^[a-z_]+$")
+    name: str = Field(..., min_length=1, max_length=50)
     description: Optional[str] = Field(None, max_length=255)
     
     @field_validator('name')
     @classmethod
     def validate_role_name(cls, name: str) -> str:
         """Validate role name format."""
-        if not name.islower():
-            raise ValueError("Role name must be lowercase")
+        name = name.lower().strip()
+        if not re.match(r"^[a-z_]+$", name):
+            raise ValueError("Role name must be lowercase letters and underscores only")
         return name
 
 
@@ -298,12 +283,3 @@ class RoleListResponse(BaseModel):
     """Schema for role list response."""
     roles: List[RoleResponse]
     total: int
-
-
-# Username generation response
-class UsernameGenerationResponse(BaseModel):
-    """Schema for username generation preview."""
-    original_nama: str
-    generated_username: str
-    is_available: bool
-    suggested_alternatives: List[str] = []

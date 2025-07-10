@@ -64,7 +64,7 @@ class AuthService:
         refresh_token = create_refresh_token(data=refresh_token_data)
         
         # Build user response
-        user_response = self.user_service._build_user_response(user)
+        user_response = self.user_service._model_to_response(user)
         
         return Token(
             access_token=access_token,
@@ -121,7 +121,7 @@ class AuthService:
             )
             
             # Build user response
-            user_response = self.user_service._build_user_response(user)
+            user_response = self.user_service._model_to_response(user)
             
             return Token(
                 access_token=access_token,

@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from src.api.endpoints import auth, users, roles
+from src.api.endpoints import auth, users, role
 
 # Create main API router
 api_router = APIRouter()
@@ -32,7 +32,7 @@ api_router.include_router(
 )
 
 api_router.include_router(
-    roles.router, 
+    role.router, 
     prefix="/roles", 
     tags=["Role Management"],
     responses={

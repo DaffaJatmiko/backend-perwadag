@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from src.models.user import Role, UserRole
 from src.schemas.user import RoleCreate, RoleUpdate
+from src.schemas.filters import RoleFilterParams
 
 
 class RoleRepository:
@@ -45,6 +46,40 @@ class RoleRepository:
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
     
+    async def get_all_roles_filtered(self, filters: RoleFilterParams) -> Tuple[List[Role], int]:
+        """Get all roles dengan filter schema (method yang missing!)."""
+        
+        # Build base query
+        query = select(Role).where(Role.deleted_at.is_(None))
+        
+        # Apply filters
+        if filters.is_active is not None:
+            query = query.where(Role.is_active == filters.is_active)
+        
+        if filters.search:
+            search_term = f"%{filters.search}%"
+            query = query.where(
+                or_(
+                    Role.name.ilike(search_term),
+                    Role.description.ilike(search_term)
+                )
+            )
+        
+        # Get total count
+        count_query = select(func.count()).select_from(query.subquery())
+        total_result = await self.session.execute(count_query)
+        total = total_result.scalar()
+        
+        # Apply pagination
+        offset = (filters.page - 1) * filters.size
+        query = query.offset(offset).limit(filters.size).order_by(Role.name)
+        
+        # Execute query
+        result = await self.session.execute(query)
+        roles = result.scalars().all()
+        
+        return list(roles), total 
+
     async def get_all_roles(
         self, 
         page: int = 1, 

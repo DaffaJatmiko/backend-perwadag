@@ -82,17 +82,17 @@ async def logout(
     return await auth_service.logout()
 
 
-@router.get("/me", response_model=UserResponse, summary="Get current user info")
-async def get_current_user_info(
-    current_user: dict = Depends(get_current_active_user),
-    auth_service: AuthService = Depends(get_auth_service)
-):
-    """
-    Get current authenticated user information.
+# @router.get("/me", response_model=UserResponse, summary="Get current user info")
+# async def get_current_user_info(
+#     current_user: dict = Depends(get_current_active_user),
+#     auth_service: AuthService = Depends(get_auth_service)
+# ):
+#     """
+#     Get current authenticated user information.
     
-    Returns detailed user profile including roles.
-    """
-    return await auth_service.get_current_user_info(current_user["id"])
+#     Returns detailed user profile including roles.
+#     """
+#     return await auth_service.get_current_user_info(current_user["id"])
 
 
 @router.get("/password-reset-eligibility", summary="Check password reset eligibility")

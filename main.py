@@ -103,8 +103,8 @@ def create_application() -> FastAPI:
         allow_headers=settings.CORS_HEADERS_LIST,
     )
 
-    # Add rate limiting middleware
-    add_rate_limiting(app)
+    # # Add rate limiting middleware
+    # add_rate_limiting(app)
 
     # Add error handlers
     add_error_handlers(app)

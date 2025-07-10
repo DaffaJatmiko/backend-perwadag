@@ -9,7 +9,7 @@ from .base import BaseModel
 
 
 class User(BaseModel, SQLModel, table=True):
-    """User model for government employees (simplified)."""
+    """User model with dedicated username column."""
     
     __tablename__ = "users"
     
@@ -20,7 +20,8 @@ class User(BaseModel, SQLModel, table=True):
     )
     
     # Personal Information
-    nama: str = Field(max_length=200, index=True, description="Nama lengkap (sekaligus username)")
+    nama: str = Field(max_length=200, index=True, description="Nama lengkap")
+    username: str = Field(max_length=50, unique=True, index=True, description="Auto-generated username untuk login")
     tempat_lahir: str = Field(max_length=100)
     tanggal_lahir: date
     
@@ -37,16 +38,14 @@ class User(BaseModel, SQLModel, table=True):
     last_login: Optional[datetime] = Field(default=None)
     
     # Relationships
-    roles: List["UserRole"] = Relationship(back_populates="user")
-    
-    @property
-    def username(self) -> str:
-        """Username is the same as nama."""
-        return self.nama
+    roles: List["UserRole"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"foreign_keys": "[UserRole.user_id]"}
+    )
     
     @property
     def display_name(self) -> str:
-        """Display name is the same as nama."""
+        """Display name adalah nama lengkap."""
         return self.nama
     
     @property
@@ -62,7 +61,7 @@ class User(BaseModel, SQLModel, table=True):
         return self.email is not None and self.email.strip() != ""
     
     def __repr__(self) -> str:
-        return f"<User(id={self.id}, nama={self.nama})>"
+        return f"<User(id={self.id}, username={self.username}, nama={self.nama})>"
 
 
 class Role(BaseModel, SQLModel, table=True):
@@ -99,14 +98,24 @@ class UserRole(BaseModel, SQLModel, table=True):
     user_id: str = Field(foreign_key="users.id", index=True, max_length=36)
     role_id: str = Field(foreign_key="roles.id", index=True, max_length=36)
     
-    # Optional: Add role assignment metadata
     assigned_by: Optional[str] = Field(default=None, foreign_key="users.id", max_length=36)
     assigned_at: datetime = Field(default_factory=datetime.utcnow)
     
-    # Relationships
-    user: User = Relationship(back_populates="roles")
-    role: Role = Relationship(back_populates="users")
+    # --- FIXED RELATIONSHIPS ---
+    # This relationship connects to the user getting the role
+    user: "User" = Relationship(
+        back_populates="roles",
+        sa_relationship_kwargs={"foreign_keys": "[UserRole.user_id]"}
+    )
     
+    # This relationship connects to the role being assigned
+    role: "Role" = Relationship(back_populates="users")
+    
+    # This NEW relationship connects to the user who assigned the role
+    assigner: Optional["User"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[UserRole.assigned_by]"}
+    )
+
     def __repr__(self) -> str:
         return f"<UserRole(user_id={self.user_id}, role_id={self.role_id})>"
 
