@@ -16,17 +16,18 @@ from src.core.config import settings
 
 
 class AuthService:
-    """Service for authentication operations with government-specific features."""
+    """Service for authentication operations - simplified."""
     
     def __init__(self, user_service: UserService, user_repo: UserRepository):
         self.user_service = user_service
         self.user_repo = user_repo
+        # No more role_repo needed!
     
     async def login(self, login_data: UserLogin) -> Token:
-        """Login user with username and password."""
+        """Login user with simplified role handling."""
         # Authenticate user
         user = await self.user_service.authenticate_user(
-            login_data.username,
+            login_data.username,  # atau login_data.nama jika schema pakai nama
             login_data.password
         )
         
@@ -37,15 +38,12 @@ class AuthService:
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        # Get user roles for token
-        user_roles = [role.role.name for role in user.roles]
-        
-        # Create token data
+        # Create token data dengan single role (SIMPLIFIED!)
         token_data = {
             "sub": str(user.id),
             "username": user.username,
             "nama": user.nama,
-            "roles": user_roles,
+            "role": user.role.value,  # Single role instead of array
             "type": "access"
         }
         
@@ -54,23 +52,30 @@ class AuthService:
             "type": "refresh"
         }
         
-        # Generate tokens
+        # ✅ CREATE TOKENS (match your existing JWT functions)
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
             data=token_data,
             expires_delta=access_token_expires
         )
         
+        # ✅ Call refresh token WITHOUT expires_delta (match your JWT function signature)
         refresh_token = create_refresh_token(data=refresh_token_data)
         
-        # Build user response
-        user_response = self.user_service._model_to_response(user)
+        # ✅ BUILD USER RESPONSE
+        # Check if method exists, otherwise use alternative
+        try:
+            user_response = self.user_service._model_to_response(user)
+        except AttributeError:
+            # Fallback to direct conversion
+            user_response = UserResponse.from_user_model(user)
         
+        # ✅ RETURN TOKEN RESPONSE
         return Token(
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
-            expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert to seconds
+            expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             user=user_response
         )
     

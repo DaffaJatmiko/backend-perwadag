@@ -1,19 +1,19 @@
-"""Clean User Repository - Final version dengan username column dan filter schema."""
+"""Simplified User Repository tanpa Role tables."""
 
 from typing import List, Optional, Tuple
 from datetime import datetime, date
 from sqlalchemy import select, and_, or_, func, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from src.models.user import User, Role, UserRole, PasswordResetToken
+from src.models.user import User, PasswordResetToken
+from src.models.enums import UserRole
 from src.schemas.user import UserCreate, UserUpdate
 from src.schemas.filters import UserFilterParams
 from src.auth.jwt import get_password_hash
 
 
 class UserRepository:
-    """Clean user repository dengan proper schema usage dan username column."""
+    """Simplified user repository dengan single table."""
     
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -21,63 +21,51 @@ class UserRepository:
     # ===== USER CRUD OPERATIONS =====
     
     async def create(self, user_data: UserCreate, username: str) -> User:
-        """Create user dengan username yang sudah di-generate."""
+        """Create user dengan single table approach."""
         # Default password untuk semua user
         default_password = "@Kemendag123"
         hashed_password = get_password_hash(default_password)
         
-        # Create user instance dengan username
+        # Create user instance
         user = User(
             nama=user_data.nama,
-            username=username,  # Simpan username yang sudah di-generate
+            username=username,
             tempat_lahir=user_data.tempat_lahir,
             tanggal_lahir=user_data.tanggal_lahir,
             pangkat=user_data.pangkat,
             jabatan=user_data.jabatan,
             hashed_password=hashed_password,
-            email=user_data.email,  # Optional
-            is_active=user_data.is_active
+            email=user_data.email,
+            is_active=user_data.is_active,
+            role=user_data.role,  # ENUM field
+            inspektorat=user_data.inspektorat  # For perwadag
         )
         
         self.session.add(user)
-        await self.session.flush()  # Get user ID
-        
-        # Assign roles
-        if user_data.role_names:
-            await self._assign_roles_to_user(user.id, user_data.role_names)
-        
         await self.session.commit()
         await self.session.refresh(user)
-        
-        # Return user dengan roles loaded
-        return await self.get_by_id(user.id)
+        return user
     
     async def get_by_id(self, user_id: str) -> Optional[User]:
-        """Get user by UUID dengan roles."""
-        query = (
-            select(User)
-            .options(selectinload(User.roles).selectinload(UserRole.role))
-            .where(and_(User.id == user_id, User.deleted_at.is_(None)))
+        """Get user by UUID."""
+        query = select(User).where(
+            and_(User.id == user_id, User.deleted_at.is_(None))
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
     
     async def get_by_username(self, username: str) -> Optional[User]:
-        """Get user by username (untuk login) dengan roles."""
-        query = (
-            select(User)
-            .options(selectinload(User.roles).selectinload(UserRole.role))
-            .where(and_(User.username == username, User.deleted_at.is_(None)))
+        """Get user by username (untuk login)."""
+        query = select(User).where(
+            and_(User.username == username, User.deleted_at.is_(None))
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
     
     async def get_by_email(self, email: str) -> Optional[User]:
-        """Get user by email dengan roles."""
-        query = (
-            select(User)
-            .options(selectinload(User.roles).selectinload(UserRole.role))
-            .where(and_(User.email == email.lower(), User.deleted_at.is_(None)))
+        """Get user by email."""
+        query = select(User).where(
+            and_(User.email == email.lower(), User.deleted_at.is_(None))
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
@@ -99,8 +87,7 @@ class UserRepository:
         user.updated_at = datetime.utcnow()
         await self.session.commit()
         await self.session.refresh(user)
-        
-        return await self.get_by_id(user_id)
+        return user
     
     async def update_password(self, user_id: str, new_hashed_password: str) -> bool:
         """Update user password."""
@@ -140,17 +127,13 @@ class UserRepository:
         await self.session.commit()
         return user
     
-    # ===== USER LISTING WITH CLEAN FILTER SCHEMA =====
+    # ===== USER LISTING WITH SIMPLIFIED FILTERS =====
     
     async def get_all_users_filtered(self, filters: UserFilterParams) -> Tuple[List[User], int]:
-        """Get users dengan clean filter schema - lebih readable dan maintainable."""
+        """Get users dengan simplified filter (tanpa join ke role table)."""
         
         # Build base query
-        query = (
-            select(User)
-            .options(selectinload(User.roles).selectinload(UserRole.role))
-            .where(User.deleted_at.is_(None))
-        )
+        query = select(User).where(User.deleted_at.is_(None))
         
         # Apply search filter
         if filters.search:
@@ -158,11 +141,12 @@ class UserRepository:
             query = query.where(
                 or_(
                     User.nama.ilike(search_term),
-                    User.username.ilike(search_term),  # Include username dalam search
+                    User.username.ilike(search_term),
                     User.tempat_lahir.ilike(search_term),
                     User.pangkat.ilike(search_term),
                     User.jabatan.ilike(search_term),
-                    User.email.ilike(search_term) if filters.search else False
+                    User.email.ilike(search_term) if filters.search else False,
+                    User.inspektorat.ilike(search_term) if filters.search else False
                 )
             )
         
@@ -179,37 +163,34 @@ class UserRepository:
         if filters.tempat_lahir:
             query = query.where(User.tempat_lahir.ilike(f"%{filters.tempat_lahir}%"))
         
-        # Email filter (has_email true/false)
+        # Role filter (ENUM field - MUCH SIMPLER!)
+        if filters.role:
+            query = query.where(User.role == filters.role)
+        
+        # Inspektorat filter (for perwadag)
+        if filters.inspektorat:
+            query = query.where(User.inspektorat.ilike(f"%{filters.inspektorat}%"))
+        
+        # Email filter
         if filters.has_email is not None:
             if filters.has_email:
                 query = query.where(and_(User.email.is_not(None), User.email != ""))
             else:
                 query = query.where(or_(User.email.is_(None), User.email == ""))
         
-        # Age filters (calculate from tanggal_lahir)
+        # Age filters
         if filters.min_age or filters.max_age:
             today = date.today()
             
             if filters.min_age:
-                # Max birth date untuk min age
                 max_birth_date = date(today.year - filters.min_age, today.month, today.day)
                 query = query.where(User.tanggal_lahir <= max_birth_date)
             
             if filters.max_age:
-                # Min birth date untuk max age
                 min_birth_date = date(today.year - filters.max_age, today.month, today.day)
                 query = query.where(User.tanggal_lahir >= min_birth_date)
         
-        # Role filter (requires join)
-        if filters.role_name:
-            query = (
-                query
-                .join(UserRole, User.id == UserRole.user_id)
-                .join(Role, UserRole.role_id == Role.id)
-                .where(Role.name == filters.role_name)
-            )
-        
-        # Get total count before pagination
+        # Get total count
         count_query = select(func.count()).select_from(query.subquery())
         total_result = await self.session.execute(count_query)
         total = total_result.scalar()
@@ -224,22 +205,16 @@ class UserRepository:
         
         return list(users), total
     
-    async def get_users_by_role(self, role_name: str) -> List[User]:
+    async def get_users_by_role(self, role: UserRole) -> List[User]:
         """Get all active users dengan specific role."""
-        query = (
-            select(User)
-            .options(selectinload(User.roles).selectinload(UserRole.role))
-            .join(UserRole, User.id == UserRole.user_id)
-            .join(Role, UserRole.role_id == Role.id)
-            .where(
-                and_(
-                    Role.name == role_name,
-                    User.deleted_at.is_(None),
-                    User.is_active == True
-                )
+        query = select(User).where(
+            and_(
+                User.role == role,
+                User.deleted_at.is_(None),
+                User.is_active == True
             )
-            .order_by(User.nama)
-        )
+        ).order_by(User.nama)
+        
         result = await self.session.execute(query)
         return list(result.scalars().all())
     
@@ -277,46 +252,6 @@ class UserRepository:
         
         result = await self.session.execute(query)
         return result.scalar_one_or_none() is not None
-    
-    # ===== ROLE MANAGEMENT =====
-    
-    async def _assign_roles_to_user(self, user_id: str, role_names: List[str]) -> None:
-        """Assign roles to user (private helper method)."""
-        # Get role IDs
-        query = select(Role.id, Role.name).where(Role.name.in_(role_names))
-        result = await self.session.execute(query)
-        roles = result.all()
-        
-        # Create user-role associations
-        for role_id, role_name in roles:
-            user_role = UserRole(
-                user_id=user_id,
-                role_id=role_id,
-                assigned_at=datetime.utcnow()
-            )
-            self.session.add(user_role)
-    
-    async def update_user_roles(self, user_id: str, role_names: List[str]) -> bool:
-        """Update user roles (replace existing)."""
-        # Remove existing roles
-        delete_query = delete(UserRole).where(UserRole.user_id == user_id)
-        await self.session.execute(delete_query)
-        
-        # Assign new roles
-        await self._assign_roles_to_user(user_id, role_names)
-        await self.session.commit()
-        return True
-    
-    async def get_user_roles(self, user_id: str) -> List[Role]:
-        """Get user's roles."""
-        query = (
-            select(Role)
-            .join(UserRole, Role.id == UserRole.role_id)
-            .where(UserRole.user_id == user_id)
-            .order_by(Role.name)
-        )
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
     
     # ===== PASSWORD RESET TOKEN MANAGEMENT =====
     
@@ -374,13 +309,6 @@ class UserRepository:
         total_active_result = await self.session.execute(total_active_query)
         total_active = total_active_result.scalar() or 0
         
-        # Total inactive users
-        total_inactive_query = select(func.count(User.id)).where(
-            and_(User.deleted_at.is_(None), User.is_active == False)
-        )
-        total_inactive_result = await self.session.execute(total_inactive_query)
-        total_inactive = total_inactive_result.scalar() or 0
-        
         # Users with email
         users_with_email_query = select(func.count(User.id)).where(
             and_(
@@ -393,30 +321,25 @@ class UserRepository:
         users_with_email_result = await self.session.execute(users_with_email_query)
         users_with_email = users_with_email_result.scalar() or 0
         
-        # Email completion rate
-        email_completion_rate = (users_with_email / total_active * 100) if total_active > 0 else 0
-        
-        # Users by role (top 5)
+        # Users by role (MUCH SIMPLER - no joins!)
         users_by_role_query = (
-            select(Role.name, func.count(UserRole.user_id).label('user_count'))
-            .select_from(Role)
-            .join(UserRole, Role.id == UserRole.role_id)
-            .join(User, UserRole.user_id == User.id)
+            select(User.role, func.count(User.id).label('user_count'))
             .where(and_(User.deleted_at.is_(None), User.is_active == True))
-            .group_by(Role.name)
-            .order_by(func.count(UserRole.user_id).desc())
-            .limit(5)
+            .group_by(User.role)
+            .order_by(func.count(User.id).desc())
         )
         users_by_role_result = await self.session.execute(users_by_role_query)
         users_by_role = [
-            {"role": row.name, "count": row.user_count} 
+            {"role": row.role.value, "count": row.user_count} 
             for row in users_by_role_result.all()
         ]
         
+        # Email completion rate
+        email_completion_rate = (users_with_email / total_active * 100) if total_active > 0 else 0
+        
         return {
             "total_active_users": total_active,
-            "total_inactive_users": total_inactive,
-            "total_users": total_active + total_inactive,
+            "total_users": total_active,
             "users_with_email": users_with_email,
             "users_without_email": total_active - users_with_email,
             "email_completion_rate": round(email_completion_rate, 2),

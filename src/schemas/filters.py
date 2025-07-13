@@ -1,21 +1,24 @@
-"""Complete filter schemas for clean query parameters."""
+"""Updated filter schemas untuk simplified role system."""
 
 from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
 
+from src.models.enums import UserRole
+
 
 class UserFilterParams(BaseModel):
-    """Schema for user filtering parameters."""
+    """Schema for user filtering parameters - updated untuk enum role."""
     
     # Pagination
     page: int = Field(1, ge=1, description="Page number")
     size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
     
     # Search
-    search: Optional[str] = Field(None, description="Search by nama, username, tempat lahir, pangkat, jabatan, email")
+    search: Optional[str] = Field(None, description="Search by nama, username, tempat lahir, pangkat, jabatan, email, inspektorat")
     
-    # Filters
-    role_name: Optional[str] = Field(None, description="Filter by role name")
+    # Filters - UPDATED: role sekarang ENUM bukan string
+    role: Optional[UserRole] = Field(None, description="Filter by role: admin, inspektorat, atau perwadag")
+    inspektorat: Optional[str] = Field(None, description="Filter by inspektorat (untuk perwadag)")
     pangkat: Optional[str] = Field(None, description="Filter by pangkat")
     jabatan: Optional[str] = Field(None, description="Filter by jabatan")
     tempat_lahir: Optional[str] = Field(None, description="Filter by tempat lahir")
@@ -36,47 +39,17 @@ class UserFilterParams(BaseModel):
             search = search.strip()
             if not search:
                 return None
-            # Limit search length for performance
             if len(search) > 100:
                 raise ValueError("Search term too long (max 100 characters)")
-        return search
-    
-    @field_validator('min_age', 'max_age')
-    @classmethod
-    def validate_age_range(cls, age: Optional[int]) -> Optional[int]:
-        """Validate age range."""
-        if age is not None:
-            if age < 17 or age > 70:
-                raise ValueError("Age must be between 17 and 70")
-        return age
-
-
-class RoleFilterParams(BaseModel):
-    """Schema for role filtering parameters."""
-    
-    page: int = Field(1, ge=1, description="Page number")
-    size: int = Field(50, ge=1, le=100, description="Page size (max 100)")
-    is_active: Optional[bool] = Field(None, description="Filter by active status")
-    search: Optional[str] = Field(None, description="Search by role name or description")
-    
-    @field_validator('search')
-    @classmethod
-    def validate_search(cls, search: Optional[str]) -> Optional[str]:
-        """Validate and clean search term."""
-        if search is not None:
-            search = search.strip()
-            if not search:
-                return None
-            if len(search) > 50:
-                raise ValueError("Search term too long (max 50 characters)")
         return search
 
 
 class UsernameGenerationPreview(BaseModel):
     """Schema for username generation preview."""
     
-    nama: str = Field(..., min_length=1, max_length=200, description="Full name")
+    nama: str = Field(..., min_length=1, max_length=200, description="Full name atau nama perwadag")
     tanggal_lahir: str = Field(..., description="Birth date in YYYY-MM-DD format")
+    role: UserRole = Field(..., description="Role untuk menentukan format username")
     
     @field_validator('nama')
     @classmethod
@@ -93,6 +66,7 @@ class UsernameGenerationResponse(BaseModel):
     
     original_nama: str
     tanggal_lahir: str
+    role: UserRole
     generated_username: str
     is_available: bool
     suggested_alternatives: List[str] = []
@@ -102,6 +76,7 @@ class UsernameGenerationResponse(BaseModel):
             "example": {
                 "original_nama": "Daffa Jatmiko",
                 "tanggal_lahir": "2003-08-01",
+                "role": "inspektorat",
                 "generated_username": "daffa01082003",
                 "is_available": True,
                 "suggested_alternatives": []

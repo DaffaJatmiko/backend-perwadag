@@ -1,15 +1,17 @@
-"""Simplified User model - nama as username."""
+"""Simplified User model sesuai ERD - tanpa Role tables."""
 
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime, date
-from sqlmodel import Field, SQLModel, Relationship
+from sqlmodel import Field, SQLModel, Column
+from sqlalchemy import Enum as SQLEnum
 import uuid as uuid_lib
 
 from .base import BaseModel
+from .enums import UserRole
 
 
 class User(BaseModel, SQLModel, table=True):
-    """User model with dedicated username column."""
+    """User model yang disederhanakan sesuai ERD."""
     
     __tablename__ = "users"
     
@@ -20,27 +22,34 @@ class User(BaseModel, SQLModel, table=True):
     )
     
     # Personal Information
-    nama: str = Field(max_length=200, index=True, description="Nama lengkap")
-    username: str = Field(max_length=50, unique=True, index=True, description="Auto-generated username untuk login")
+    nama: str = Field(max_length=200, index=True, description="Nama lengkap atau nama perwadag")
+    username: str = Field(max_length=50, unique=True, index=True, description="Auto-generated username")
     tempat_lahir: str = Field(max_length=100)
     tanggal_lahir: date
     
     # Government Position
-    pangkat: str = Field(max_length=100)
-    jabatan: str = Field(max_length=200)
+    pangkat: str = Field(max_length=100, description="Pangkat/golongan pegawai")
+    jabatan: str = Field(max_length=200, description="Jabatan/posisi pegawai")
     
     # Authentication
-    hashed_password: str
+    hashed_password: str = Field(description="Password yang sudah di-hash")
     email: Optional[str] = Field(default=None, unique=True, index=True, max_length=255)
     
     # Status
     is_active: bool = Field(default=True)
     last_login: Optional[datetime] = Field(default=None)
     
-    # Relationships
-    roles: List["UserRole"] = Relationship(
-        back_populates="user",
-        sa_relationship_kwargs={"foreign_keys": "[UserRole.user_id]"}
+    # Role - ENUM FIELD (MAJOR CHANGE!)
+    role: UserRole = Field(
+        sa_column=Column(SQLEnum(UserRole), nullable=False, index=True),
+        description="Role pengguna: admin, inspektorat, atau perwadag"
+    )
+    
+    # Inspektorat Assignment (KHUSUS UNTUK PERWADAG)
+    inspektorat: Optional[str] = Field(
+        default=None, 
+        max_length=100,
+        description="Wajib diisi untuk role perwadag. Menentukan wilayah kerja inspektorat"
     )
     
     @property
@@ -60,68 +69,33 @@ class User(BaseModel, SQLModel, table=True):
         """Check if user has email set."""
         return self.email is not None and self.email.strip() != ""
     
+    def is_admin(self) -> bool:
+        """Check if user is admin."""
+        return self.role == UserRole.ADMIN
+    
+    def is_inspektorat(self) -> bool:
+        """Check if user is inspektorat."""
+        return self.role == UserRole.INSPEKTORAT
+    
+    def is_perwadag(self) -> bool:
+        """Check if user is perwadag."""
+        return self.role == UserRole.PERWADAG
+    
+    def get_role_display(self) -> str:
+        """Get role display name."""
+        role_display = {
+            UserRole.ADMIN: "Administrator",
+            UserRole.INSPEKTORAT: "Inspektorat",
+            UserRole.PERWADAG: "Perwakilan Dagang"
+        }
+        return role_display.get(self.role, self.role.value)
+    
     def __repr__(self) -> str:
-        return f"<User(id={self.id}, username={self.username}, nama={self.nama})>"
-
-
-class Role(BaseModel, SQLModel, table=True):
-    """Role model for RBAC."""
-    
-    __tablename__ = "roles"
-    
-    id: str = Field(
-        default_factory=lambda: str(uuid_lib.uuid4()),
-        primary_key=True,
-        max_length=36
-    )
-    name: str = Field(unique=True, index=True, max_length=50)
-    description: Optional[str] = Field(default=None, max_length=255)
-    is_active: bool = Field(default=True)
-    
-    # Relationships
-    users: List["UserRole"] = Relationship(back_populates="role")
-    
-    def __repr__(self) -> str:
-        return f"<Role(id={self.id}, name={self.name})>"
-
-
-class UserRole(BaseModel, SQLModel, table=True):
-    """User-Role association model."""
-    
-    __tablename__ = "user_roles"
-    
-    id: str = Field(
-        default_factory=lambda: str(uuid_lib.uuid4()),
-        primary_key=True,
-        max_length=36
-    )
-    user_id: str = Field(foreign_key="users.id", index=True, max_length=36)
-    role_id: str = Field(foreign_key="roles.id", index=True, max_length=36)
-    
-    assigned_by: Optional[str] = Field(default=None, foreign_key="users.id", max_length=36)
-    assigned_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    # --- FIXED RELATIONSHIPS ---
-    # This relationship connects to the user getting the role
-    user: "User" = Relationship(
-        back_populates="roles",
-        sa_relationship_kwargs={"foreign_keys": "[UserRole.user_id]"}
-    )
-    
-    # This relationship connects to the role being assigned
-    role: "Role" = Relationship(back_populates="users")
-    
-    # This NEW relationship connects to the user who assigned the role
-    assigner: Optional["User"] = Relationship(
-        sa_relationship_kwargs={"foreign_keys": "[UserRole.assigned_by]"}
-    )
-
-    def __repr__(self) -> str:
-        return f"<UserRole(user_id={self.user_id}, role_id={self.role_id})>"
+        return f"<User(id={self.id}, username={self.username}, nama={self.nama}, role={self.role.value})>"
 
 
 class PasswordResetToken(BaseModel, SQLModel, table=True):
-    """Password reset token model."""
+    """Password reset token model - tidak berubah."""
     
     __tablename__ = "password_reset_tokens"
     

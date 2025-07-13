@@ -44,7 +44,7 @@ def normalize_name(nama: str) -> str:
 
 def generate_username_from_name_and_date(nama: str, tanggal_lahir: date) -> str:
     """
-    Generate username from nama depan + ddmmyyyy.
+    Generate username from nama depan + ddmmyyyy (untuk admin & inspektorat).
     
     Format: {nama_depan}{dd}{mm}{yyyy}
     Example: "Daffa Jatmiko" + 01-08-2003 = "daffa01082003"
@@ -66,6 +66,36 @@ def generate_username_from_name_and_date(nama: str, tanggal_lahir: date) -> str:
     
     return username
 
+def generate_perwadag_username(nama: str) -> str:
+    """
+    Generate username untuk perwadag dari nama.
+    
+    Examples:
+    - "ITPC Lagos – Nigeria" → "itpc_lagos"
+    - "Atdag Moscow – Rusia" → "atdag_moscow"
+    - "KJRI Kuching" → "kjri_kuching"
+    """
+    # Remove unicode and normalize
+    nama = unicodedata.normalize('NFD', nama)
+    nama = ''.join(c for c in nama if unicodedata.category(c) != 'Mn')
+    
+    # Convert to lowercase
+    nama = nama.lower()
+    
+    # Split by common separators and take first two meaningful parts
+    parts = re.split(r'[–—\-\s]+', nama)
+    meaningful_parts = [part.strip() for part in parts if part.strip() and len(part.strip()) > 1]
+    
+    if len(meaningful_parts) >= 2:
+        username = f"{meaningful_parts[0]}_{meaningful_parts[1]}"
+    else:
+        username = meaningful_parts[0] if meaningful_parts else "perwadag"
+    
+    # Clean username - remove non-alphanumeric except underscore
+    username = re.sub(r'[^a-z0-9_]', '', username)
+    
+    # Limit length
+    return username[:50]
 
 def generate_username_alternatives(base_username: str, count: int = 5) -> List[str]:
     """Generate alternative usernames by adding suffix numbers."""

@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from src.api.endpoints import auth, users, role
+from src.api.endpoints import auth, users
 
 # Create main API router
 api_router = APIRouter()
@@ -31,14 +31,3 @@ api_router.include_router(
     }
 )
 
-api_router.include_router(
-    role.router, 
-    prefix="/roles", 
-    tags=["Role Management"],
-    responses={
-        401: {"description": "Unauthorized"},
-        403: {"description": "Forbidden - Admin only"},
-        404: {"description": "Role not found"},
-        422: {"description": "Validation Error"},
-    }
-)

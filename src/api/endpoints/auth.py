@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.repositories.user import UserRepository
-from src.repositories.role import RoleRepository
 from src.services.user import UserService
 from src.services.auth import AuthService
 from src.schemas.user import (
@@ -18,10 +17,9 @@ router = APIRouter()
 
 
 async def get_auth_service(session: AsyncSession = Depends(get_db)) -> AuthService:
-    """Get auth service dependency."""
+    """Get auth service dependency - SIMPLIFIED."""
     user_repo = UserRepository(session)
-    role_repo = RoleRepository(session)
-    user_service = UserService(user_repo, role_repo)
+    user_service = UserService(user_repo)  # No more role_repo!
     return AuthService(user_service, user_repo)
 
 
