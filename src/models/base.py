@@ -11,16 +11,15 @@ class TimestampMixin(SQLModel):
     updated_at: Optional[datetime] = Field(default=None)
 
 
+class AuditMixin(SQLModel):
+    """Mixin for audit fields."""
+    created_by: Optional[str] = Field(default=None, max_length=36)  # ✅ UUID string
+    updated_by: Optional[str] = Field(default=None, max_length=36)  # ✅ UUID string
+
 class SoftDeleteMixin(SQLModel):
     """Mixin for soft delete functionality."""
     deleted_at: Optional[datetime] = Field(default=None)
-    deleted_by: Optional[int] = Field(default=None)
-
-
-class AuditMixin(SQLModel):
-    """Mixin for audit fields."""
-    created_by: Optional[int] = Field(default=None)
-    updated_by: Optional[int] = Field(default=None)
+    deleted_by: Optional[str] = Field(default=None, max_length=36)  # ✅ UUID string juga
 
 
 class BaseModel(TimestampMixin, SoftDeleteMixin, AuditMixin):

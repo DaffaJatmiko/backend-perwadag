@@ -466,7 +466,7 @@ class SuratTugasService:
         
         # Get all related data
         surat_pemberitahuan = await self.surat_pemberitahuan_repo.get_by_surat_tugas_id(surat_tugas_id)
-        meetings = await self.meeting_repo.get_all_by_surat_tugas(surat_tugas_id)
+        meetings = await self.meeting_repo.get_all_by_surat_tugas_id(surat_tugas_id)
         matriks = await self.matriks_repo.get_by_surat_tugas_id(surat_tugas_id)
         laporan_hasil = await self.laporan_hasil_repo.get_by_surat_tugas_id(surat_tugas_id)
         kuisioner = await self.kuisioner_repo.get_by_surat_tugas_id(surat_tugas_id)

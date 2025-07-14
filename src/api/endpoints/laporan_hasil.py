@@ -1,17 +1,20 @@
 # ===== src/api/endpoints/laporan_hasil.py =====
-"""API endpoints untuk laporan hasil."""
+"""Enhanced API endpoints untuk laporan hasil evaluasi."""
 
-from fastapi import APIRouter, Depends, UploadFile, File
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Path
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.repositories.laporan_hasil import LaporanHasilRepository
 from src.services.laporan_hasil import LaporanHasilService
 from src.schemas.laporan_hasil import (
-    LaporanHasilUpdate, LaporanHasilResponse, LaporanHasilFileUploadResponse
+    LaporanHasilUpdate, LaporanHasilResponse,
+    LaporanHasilFileUploadResponse, LaporanHasilListResponse
 )
+from src.schemas.filters import LaporanHasilFilterParams
 from src.auth.evaluasi_permissions import (
-    require_evaluasi_read_access, require_laporan_edit_access
+    require_evaluasi_read_access, require_auto_generated_edit_access, get_evaluasi_filter_scope
 )
 
 router = APIRouter()
@@ -23,13 +26,43 @@ async def get_laporan_hasil_service(session: AsyncSession = Depends(get_db)) -> 
     return LaporanHasilService(laporan_hasil_repo)
 
 
+@router.get("/", response_model=LaporanHasilListResponse)
+async def get_all_laporan_hasil(
+    filters: LaporanHasilFilterParams = Depends(),
+    current_user: dict = Depends(require_evaluasi_read_access()),
+    service: LaporanHasilService = Depends(get_laporan_hasil_service)
+):
+    """
+    Get all laporan hasil dengan comprehensive filtering dan enriched data.
+    
+    **Role-based Access:**
+    - **Admin**: Semua data laporan hasil
+    - **Inspektorat**: Data di wilayah kerjanya
+    - **Perwadag**: Data milik sendiri only
+    
+    **Enhanced Features:**
+    - Include tanggal evaluasi, nama perwadag, inspektorat dari surat tugas
+    - File download/view URLs
+    - Completion statistics
+    - Advanced filtering options
+    """
+    filter_scope = get_evaluasi_filter_scope(current_user)
+      
+    return await service.get_all_laporan_hasil(
+        filters=filters,
+        user_role=filter_scope["user_role"],
+        user_inspektorat=filter_scope.get("user_inspektorat"),
+        user_id=filter_scope.get("user_id")
+    )
+
+
 @router.get("/{laporan_hasil_id}", response_model=LaporanHasilResponse)
 async def get_laporan_hasil(
     laporan_hasil_id: str,
     current_user: dict = Depends(require_evaluasi_read_access()),
     service: LaporanHasilService = Depends(get_laporan_hasil_service)
 ):
-    """Get laporan hasil by ID."""
+    """Get laporan hasil by ID dengan enriched data."""
     return await service.get_laporan_hasil_or_404(laporan_hasil_id)
 
 
@@ -50,15 +83,10 @@ async def get_laporan_hasil_by_surat_tugas(
 async def update_laporan_hasil(
     laporan_hasil_id: str,
     update_data: LaporanHasilUpdate,
-    current_user: dict = Depends(require_laporan_edit_access()),
+    current_user: dict = Depends(require_auto_generated_edit_access()),
     service: LaporanHasilService = Depends(get_laporan_hasil_service)
 ):
-    """
-    Update laporan hasil - PERWADAG dapat full edit.
-    
-    **Accessible by**: Admin, Inspektorat, Perwadag (milik sendiri)
-    **Updatable**: nomor_laporan, tanggal_laporan
-    """
+    """Update laporan hasil (nomor laporan)."""
     return await service.update_laporan_hasil(laporan_hasil_id, update_data, current_user["id"])
 
 
@@ -66,9 +94,28 @@ async def update_laporan_hasil(
 async def upload_laporan_hasil_file(
     laporan_hasil_id: str,
     file: UploadFile = File(..., description="File laporan hasil"),
-    current_user: dict = Depends(require_laporan_edit_access()),
+    current_user: dict = Depends(require_evaluasi_read_access()),
     service: LaporanHasilService = Depends(get_laporan_hasil_service)
 ):
-    """Upload file laporan hasil - PERWADAG dapat upload."""
+    """Upload file laporan hasil."""
     return await service.upload_file(laporan_hasil_id, file, current_user["id"])
 
+
+@router.get("/{laporan_hasil_id}/download", response_class=FileResponse)
+async def download_laporan_hasil_file(
+    laporan_hasil_id: str = Path(..., description="Laporan Hasil ID"),
+    current_user: dict = Depends(require_evaluasi_read_access()),
+    service: LaporanHasilService = Depends(get_laporan_hasil_service)
+):
+    """Download laporan hasil file."""
+    return await service.download_file(laporan_hasil_id, download_type="download")
+
+
+@router.get("/{laporan_hasil_id}/view", response_class=FileResponse)
+async def view_laporan_hasil_file(
+    laporan_hasil_id: str = Path(..., description="Laporan Hasil ID"),
+    current_user: dict = Depends(require_evaluasi_read_access()),
+    service: LaporanHasilService = Depends(get_laporan_hasil_service)
+):
+    """View/preview laporan hasil file in browser."""
+    return await service.download_file(laporan_hasil_id, download_type="view")

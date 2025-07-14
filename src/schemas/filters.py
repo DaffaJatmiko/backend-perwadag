@@ -230,6 +230,9 @@ class MeetingFilterParams(BaseModel):
         None, 
         description="Filter by zoom link status"
     )
+
+    include_statistics: bool = Field(default=False, description="Include statistics in response")
+
     
     @field_validator('search')
     @classmethod
@@ -285,40 +288,24 @@ class SuratPemberitahuanFilterParams(BaseModel):
 
 
 class MeetingFilterParams(BaseModel):
-    """Filter parameters untuk meetings - TAMBAHKAN ini."""
+    """Filter parameters untuk meetings - ESSENTIAL ONLY."""
     
     # Pagination
     page: int = Field(1, ge=1, description="Page number")
     size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
     
     # Search
-    search: Optional[str] = Field(None, description="Search by meeting info, nama perwadag")
+    search: Optional[str] = Field(None, description="Search by meeting info")
     
-    # Basic filters
+    # Essential filters only
     surat_tugas_id: Optional[str] = Field(None, description="Filter by surat tugas")
     meeting_type: Optional[MeetingType] = Field(None, description="Filter by meeting type")
-    meeting_types: Optional[List[MeetingType]] = Field(None, description="Filter by multiple meeting types")
-    
-    # Surat tugas related filters
     inspektorat: Optional[str] = Field(None, description="Filter by inspektorat")
     user_perwadag_id: Optional[str] = Field(None, description="Filter by specific perwadag")
     tahun_evaluasi: Optional[int] = Field(None, ge=2020, le=2030, description="Filter by tahun evaluasi")
     
-    # Meeting status filters
-    has_tanggal: Optional[bool] = Field(None, description="Filter by tanggal meeting status")
-    has_zoom_link: Optional[bool] = Field(None, description="Filter by zoom link status")
-    has_daftar_hadir_link: Optional[bool] = Field(None, description="Filter by daftar hadir link status")
-    has_files: Optional[bool] = Field(None, description="Filter by file upload status")
-    
-    # File filters
-    file_count_min: Optional[int] = Field(None, ge=0, description="Minimum file count")
-    file_count_max: Optional[int] = Field(None, ge=0, description="Maximum file count")
-    
-    # Date filters
-    tanggal_meeting_from: Optional[date] = Field(None, description="Filter from tanggal meeting")
-    tanggal_meeting_to: Optional[date] = Field(None, description="Filter to tanggal meeting")
-    created_from: Optional[date] = Field(None, description="Filter created from date")
-    created_to: Optional[date] = Field(None, description="Filter created to date")
+    # Statistics
+    include_statistics: bool = Field(default=False, description="Include statistics in response")
     
     @field_validator('search')
     @classmethod
@@ -357,6 +344,8 @@ class MatriksFilterParams(BaseModel):
     created_from: Optional[date] = Field(None, description="Filter created from date")
     created_to: Optional[date] = Field(None, description="Filter created to date")
     
+    include_statistics: bool = Field(default=False, description="Include statistics in response")
+
     @field_validator('search')
     @classmethod
     def validate_search(cls, search: Optional[str]) -> Optional[str]:

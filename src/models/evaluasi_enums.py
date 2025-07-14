@@ -5,9 +5,9 @@ from enum import Enum
 
 class MeetingType(str, Enum):
     """Enum untuk jenis meeting dalam proses evaluasi."""
-    ENTRY = "entry"
-    KONFIRMASI = "konfirmasi"
-    EXIT = "exit"
+    ENTRY = "ENTRY"
+    KONFIRMASI = "KONFIRMASI"
+    EXIT = "EXIT"
     
     @classmethod
     def get_all_values(cls):
