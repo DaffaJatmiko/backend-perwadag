@@ -1,13 +1,22 @@
-"""API router configuration for government project."""
+"""Updated API router configuration dengan evaluasi endpoints."""
 
 from fastapi import APIRouter
 
+# Existing imports
 from src.api.endpoints import auth, users
+
+# New evaluasi imports
+from src.api.endpoints import (
+    surat_tugas, meeting, surat_pemberitahuan,
+    matriks, laporan_hasil, kuisioner, format_kuisioner
+)
 
 # Create main API router
 api_router = APIRouter()
 
-# Include endpoint routers with proper tags and descriptions
+# ===== EXISTING ENDPOINTS =====
+
+# Include existing endpoint routers dengan proper tags dan descriptions
 api_router.include_router(
     auth.router, 
     prefix="/auth", 
@@ -31,3 +40,193 @@ api_router.include_router(
     }
 )
 
+# ===== NEW EVALUASI ENDPOINTS =====
+
+# Surat Tugas - Main evaluation workflow
+api_router.include_router(
+    surat_tugas.router,
+    prefix="/evaluasi/surat-tugas",
+    tags=["Evaluasi - Surat Tugas"],
+    responses={
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden - Insufficient permissions"},
+        404: {"description": "Surat tugas not found"},
+        422: {"description": "Validation Error"},
+    }
+)
+
+# Meetings - Multiple file support
+api_router.include_router(
+    meeting.router,
+    prefix="/evaluasi/meeting",
+    tags=["Evaluasi - Meeting"],
+    responses={
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden - Admin/Inspektorat only for write operations"},
+        404: {"description": "Meeting not found"},
+        413: {"description": "File too large"},
+        422: {"description": "Validation Error"},
+    }
+)
+
+# Surat Pemberitahuan - Auto-generated documents
+api_router.include_router(
+    surat_pemberitahuan.router,
+    prefix="/evaluasi/surat-pemberitahuan",
+    tags=["Evaluasi - Surat Pemberitahuan"],
+    responses={
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden - Admin/Inspektorat only for write operations"},
+        404: {"description": "Surat pemberitahuan not found"},
+        422: {"description": "Validation Error"},
+    }
+)
+
+# Matriks - Recommendation matrix
+api_router.include_router(
+    matriks.router,
+    prefix="/evaluasi/matriks",
+    tags=["Evaluasi - Matriks"],
+    responses={
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden - Admin/Inspektorat only for write operations"},
+        404: {"description": "Matriks not found"},
+        422: {"description": "Validation Error"},
+    }
+)
+
+# Laporan Hasil - Final reports (Perwadag can edit)
+api_router.include_router(
+    laporan_hasil.router,
+    prefix="/evaluasi/laporan-hasil",
+    tags=["Evaluasi - Laporan Hasil"],
+    responses={
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden - Check role permissions"},
+        404: {"description": "Laporan hasil not found"},
+        422: {"description": "Validation Error"},
+    }
+)
+
+# Kuisioner - Questionnaires (Perwadag can upload)
+api_router.include_router(
+    kuisioner.router,
+    prefix="/evaluasi/kuisioner",
+    tags=["Evaluasi - Kuisioner"],
+    responses={
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden - Check role permissions"},
+        404: {"description": "Kuisioner not found"},
+        422: {"description": "Validation Error"},
+    }
+)
+
+# Format Kuisioner - Master templates (Admin only)
+api_router.include_router(
+    format_kuisioner.router,
+    prefix="/evaluasi/format-kuisioner",
+    tags=["Evaluasi - Format Kuisioner (Admin Only)"],
+    responses={
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden - Admin only"},
+        404: {"description": "Format kuisioner not found"},
+        422: {"description": "Validation Error"},
+    }
+)
+
+# ===== DOCUMENTATION METADATA =====
+
+# Update tags metadata untuk better documentation
+tags_metadata = [
+    {
+        "name": "Authentication",
+        "description": "Authentication endpoints dengan JWT tokens dan password reset",
+    },
+    {
+        "name": "User Management", 
+        "description": "User CRUD operations dengan role-based access control",
+    },
+    {
+        "name": "Evaluasi - Surat Tugas",
+        "description": """
+        **Main evaluation workflow endpoints**
+        
+        - Auto-generate semua related records saat create
+        - Role-based access: Admin & Inspektorat dapat CRUD
+        - Cascade delete functionality
+        - Progress tracking dan statistics
+        - Dashboard summaries
+        """,
+    },
+    {
+        "name": "Evaluasi - Meetings",
+        "description": """
+        **Meeting management dengan multiple file support**
+        
+        - 3 types: Entry, Konfirmasi, Exit
+        - Multiple file upload untuk bukti hadir
+        - Role-based access: Admin & Inspektorat untuk edit
+        - JSON storage untuk file metadata
+        """,
+    },
+    {
+        "name": "Evaluasi - Surat Pemberitahuan",
+        "description": """
+        **Auto-generated notification documents**
+        
+        - Created automatically via surat tugas workflow
+        - Simple file upload functionality
+        - Role-based access: Admin & Inspektorat untuk edit
+        """,
+    },
+    {
+        "name": "Evaluasi - Matriks",
+        "description": """
+        **Recommendation matrix documents**
+        
+        - Auto-generated via surat tugas workflow
+        - File upload untuk matriks rekomendasi
+        - Role-based access: Admin & Inspektorat untuk edit
+        """,
+    },
+    {
+        "name": "Evaluasi - Laporan Hasil",
+        "description": """
+        **Final evaluation reports**
+        
+        - Auto-generated via surat tugas workflow
+        - **Special access**: Perwadag dapat full edit milik sendiri
+        - Nomor laporan, tanggal, dan file upload
+        """,
+    },
+    {
+        "name": "Evaluasi - Kuisioner",
+        "description": """
+        **Evaluation questionnaires**
+        
+        - Auto-generated via surat tugas workflow
+        - **Special access**: Perwadag dapat upload file milik sendiri
+        - Integration dengan format templates
+        """,
+    },
+    {
+        "name": "Evaluasi - Format Kuisioner (Admin Only)",
+        "description": """
+        **Master questionnaire templates**
+        
+        - **Admin only**: Template management
+        - Year-based organization
+        - Download functionality untuk templates
+        - Statistics dan monitoring
+        """,
+    },
+]
+
+# Export untuk main.py
+def get_api_router():
+    """Get configured API router dengan semua endpoints."""
+    return api_router
+
+def get_tags_metadata():
+    """Get tags metadata untuk OpenAPI documentation."""
+    return tags_metadata

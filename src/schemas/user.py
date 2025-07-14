@@ -46,9 +46,9 @@ class UserBase(BaseModel):
         if role == UserRole.PERWADAG and not inspektorat:
             raise ValueError("Inspektorat is required for role 'perwadag'")
         
-        # For non-perwadag, inspektorat should be None
-        if role != UserRole.PERWADAG and inspektorat:
-            raise ValueError("Inspektorat should only be set for role 'perwadag'")
+        # # For non-perwadag, inspektorat should be None
+        # if role != UserRole.PERWADAG and inspektorat:
+        #     raise ValueError("Inspektorat should only be set for role 'perwadag'")
         
         return inspektorat.strip() if inspektorat else None
     

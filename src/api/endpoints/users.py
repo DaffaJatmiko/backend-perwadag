@@ -19,10 +19,10 @@ from src.auth.permissions import get_current_active_user, require_roles
 router = APIRouter()
 
 # Dependency for admin-only endpoints
-admin_required = require_roles(["admin"])
+admin_required = require_roles(["ADMIN"])
 
 # Dependency for admin and inspektorat endpoints
-admin_or_inspektorat = require_roles(["admin", "inspektorat"])
+admin_or_inspektorat = require_roles(["ADMIN", "INSPEKTORAT"])
 
 
 async def get_user_service(session: AsyncSession = Depends(get_db)) -> UserService:
