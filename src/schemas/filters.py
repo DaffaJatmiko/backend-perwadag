@@ -245,70 +245,159 @@ class MeetingFilterParams(BaseModel):
 
 
 class SuratPemberitahuanFilterParams(BaseModel):
-    """Filter parameters untuk surat pemberitahuan."""
-    
-    # Pagination
-    page: int = Field(1, ge=1, description="Page number")
-    size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
-    
-    # Basic filters
-    surat_tugas_id: Optional[str] = Field(None, description="Filter by surat tugas")
-    inspektorat: Optional[str] = Field(None, description="Filter by inspektorat")
-    
-    # Date filters
-    tanggal_from: Optional[date] = Field(None, description="Filter from tanggal")
-    tanggal_to: Optional[date] = Field(None, description="Filter to tanggal")
-    tahun: Optional[int] = Field(None, ge=2020, le=2030, description="Filter by tahun")
-    
-    # Status filters
-    has_file: Optional[bool] = Field(None, description="Filter by file status")
-    has_date: Optional[bool] = Field(None, description="Filter by date status")
-    is_completed: Optional[bool] = Field(None, description="Filter by completion status")
-
-
-class MatriksFilterParams(BaseModel):
-    """Filter parameters untuk matriks."""
-    
-    # Pagination
-    page: int = Field(1, ge=1, description="Page number")
-    size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
-    
-    # Basic filters
-    surat_tugas_id: Optional[str] = Field(None, description="Filter by surat tugas")
-    inspektorat: Optional[str] = Field(None, description="Filter by inspektorat")
-    
-    # Status filters
-    has_file: Optional[bool] = Field(None, description="Filter by file status")
-    is_completed: Optional[bool] = Field(None, description="Filter by completion status")
-    
-    # Date filters
-    tahun: Optional[int] = Field(None, ge=2020, le=2030, description="Filter by tahun")
-
-
-class LaporanHasilFilterParams(BaseModel):
-    """Filter parameters untuk laporan hasil."""
+    """Filter parameters untuk surat pemberitahuan - TAMBAHKAN ini."""
     
     # Pagination
     page: int = Field(1, ge=1, description="Page number")
     size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
     
     # Search
-    search: Optional[str] = Field(None, description="Search by nomor laporan")
+    search: Optional[str] = Field(None, description="Search by nama perwadag, no surat, inspektorat")
+    
+    # Surat tugas related filters
+    inspektorat: Optional[str] = Field(None, description="Filter by inspektorat")
+    user_perwadag_id: Optional[str] = Field(None, description="Filter by specific perwadag")
+    tahun_evaluasi: Optional[int] = Field(None, ge=2020, le=2030, description="Filter by tahun evaluasi")
+    
+    # Specific filters
+    surat_tugas_id: Optional[str] = Field(None, description="Filter by surat tugas")
+    has_file: Optional[bool] = Field(None, description="Filter by file upload status")
+    has_date: Optional[bool] = Field(None, description="Filter by tanggal status")
+    is_completed: Optional[bool] = Field(None, description="Filter by completion status")
+    
+    # Date range filters
+    tanggal_from: Optional[date] = Field(None, description="Filter from tanggal surat")
+    tanggal_to: Optional[date] = Field(None, description="Filter to tanggal surat")
+    created_from: Optional[date] = Field(None, description="Filter created from date")
+    created_to: Optional[date] = Field(None, description="Filter created to date")
+    
+    @field_validator('search')
+    @classmethod
+    def validate_search(cls, search: Optional[str]) -> Optional[str]:
+        """Validate and clean search term."""
+        if search is not None:
+            search = search.strip()
+            if not search:
+                return None
+            if len(search) > 100:
+                raise ValueError("Search term too long (max 100 characters)")
+        return search
+
+
+class MeetingFilterParams(BaseModel):
+    """Filter parameters untuk meetings - TAMBAHKAN ini."""
+    
+    # Pagination
+    page: int = Field(1, ge=1, description="Page number")
+    size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
+    
+    # Search
+    search: Optional[str] = Field(None, description="Search by meeting info, nama perwadag")
     
     # Basic filters
     surat_tugas_id: Optional[str] = Field(None, description="Filter by surat tugas")
+    meeting_type: Optional[MeetingType] = Field(None, description="Filter by meeting type")
+    meeting_types: Optional[List[MeetingType]] = Field(None, description="Filter by multiple meeting types")
+    
+    # Surat tugas related filters
     inspektorat: Optional[str] = Field(None, description="Filter by inspektorat")
+    user_perwadag_id: Optional[str] = Field(None, description="Filter by specific perwadag")
+    tahun_evaluasi: Optional[int] = Field(None, ge=2020, le=2030, description="Filter by tahun evaluasi")
+    
+    # Meeting status filters
+    has_tanggal: Optional[bool] = Field(None, description="Filter by tanggal meeting status")
+    has_zoom_link: Optional[bool] = Field(None, description="Filter by zoom link status")
+    has_daftar_hadir_link: Optional[bool] = Field(None, description="Filter by daftar hadir link status")
+    has_files: Optional[bool] = Field(None, description="Filter by file upload status")
+    
+    # File filters
+    file_count_min: Optional[int] = Field(None, ge=0, description="Minimum file count")
+    file_count_max: Optional[int] = Field(None, ge=0, description="Maximum file count")
     
     # Date filters
-    tanggal_from: Optional[date] = Field(None, description="Filter from tanggal laporan")
-    tanggal_to: Optional[date] = Field(None, description="Filter to tanggal laporan")
-    tahun: Optional[int] = Field(None, ge=2020, le=2030, description="Filter by tahun")
+    tanggal_meeting_from: Optional[date] = Field(None, description="Filter from tanggal meeting")
+    tanggal_meeting_to: Optional[date] = Field(None, description="Filter to tanggal meeting")
+    created_from: Optional[date] = Field(None, description="Filter created from date")
+    created_to: Optional[date] = Field(None, description="Filter created to date")
     
-    # Status filters
-    has_file: Optional[bool] = Field(None, description="Filter by file status")
-    has_nomor: Optional[bool] = Field(None, description="Filter by nomor laporan status")
-    has_tanggal: Optional[bool] = Field(None, description="Filter by tanggal status")
+    @field_validator('search')
+    @classmethod
+    def validate_search(cls, search: Optional[str]) -> Optional[str]:
+        """Validate search term."""
+        if search is not None:
+            search = search.strip()
+            if not search:
+                return None
+            if len(search) > 100:
+                raise ValueError("Search term too long")
+        return search
+
+
+class MatriksFilterParams(BaseModel):
+    """Filter parameters untuk matriks - TAMBAHKAN ini."""
+    
+    # Pagination
+    page: int = Field(1, ge=1, description="Page number")
+    size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
+    
+    # Search
+    search: Optional[str] = Field(None, description="Search by nama perwadag, inspektorat")
+    
+    # Surat tugas related filters
+    inspektorat: Optional[str] = Field(None, description="Filter by inspektorat")
+    user_perwadag_id: Optional[str] = Field(None, description="Filter by specific perwadag")
+    tahun_evaluasi: Optional[int] = Field(None, ge=2020, le=2030, description="Filter by tahun evaluasi")
+    
+    # Specific filters
+    surat_tugas_id: Optional[str] = Field(None, description="Filter by surat tugas")
+    has_file: Optional[bool] = Field(None, description="Filter by file upload status")
     is_completed: Optional[bool] = Field(None, description="Filter by completion status")
+    
+    # Date filters
+    created_from: Optional[date] = Field(None, description="Filter created from date")
+    created_to: Optional[date] = Field(None, description="Filter created to date")
+    
+    @field_validator('search')
+    @classmethod
+    def validate_search(cls, search: Optional[str]) -> Optional[str]:
+        """Validate search term."""
+        if search is not None:
+            search = search.strip()
+            if not search:
+                return None
+            if len(search) > 100:
+                raise ValueError("Search term too long")
+        return search
+
+
+class LaporanHasilFilterParams(BaseModel):
+    """Filter parameters untuk laporan hasil - TAMBAHKAN ini."""
+    
+    # Pagination
+    page: int = Field(1, ge=1, description="Page number")
+    size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
+    
+    # Search
+    search: Optional[str] = Field(None, description="Search by nomor laporan, nama perwadag")
+    
+    # Surat tugas related filters
+    inspektorat: Optional[str] = Field(None, description="Filter by inspektorat")
+    user_perwadag_id: Optional[str] = Field(None, description="Filter by specific perwadag")
+    tahun_evaluasi: Optional[int] = Field(None, ge=2020, le=2030, description="Filter by tahun evaluasi")
+    
+    # Specific filters
+    surat_tugas_id: Optional[str] = Field(None, description="Filter by surat tugas")
+    nomor_laporan: Optional[str] = Field(None, description="Filter by nomor laporan")
+    has_file: Optional[bool] = Field(None, description="Filter by file upload status")
+    has_nomor: Optional[bool] = Field(None, description="Filter by nomor laporan status")
+    has_tanggal: Optional[bool] = Field(None, description="Filter by tanggal laporan status")
+    is_completed: Optional[bool] = Field(None, description="Filter by completion status")
+    
+    # Date filters specific to laporan
+    tanggal_laporan_from: Optional[date] = Field(None, description="Filter from tanggal laporan")
+    tanggal_laporan_to: Optional[date] = Field(None, description="Filter to tanggal laporan")
+    created_from: Optional[date] = Field(None, description="Filter created from date")
+    created_to: Optional[date] = Field(None, description="Filter created to date")
     
     @field_validator('search')
     @classmethod
@@ -324,23 +413,40 @@ class LaporanHasilFilterParams(BaseModel):
 
 
 class KuisionerFilterParams(BaseModel):
-    """Filter parameters untuk kuisioner."""
+    """Filter parameters untuk kuisioner - TAMBAHKAN ini."""
     
     # Pagination
     page: int = Field(1, ge=1, description="Page number")
     size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
     
-    # Basic filters
-    surat_tugas_id: Optional[str] = Field(None, description="Filter by surat tugas")
-    inspektorat: Optional[str] = Field(None, description="Filter by inspektorat")
+    # Search
+    search: Optional[str] = Field(None, description="Search by nama perwadag, inspektorat")
     
-    # Status filters
-    has_file: Optional[bool] = Field(None, description="Filter by file status")
+    # Surat tugas related filters
+    inspektorat: Optional[str] = Field(None, description="Filter by inspektorat")
+    user_perwadag_id: Optional[str] = Field(None, description="Filter by specific perwadag")
+    tahun_evaluasi: Optional[int] = Field(None, ge=2020, le=2030, description="Filter by tahun evaluasi")
+    
+    # Specific filters
+    surat_tugas_id: Optional[str] = Field(None, description="Filter by surat tugas")
+    has_file: Optional[bool] = Field(None, description="Filter by file upload status")
     is_completed: Optional[bool] = Field(None, description="Filter by completion status")
     
     # Date filters
-    tahun: Optional[int] = Field(None, ge=2020, le=2030, description="Filter by tahun")
-
+    created_from: Optional[date] = Field(None, description="Filter created from date")
+    created_to: Optional[date] = Field(None, description="Filter created to date")
+    
+    @field_validator('search')
+    @classmethod
+    def validate_search(cls, search: Optional[str]) -> Optional[str]:
+        """Validate search term."""
+        if search is not None:
+            search = search.strip()
+            if not search:
+                return None
+            if len(search) > 100:
+                raise ValueError("Search term too long")
+        return search
 
 class FormatKuisionerFilterParams(BaseModel):
     """Filter parameters untuk format kuisioner."""

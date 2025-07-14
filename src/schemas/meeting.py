@@ -6,6 +6,10 @@ from datetime import datetime, date
 
 from src.models.evaluasi_enums import MeetingType
 from src.schemas.common import SuccessResponse
+from src.schemas.shared import (
+    SuratTugasBasicInfo, FileMetadata, FileUrls, 
+    PaginationInfo, ModuleStatistics, AuditInfo
+)
 
 
 # ===== REQUEST SCHEMAS =====
@@ -60,20 +64,29 @@ class MeetingFileUploadRequest(BaseModel):
 # ===== RESPONSE SCHEMAS =====
 
 class MeetingFileInfo(BaseModel):
-    """Schema untuk info file dalam meeting."""
+    """Enhanced file info untuk meeting files."""
     
     filename: str
     original_filename: str
     path: str
-    url: str
     size: int
-    uploaded_at: str
+    size_mb: float
+    content_type: str
+    uploaded_at: datetime
     uploaded_by: str
+    
+    # Download URLs
+    download_url: str
+    view_url: Optional[str] = None
+    is_viewable: bool
+    
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MeetingResponse(BaseModel):
-    """Schema untuk response meeting."""
+    """Enhanced response schema untuk meetings."""
     
+    # Basic fields
     id: str
     surat_tugas_id: str
     meeting_type: MeetingType
@@ -81,39 +94,73 @@ class MeetingResponse(BaseModel):
     tanggal_meeting: Optional[date] = None
     link_zoom: Optional[str] = None
     link_daftar_hadir: Optional[str] = None
-    file_bukti_hadir: Optional[List[MeetingFileInfo]] = None
     
-    # Status fields
+    # Enhanced file information
+    file_bukti_hadir: Optional[List[MeetingFileInfo]] = None
+    total_files_uploaded: int = 0
+    total_files_size_mb: float = 0.0
+    
+    # Status information
     is_completed: bool
     has_files: bool
     has_zoom_link: bool
     has_daftar_hadir_link: bool
-    completion_percentage: int
-    total_files_uploaded: int
+    completion_percentage: int = Field(ge=0, le=100)
     
-    # Audit fields
+    # Enriched surat tugas data
+    surat_tugas_info: SuratTugasBasicInfo
+    nama_perwadag: str
+    inspektorat: str
+    tanggal_evaluasi_mulai: date
+    tanggal_evaluasi_selesai: date
+    tahun_evaluasi: int
+    evaluation_status: str
+    
+    # Additional meeting context
+    days_until_evaluation: Optional[int] = None
+    is_evaluation_period: bool = False
+    meeting_order: int = Field(description="Order in evaluation process (1-3)")
+    
+    # Audit information
     created_at: datetime
     updated_at: Optional[datetime] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
 
 class MeetingListResponse(BaseModel):
-    """Schema untuk response list meetings dengan pagination."""
+    """Enhanced list response untuk meetings."""
     
     meetings: List[MeetingResponse]
-    total: int
-    page: int
-    size: int
-    pages: int
+    pagination: PaginationInfo
+    statistics: Optional[ModuleStatistics] = None
+    
+    # Meeting-specific summaries
+    by_type_summary: Dict[str, int] = Field(description="Count by meeting type")
+    by_status_summary: Dict[str, int] = Field(description="Count by completion status")
+    
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MeetingsByTypeResponse(BaseModel):
-    """Schema untuk response meetings grouped by type."""
+    """Enhanced response untuk meetings grouped by type."""
     
     entry_meeting: Optional[MeetingResponse] = None
     konfirmasi_meeting: Optional[MeetingResponse] = None
     exit_meeting: Optional[MeetingResponse] = None
+    
+    # Summary information
+    total_meetings: int = 3
+    completed_meetings: int = 0
+    progress_percentage: int = Field(ge=0, le=100)
+    next_meeting_type: Optional[str] = None
+    
+    # Surat tugas context
+    surat_tugas_info: SuratTugasBasicInfo
+    
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MeetingFileUploadResponse(SuccessResponse):

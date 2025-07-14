@@ -3,9 +3,13 @@
 
 from typing import List, Optional
 from pydantic import BaseModel, Field, ConfigDict
-from datetime import datetime
+from datetime import datetime, date
 
 from src.schemas.common import SuccessResponse
+from src.schemas.shared import (
+    SuratTugasBasicInfo, FileMetadata, FileUrls, 
+    PaginationInfo, ModuleStatistics, AuditInfo
+)
 
 
 class MatriksCreate(BaseModel):
@@ -19,27 +23,53 @@ class MatriksUpdate(BaseModel):
 
 
 class MatriksResponse(BaseModel):
-    """Schema untuk response matriks."""
+    """Enhanced response schema untuk matriks."""
+    
+    # Basic fields
     id: str
     surat_tugas_id: str
     file_dokumen_matriks: Optional[str] = None
-    file_dokumen_matriks_url: Optional[str] = None
+    
+    # Enhanced file information
+    file_urls: Optional[FileUrls] = None
+    file_metadata: Optional[FileMetadata] = None
+    
+    # Status information
     is_completed: bool
     has_file: bool
-    completion_percentage: int
+    completion_percentage: int = Field(ge=0, le=100)
+    
+    # Enriched surat tugas data
+    surat_tugas_info: SuratTugasBasicInfo
+    nama_perwadag: str
+    inspektorat: str
+    tanggal_evaluasi_mulai: date
+    tanggal_evaluasi_selesai: date
+    tahun_evaluasi: int
+    evaluation_status: str
+    
+    # Context information
+    is_evaluation_completed: bool = Field(description="Whether evaluation period has ended")
+    days_since_evaluation: Optional[int] = None
+    
+    # Audit information
     created_at: datetime
     updated_at: Optional[datetime] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
 
+
 class MatriksListResponse(BaseModel):
-    """Schema untuk response list matriks."""
+    """Enhanced list response untuk matriks."""
+    
     matriks: List[MatriksResponse]
-    total: int
-    page: int
-    size: int
-    pages: int
+    pagination: PaginationInfo
+    statistics: Optional[ModuleStatistics] = None
+    
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MatriksFileUploadResponse(SuccessResponse):

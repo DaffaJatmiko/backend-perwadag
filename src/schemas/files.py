@@ -3,23 +3,23 @@
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from datetime import datetime
+from src.schemas.shared import (
+    SuratTugasBasicInfo, FileMetadata, FileUrls, 
+    PaginationInfo, ModuleStatistics, AuditInfo
+)
 
 
-class FileUploadResponse(BaseModel):
-    """Response schema for file upload."""
-    id: int
+class FileUploadResponse(SuccessResponse):
+    """Enhanced response untuk file uploads."""
+    
+    file_id: str
     filename: str
     original_filename: str
     file_path: str
-    file_url: str
-    content_type: str
-    file_size: int
-    folder: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = Field(None, alias="file_metadata")
-    uploaded_by: int
-    uploaded_at: datetime = Field(alias="created_at")
+    file_urls: FileUrls
+    file_metadata: FileMetadata
     
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FileListResponse(BaseModel):
@@ -70,3 +70,27 @@ class FileUrlResponse(BaseModel):
     url: str
     expires_in: Optional[int] = None
     expires_at: Optional[datetime] = None
+
+class FileDownloadResponse(BaseModel):
+    """Response untuk file download operations."""
+    
+    success: bool
+    filename: str
+    content_type: str
+    size_mb: float
+    download_url: str
+    expires_at: Optional[datetime] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class MultiFileDownloadResponse(BaseModel):
+    """Response untuk multiple file downloads."""
+    
+    success: bool
+    message: str
+    files: List[FileDownloadResponse]
+    zip_file_url: Optional[str] = None
+    total_size_mb: float
+    expires_at: Optional[datetime] = None
+    
+    model_config = ConfigDict(from_attributes=True)

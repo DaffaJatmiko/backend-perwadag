@@ -166,10 +166,10 @@ class SuratTugasResponse(BaseModel):
     file_surat_tugas: str
     
     # Computed fields
-    tahun_evaluasi: int
-    durasi_evaluasi: int
-    is_evaluation_active: bool
-    evaluation_status: str
+    tahun_evaluasi: Optional[int] = None
+    durasi_evaluasi: Optional[int] = None
+    is_evaluation_active: Optional[bool] = None
+    evaluation_status: Optional[str] = None
     
     # Progress tracking
     progress: EvaluasiProgress

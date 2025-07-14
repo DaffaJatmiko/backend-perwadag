@@ -96,16 +96,31 @@ class MeetingRepository:
         user_role: str,
         user_inspektorat: Optional[str] = None,
         user_id: Optional[str] = None
-    ) -> Tuple[List[Meeting], int]:
-        """Get all meetings dengan filtering berdasarkan role."""
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Get all meetings dengan filtering dan JOIN ke surat tugas."""
         
-        # Build base query dengan join ke SuratTugas untuk inspektorat filtering
-        from src.models.surat_tugas import SuratTugas
-        
-        query = select(Meeting).join(SuratTugas).where(
-            and_(
-                Meeting.deleted_at.is_(None),
-                SuratTugas.deleted_at.is_(None)
+        # Build base query dengan JOIN
+        query = (
+            select(
+                Meeting,
+                SuratTugas.no_surat,
+                SuratTugas.nama_perwadag,
+                SuratTugas.inspektorat,
+                SuratTugas.tanggal_evaluasi_mulai,
+                SuratTugas.tanggal_evaluasi_selesai,
+                User.nama.label('perwadag_nama')
+            )
+            .select_from(
+                Meeting
+                .join(SuratTugas, Meeting.surat_tugas_id == SuratTugas.id)
+                .join(User, SuratTugas.user_perwadag_id == User.id)
+            )
+            .where(
+                and_(
+                    Meeting.deleted_at.is_(None),
+                    SuratTugas.deleted_at.is_(None),
+                    User.deleted_at.is_(None)
+                )
             )
         )
         
@@ -115,50 +130,45 @@ class MeetingRepository:
         elif user_role == "INSPEKTORAT" and user_inspektorat:
             query = query.where(SuratTugas.inspektorat == user_inspektorat)
         
-        # Apply specific filters
+        # Apply filters
+        if filters.search:
+            search_term = f"%{filters.search}%"
+            query = query.where(
+                or_(
+                    SuratTugas.nama_perwadag.ilike(search_term),
+                    SuratTugas.no_surat.ilike(search_term),
+                    SuratTugas.inspektorat.ilike(search_term),
+                    Meeting.link_zoom.ilike(search_term),
+                    Meeting.link_daftar_hadir.ilike(search_term)
+                )
+            )
+        
         if filters.surat_tugas_id:
             query = query.where(Meeting.surat_tugas_id == filters.surat_tugas_id)
         
         if filters.meeting_type:
             query = query.where(Meeting.meeting_type == filters.meeting_type)
         
+        if filters.meeting_types:
+            query = query.where(Meeting.meeting_type.in_(filters.meeting_types))
+        
         if filters.inspektorat:
             query = query.where(SuratTugas.inspektorat.ilike(f"%{filters.inspektorat}%"))
         
-        # Date filters
-        if filters.tanggal_from:
-            query = query.where(Meeting.tanggal_meeting >= filters.tanggal_from)
+        if filters.user_perwadag_id:
+            query = query.where(SuratTugas.user_perwadag_id == filters.user_perwadag_id)
         
-        if filters.tanggal_to:
-            query = query.where(Meeting.tanggal_meeting <= filters.tanggal_to)
-        
-        if filters.tahun:
+        if filters.tahun_evaluasi:
             query = query.where(
-                func.extract('year', Meeting.tanggal_meeting) == filters.tahun
+                func.extract('year', SuratTugas.tanggal_evaluasi_mulai) == filters.tahun_evaluasi
             )
         
-        # Status filters
+        # Meeting-specific filters
         if filters.has_tanggal is not None:
             if filters.has_tanggal:
                 query = query.where(Meeting.tanggal_meeting.is_not(None))
             else:
                 query = query.where(Meeting.tanggal_meeting.is_(None))
-        
-        if filters.has_files is not None:
-            if filters.has_files:
-                query = query.where(
-                    and_(
-                        Meeting.file_bukti_hadir.is_not(None),
-                        func.json_length(Meeting.file_bukti_hadir) > 0
-                    )
-                )
-            else:
-                query = query.where(
-                    or_(
-                        Meeting.file_bukti_hadir.is_(None),
-                        func.json_length(Meeting.file_bukti_hadir) == 0
-                    )
-                )
         
         if filters.has_zoom_link is not None:
             if filters.has_zoom_link:
@@ -176,22 +186,62 @@ class MeetingRepository:
                     )
                 )
         
-        # Apply search filter
-        if filters.search:
-            search_term = f"%{filters.search}%"
-            query = query.where(
-                or_(
-                    SuratTugas.nama_perwadag.ilike(search_term),
-                    SuratTugas.no_surat.ilike(search_term),
-                    Meeting.link_zoom.ilike(search_term),
-                    Meeting.link_daftar_hadir.ilike(search_term)
+        if filters.has_daftar_hadir_link is not None:
+            if filters.has_daftar_hadir_link:
+                query = query.where(
+                    and_(
+                        Meeting.link_daftar_hadir.is_not(None),
+                        Meeting.link_daftar_hadir != ""
+                    )
                 )
-            )
+            else:
+                query = query.where(
+                    or_(
+                        Meeting.link_daftar_hadir.is_(None),
+                        Meeting.link_daftar_hadir == ""
+                    )
+                )
+        
+        if filters.has_file is not None:
+            if filters.has_file:
+                query = query.where(
+                    and_(
+                        Meeting.file_bukti_hadir.is_not(None),
+                        func.json_length(Meeting.file_bukti_hadir) > 0
+                    )
+                )
+            else:
+                query = query.where(
+                    or_(
+                        Meeting.file_bukti_hadir.is_(None),
+                        func.json_length(Meeting.file_bukti_hadir) == 0
+                    )
+                )
+        
+        # File count filters
+        if filters.file_count_min is not None:
+            query = query.where(func.json_length(Meeting.file_bukti_hadir) >= filters.file_count_min)
+        
+        if filters.file_count_max is not None:
+            query = query.where(func.json_length(Meeting.file_bukti_hadir) <= filters.file_count_max)
+        
+        # Date filters
+        if filters.tanggal_meeting_from:
+            query = query.where(Meeting.tanggal_meeting >= filters.tanggal_meeting_from)
+        
+        if filters.tanggal_meeting_to:
+            query = query.where(Meeting.tanggal_meeting <= filters.tanggal_meeting_to)
+        
+        # Progress filters
+        if filters.progress_min is not None or filters.progress_max is not None:
+            # This would require calculating progress percentage in SQL
+            # For now, we'll apply this filter in the service layer
+            pass
         
         # Get total count
         count_query = select(func.count()).select_from(query.subquery())
         total_result = await self.session.execute(count_query)
-        total = total_result.scalar()
+        total = total_result.scalar() or 0
         
         # Apply pagination and ordering
         offset = (filters.page - 1) * filters.size
@@ -199,14 +249,32 @@ class MeetingRepository:
             query
             .offset(offset)
             .limit(filters.size)
-            .order_by(Meeting.created_at.desc())
+            .order_by(Meeting.meeting_type, Meeting.created_at.desc())
         )
         
         # Execute query
         result = await self.session.execute(query)
-        meetings = result.scalars().all()
+        rows = result.all()
         
-        return list(meetings), total
+        # Convert to enriched results
+        enriched_results = []
+        for row in rows:
+            meeting = row[0]
+            surat_tugas_data = {
+                'no_surat': row[1],
+                'nama_perwadag': row[2],
+                'inspektorat': row[3],
+                'tanggal_evaluasi_mulai': row[4],
+                'tanggal_evaluasi_selesai': row[5],
+                'perwadag_nama': row[6]
+            }
+            
+            enriched_results.append({
+                'meeting': meeting,
+                'surat_tugas_data': surat_tugas_data
+            })
+        
+        return enriched_results, total
     
     # ===== UPDATE OPERATIONS =====
     
@@ -434,3 +502,63 @@ class MeetingRepository:
             file_info.get('path') for file_info in meeting.file_bukti_hadir
             if file_info.get('path')
         ]
+
+    
+    async def get_meetings_by_type_summary(
+        self,
+        user_role: str,
+        user_inspektorat: Optional[str] = None,
+        user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Get summary of meetings grouped by type."""
+        
+        # Base query
+        base_query = (
+            select(Meeting.meeting_type, func.count().label('count'))
+            .join(SuratTugas, Meeting.surat_tugas_id == SuratTugas.id)
+            .where(
+                and_(
+                    Meeting.deleted_at.is_(None),
+                    SuratTugas.deleted_at.is_(None)
+                )
+            )
+            .group_by(Meeting.meeting_type)
+        )
+        
+        # Apply role-based filtering
+        if user_role == "PERWADAG":
+            base_query = base_query.where(SuratTugas.user_perwadag_id == user_id)
+        elif user_role == "INSPEKTORAT" and user_inspektorat:
+            base_query = base_query.where(SuratTugas.inspektorat == user_inspektorat)
+        
+        result = await self.session.execute(base_query)
+        by_type = {row.meeting_type.value: row.count for row in result.all()}
+        
+        # Get completion summary
+        completed_query = (
+            select(Meeting.meeting_type, func.count().label('count'))
+            .join(SuratTugas, Meeting.surat_tugas_id == SuratTugas.id)
+            .where(
+                and_(
+                    Meeting.deleted_at.is_(None),
+                    SuratTugas.deleted_at.is_(None),
+                    Meeting.tanggal_meeting.is_not(None)
+                )
+            )
+            .group_by(Meeting.meeting_type)
+        )
+        
+        if user_role == "PERWADAG":
+            completed_query = completed_query.where(SuratTugas.user_perwadag_id == user_id)
+        elif user_role == "INSPEKTORAT" and user_inspektorat:
+            completed_query = completed_query.where(SuratTugas.inspektorat == user_inspektorat)
+        
+        completed_result = await self.session.execute(completed_query)
+        completed_by_type = {row.meeting_type.value: row.count for row in completed_result.all()}
+        
+        return {
+            "by_type_summary": by_type,
+            "completed_by_type": completed_by_type,
+            "total_meetings": sum(by_type.values()),
+            "total_completed": sum(completed_by_type.values())
+        }

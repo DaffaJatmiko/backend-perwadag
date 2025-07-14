@@ -1,11 +1,15 @@
 # ===== src/schemas/kuisioner.py =====
 """Schemas untuk kuisioner."""
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
-from datetime import datetime
+from datetime import datetime, date
 
 from src.schemas.common import SuccessResponse
+from src.schemas.shared import (
+    SuratTugasBasicInfo, FileMetadata, FileUrls, 
+    PaginationInfo, ModuleStatistics, AuditInfo
+)
 
 
 class KuisionerCreate(BaseModel):
@@ -19,27 +23,52 @@ class KuisionerUpdate(BaseModel):
 
 
 class KuisionerResponse(BaseModel):
-    """Schema untuk response kuisioner."""
+    """Enhanced response schema untuk kuisioner."""
+    
+    # Basic fields
     id: str
     surat_tugas_id: str
     file_kuisioner: Optional[str] = None
-    file_kuisioner_url: Optional[str] = None
+    
+    # Enhanced file information
+    file_urls: Optional[FileUrls] = None
+    file_metadata: Optional[FileMetadata] = None
+    
+    # Status information
     is_completed: bool
     has_file: bool
-    completion_percentage: int
+    completion_percentage: int = Field(ge=0, le=100)
+    
+    # Enriched surat tugas data
+    surat_tugas_info: SuratTugasBasicInfo
+    nama_perwadag: str
+    inspektorat: str
+    tanggal_evaluasi_mulai: date
+    tanggal_evaluasi_selesai: date
+    tahun_evaluasi: int
+    evaluation_status: str
+    
+    # Context information
+    available_templates: List[Dict[str, Any]] = Field(description="Available kuisioner templates for this year")
+    template_recommendations: Optional[str] = None
+    
+    # Audit information
     created_at: datetime
     updated_at: Optional[datetime] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
 
 class KuisionerListResponse(BaseModel):
-    """Schema untuk response list kuisioner."""
+    """Enhanced list response untuk kuisioner."""
+    
     kuisioner: List[KuisionerResponse]
-    total: int
-    page: int
-    size: int
-    pages: int
+    pagination: PaginationInfo
+    statistics: Optional[ModuleStatistics] = None
+    
+    model_config = ConfigDict(from_attributes=True)
 
 
 class KuisionerFileUploadResponse(SuccessResponse):

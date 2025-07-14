@@ -1,11 +1,15 @@
 # ===== src/schemas/format_kuisioner.py =====
 """Schemas untuk format/template kuisioner."""
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime
 
 from src.schemas.common import SuccessResponse
+from src.schemas.shared import (
+    SuratTugasBasicInfo, FileMetadata, FileUrls, 
+    PaginationInfo, ModuleStatistics, AuditInfo
+)
 
 
 class FormatKuisionerCreate(BaseModel):
@@ -42,30 +46,50 @@ class FormatKuisionerUpdate(BaseModel):
 
 
 class FormatKuisionerResponse(BaseModel):
-    """Schema untuk response format kuisioner."""
+    """Enhanced response schema untuk format kuisioner."""
+    
+    # Basic fields
     id: str
     nama_template: str
     deskripsi: Optional[str] = None
     tahun: int
     link_template: str
-    link_template_url: str
+    
+    # Enhanced file information
+    file_urls: Optional[FileUrls] = None
+    file_metadata: Optional[FileMetadata] = None
+    
+    # Computed fields
     display_name: str
     has_file: bool
     is_downloadable: bool
-    file_extension: Optional[str] = None
+    is_current_year: bool = Field(description="Whether template is for current year")
+    
+    # Usage statistics
+    usage_count: int = Field(description="How many times template has been downloaded")
+    last_used: Optional[datetime] = None
+    
+    # Audit information
     created_at: datetime
     updated_at: Optional[datetime] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
 
 class FormatKuisionerListResponse(BaseModel):
-    """Schema untuk response list format kuisioner."""
+    """Enhanced list response untuk format kuisioner."""
+    
     format_kuisioner: List[FormatKuisionerResponse]
-    total: int
-    page: int
-    size: int
-    pages: int
+    pagination: PaginationInfo
+    statistics: Optional[ModuleStatistics] = None
+    
+    # Template-specific summaries
+    by_year_summary: Dict[int, int] = Field(description="Count by year")
+    current_year_templates: int = 0
+    
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FormatKuisionerFileUploadResponse(SuccessResponse):
