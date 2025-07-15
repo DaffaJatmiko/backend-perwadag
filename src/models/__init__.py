@@ -1,11 +1,12 @@
-"""Models initialization - Updated dengan evaluasi models."""
+# ===== src/models/__init__.py (UPDATE EXISTING) =====
+"""Models initialization - Updated dengan penilaian risiko models."""
 
 # ===== EXISTING MODELS =====
 from .base import BaseModel, TimestampMixin, SoftDeleteMixin, AuditMixin
 from .enums import UserRole
 from .user import User, PasswordResetToken
 
-# ===== NEW EVALUASI MODELS =====
+# ===== EXISTING EVALUASI MODELS =====
 
 # Enums
 from .evaluasi_enums import (
@@ -22,6 +23,17 @@ from .laporan_hasil import LaporanHasil
 from .kuisioner import Kuisioner
 from .format_kuisioner import FormatKuisioner
 
+# ===== NEW PENILAIAN RISIKO MODELS =====
+
+# Penilaian risiko enums
+from .penilaian_enums import (
+    StatusPeriode, ProfilRisiko, KriteriaPenilaian
+)
+
+# Penilaian risiko models
+from .periode_evaluasi import PeriodeEvaluasi
+from .penilaian_risiko import PenilaianRisiko
+
 # ===== EXPORTS =====
 
 __all__ = [
@@ -36,14 +48,14 @@ __all__ = [
     "User",
     "PasswordResetToken", 
     
-    # Evaluasi enums
+    # Existing evaluasi enums
     "MeetingType",
     "StatusEvaluasi",
     "FileType",
     "EvaluasiStage", 
     "FileCategory",
     
-    # Evaluasi models
+    # Existing evaluasi models
     "SuratTugas",
     "SuratPemberitahuan",
     "Meeting",
@@ -51,6 +63,15 @@ __all__ = [
     "LaporanHasil",
     "Kuisioner",
     "FormatKuisioner",
+    
+    # New penilaian risiko enums
+    "StatusPeriode",
+    "ProfilRisiko",
+    "KriteriaPenilaian",
+    
+    # New penilaian risiko models
+    "PeriodeEvaluasi",
+    "PenilaianRisiko",
 ]
 
 # ===== MODEL REGISTRATION FOR SQLModel =====
@@ -62,8 +83,6 @@ __all__ = [
 # - users
 # - password_reset_tokens  
 # - file_uploads
-
-# New evaluasi tables:
 # - surat_tugas
 # - surat_pemberitahuan
 # - meetings
@@ -72,12 +91,16 @@ __all__ = [
 # - kuisioner
 # - format_kuisioner
 
-# Total: 10 tables (3 existing + 7 new evaluasi tables)
+# New penilaian risiko tables:
+# - periode_evaluasi
+# - penilaian_risiko
+
+# Total: 12 tables (10 existing + 2 new penilaian risiko tables)
 
 # ===== TABLE CREATION ORDER =====
 
 """
-Table creation order (berdasarkan foreign key dependencies):
+Updated table creation order (berdasarkan foreign key dependencies):
 
 1. users (no dependencies)
 2. password_reset_tokens (depends on users)
@@ -89,6 +112,8 @@ Table creation order (berdasarkan foreign key dependencies):
 8. laporan_hasil (depends on surat_tugas)
 9. kuisioner (depends on surat_tugas)
 10. format_kuisioner (no dependencies - master table)
+11. periode_evaluasi (no dependencies - master table)
+12. penilaian_risiko (depends on users, periode_evaluasi)
 
 SQLAlchemy akan automatically handle creation order berdasarkan foreign keys.
 """
@@ -96,7 +121,7 @@ SQLAlchemy akan automatically handle creation order berdasarkan foreign keys.
 # ===== DATABASE CONSTRAINTS SUMMARY =====
 
 """
-Key constraints yang akan dibuat:
+Updated key constraints yang akan dibuat:
 
 UNIQUE CONSTRAINTS:
 - users.username
@@ -104,19 +129,17 @@ UNIQUE CONSTRAINTS:
 - password_reset_tokens.token
 - surat_tugas.no_surat
 - meetings: (surat_tugas_id, meeting_type) - unique combination
+- periode_evaluasi.tahun - unique tahun
+- penilaian_risiko: (user_perwadag_id, periode_id) - unique combination
 
 FOREIGN KEY CONSTRAINTS:
-- password_reset_tokens.user_id -> users.id
-- file_uploads.uploaded_by -> users.id
-- surat_tugas.user_perwadag_id -> users.id
-- surat_pemberitahuan.surat_tugas_id -> surat_tugas.id
-- meetings.surat_tugas_id -> surat_tugas.id
-- matriks.surat_tugas_id -> surat_tugas.id
-- laporan_hasil.surat_tugas_id -> surat_tugas.id
-- kuisioner.surat_tugas_id -> surat_tugas.id
+[Existing constraints...]
+- penilaian_risiko.user_perwadag_id -> users.id
+- penilaian_risiko.periode_id -> periode_evaluasi.id (CASCADE DELETE)
 
 INDEXES:
-- Semua foreign key fields
-- Search fields: nama_perwadag, inspektorat, tahun_evaluasi
-- Status fields untuk filtering
+[Existing indexes...]
+- periode_evaluasi.tahun, periode_evaluasi.status, periode_evaluasi.is_locked
+- penilaian_risiko.user_perwadag_id, penilaian_risiko.periode_id, penilaian_risiko.inspektorat
+- penilaian_risiko.tahun, penilaian_risiko.profil_risiko_auditan
 """

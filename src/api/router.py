@@ -8,7 +8,7 @@ from src.api.endpoints import auth, users
 # New evaluasi imports
 from src.api.endpoints import (
     surat_tugas, meeting, surat_pemberitahuan,
-    matriks, laporan_hasil, kuisioner, format_kuisioner
+    matriks, laporan_hasil, kuisioner, format_kuisioner, periode_evaluasi, penilaian_risiko
 )
 
 # Create main API router
@@ -134,6 +134,32 @@ api_router.include_router(
     }
 )
 
+# Penilaian Risiko - Periode Evaluasi
+api_router.include_router(
+    periode_evaluasi.router,
+    prefix="/periode-evaluasi",
+    tags=["Penilaian Risiko - Periode Evaluasi"],
+    responses={
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden - Admin only for write operations"},
+        404: {"description": "Periode evaluasi not found"},
+        422: {"description": "Validation Error"},
+    }
+)
+
+# Penilaian Risiko - Penilaian
+api_router.include_router(
+    penilaian_risiko.router,
+    prefix="/penilaian-risiko",
+    tags=["Penilaian Risiko - Penilaian"],
+    responses={
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden - Admin/Inspektorat only"},
+        404: {"description": "Penilaian risiko not found"},
+        422: {"description": "Validation Error"},
+    }
+)
+
 # ===== DOCUMENTATION METADATA =====
 
 # Update tags metadata untuk better documentation
@@ -221,6 +247,38 @@ tags_metadata = [
         """,
     },
 ]
+
+# Update tags_metadata untuk include new tags
+new_tags_metadata = [
+    {
+        "name": "Penilaian Risiko - Periode Evaluasi",
+        "description": """
+        **Periode evaluasi management endpoints**
+        
+        - Auto-bulk generate penilaian risiko saat create periode
+        - Lock/unlock mechanism untuk editing control
+        - Cascade delete functionality
+        - Tahun pembanding auto-generate
+        - Statistics dan monitoring
+        """,
+    },
+    {
+        "name": "Penilaian Risiko - Penilaian",
+        "description": """
+        **Penilaian risiko management dengan 8 kriteria**
+        
+        - Role-based access: Admin & Inspektorat
+        - Auto-calculation untuk kriteria dengan business rules
+        - Total nilai risiko calculation dengan weighted scoring
+        - Profil risiko determination (Rendah/Sedang/Tinggi)
+        - Comprehensive filtering dan statistics
+        - Bulk operations untuk efficiency
+        """,
+    }
+]
+
+# Extend existing tags_metadata
+tags_metadata.extend(new_tags_metadata)
 
 # Export untuk main.py
 def get_api_router():

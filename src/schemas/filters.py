@@ -6,6 +6,8 @@ from datetime import date
 
 from src.models.enums import UserRole
 from src.models.evaluasi_enums import MeetingType
+from src.models.penilaian_enums import StatusPeriode, ProfilRisiko
+
 
 
 # ===== EXISTING USER FILTERS (UNCHANGED) =====
@@ -608,3 +610,76 @@ class EvaluasiSearchFilter(BaseModel):
             if len(search) > 200:
                 raise ValueError("Search term too long (max 200 characters)")
         return search
+
+class PeriodeEvaluasiFilterParams(BaseModel):
+    """Filter parameters untuk periode evaluasi - simplified."""
+    
+    # Pagination
+    page: int = Field(1, ge=1, description="Page number")
+    size: int = Field(20, ge=1, le=100, description="Page size")
+    
+    # Search
+    search: Optional[str] = Field(None, description="Search by tahun")
+    
+    # Basic filters only
+    status: Optional[StatusPeriode] = Field(None, description="Filter by status")
+    is_locked: Optional[bool] = Field(None, description="Filter by lock status")
+    
+    @field_validator('search')
+    @classmethod
+    def validate_search(cls, search: Optional[str]) -> Optional[str]:
+        """Validate search term."""
+        if search is not None:
+            search = search.strip()
+            if not search:
+                return None
+            if len(search) > 50:
+                raise ValueError("Search term too long")
+        return search
+
+class PenilaianRisikoFilterParams(BaseModel):
+    """Filter parameters untuk penilaian risiko - simplified and focused."""
+    
+    # Pagination
+    page: int = Field(1, ge=1, description="Page number")
+    size: int = Field(20, ge=1, le=100, description="Page size")
+    
+    # Search
+    search: Optional[str] = Field(None, description="Search by nama perwadag, inspektorat")
+    
+    # Core filters only
+    periode_id: Optional[str] = Field(None, description="Filter by periode")
+    user_perwadag_id: Optional[str] = Field(None, description="Filter by perwadag")
+    inspektorat: Optional[str] = Field(None, description="Filter by inspektorat")
+    tahun: Optional[int] = Field(None, ge=2020, description="Filter by tahun")
+    
+    # Completion filter
+    is_complete: Optional[bool] = Field(None, description="Filter data yang lengkap")
+    
+    # Sorting
+    sort_by: Optional[str] = Field(
+        default="created_at",
+        description="Sort by: skor_tertinggi, skor_terendah, nama, created_at"
+    )
+    
+    @field_validator('search')
+    @classmethod
+    def validate_search(cls, search: Optional[str]) -> Optional[str]:
+        """Validate search term."""
+        if search is not None:
+            search = search.strip()
+            if not search:
+                return None
+            if len(search) > 100:
+                raise ValueError("Search term too long")
+        return search
+    
+    @field_validator('sort_by')
+    @classmethod
+    def validate_sort_by(cls, sort_by: Optional[str]) -> Optional[str]:
+        """Validate sort options."""
+        if sort_by is not None:
+            allowed_sorts = ["skor_tertinggi", "skor_terendah", "nama", "created_at"]
+            if sort_by not in allowed_sorts:
+                raise ValueError(f"Invalid sort option. Allowed: {', '.join(allowed_sorts)}")
+        return sort_by
