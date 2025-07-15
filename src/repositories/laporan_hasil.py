@@ -146,10 +146,10 @@ class LaporanHasilRepository:
                 )
         
         # Date range filters
-        if filters.created_from:
-            laporan_query = laporan_query.where(LaporanHasil.created_at >= filters.created_from)
-        if filters.created_to:
-            laporan_query = laporan_query.where(LaporanHasil.created_at <= filters.created_to)
+        # if filters.created_from:
+        #     laporan_query = laporan_query.where(LaporanHasil.created_at >= filters.created_from)
+        # if filters.created_to:
+        #     laporan_query = laporan_query.where(LaporanHasil.created_at <= filters.created_to)
         
         # Add tanggal_laporan filters if available
         if hasattr(filters, 'tanggal_laporan_from') and filters.tanggal_laporan_from:
@@ -292,3 +292,16 @@ class LaporanHasilRepository:
             'completed': 0,  # Placeholder
             'completion_rate': 0.0
         }
+
+    async def soft_delete(self, laporan_hasil_id: str) -> bool:
+        """Soft delete laporan hasil by ID."""
+        from datetime import datetime
+        
+        laporan_hasil = await self.get_by_id(laporan_hasil_id)
+        if not laporan_hasil:
+            return False
+        
+        laporan_hasil.deleted_at = datetime.utcnow()
+        laporan_hasil.updated_at = datetime.utcnow()
+        # JANGAN COMMIT - biarkan transaction context yang handle
+        return True

@@ -127,14 +127,14 @@ class MatriksRepository:
                 )
         
         # Date range filters untuk created_at
-        if filters.created_from:
-            matriks_query = matriks_query.where(Matriks.created_at >= filters.created_from)
-        if filters.created_to:
-            matriks_query = matriks_query.where(Matriks.created_at <= filters.created_to)
-        if hasattr(filters, 'tanggal_evaluasi_from') and filters.tanggal_evaluasi_from:
-            matriks_query = matriks_query.where(SuratTugas.tanggal_evaluasi_mulai >= filters.tanggal_evaluasi_from)
-        if hasattr(filters, 'tanggal_evaluasi_to') and filters.tanggal_evaluasi_to:
-            matriks_query = matriks_query.where(SuratTugas.tanggal_evaluasi_selesai <= filters.tanggal_evaluasi_to)
+        # if filters.created_from:
+        #     matriks_query = matriks_query.where(Matriks.created_at >= filters.created_from)
+        # if filters.created_to:
+        #     matriks_query = matriks_query.where(Matriks.created_at <= filters.created_to)
+        # if hasattr(filters, 'tanggal_evaluasi_from') and filters.tanggal_evaluasi_from:
+        #     matriks_query = matriks_query.where(SuratTugas.tanggal_evaluasi_mulai >= filters.tanggal_evaluasi_from)
+        # if hasattr(filters, 'tanggal_evaluasi_to') and filters.tanggal_evaluasi_to:
+        #     matriks_query = matriks_query.where(SuratTugas.tanggal_evaluasi_selesai <= filters.tanggal_evaluasi_to)
         
         # 🔥 STEP 2: Count total (SAFE)
         count_query = select(func.count()).select_from(matriks_query.subquery())
@@ -265,13 +265,16 @@ class MatriksRepository:
         }
     
     async def soft_delete(self, matriks_id: str) -> bool:
-        """Soft delete matriks."""
+        """Soft delete matriks by ID."""
+        from datetime import datetime
+        
         matriks = await self.get_by_id(matriks_id)
         if not matriks:
             return False
         
         matriks.deleted_at = datetime.utcnow()
-        await self.session.commit()
+        matriks.updated_at = datetime.utcnow()
+        # JANGAN COMMIT - biarkan transaction context yang handle
         return True
     
     async def delete_by_surat_tugas_id(self, surat_tugas_id: str) -> int:

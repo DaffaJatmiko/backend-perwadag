@@ -19,6 +19,7 @@ from src.schemas.shared import (
 from src.schemas.filters import KuisionerFilterParams
 from src.models.surat_tugas import SuratTugas
 from src.models.user import User
+from src.utils.evaluation_date_validator import validate_kuisioner_date_access
 
 
 class KuisionerService:
@@ -106,6 +107,14 @@ class KuisionerService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Kuisioner not found"
             )
+
+        surat_tugas_data = await self._get_surat_tugas_basic_info(kuisioner.surat_tugas_id)
+        
+        # 🔥 VALIDASI AKSES TANGGAL
+        validate_kuisioner_date_access(
+            tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
+            operation="update"
+        )
         
         # Set updated_by
         kuisioner.updated_by = updated_by
@@ -128,6 +137,15 @@ class KuisionerService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Kuisioner not found"
             )
+
+        surat_tugas_data = await self._get_surat_tugas_basic_info(kuisioner.surat_tugas_id)
+        
+        # 🔥 VALIDASI AKSES TANGGAL
+        validate_kuisioner_date_access(
+            tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
+            operation="upload"
+        )
+
         # 🔥 ADD: Permission check untuk PERWADAG
         if current_user and current_user.get("role") == "PERWADAG":
             # Get surat tugas info untuk check nama_perwadag

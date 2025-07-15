@@ -268,3 +268,16 @@ class KuisionerRepository:
             'completed': 0,  # Placeholder
             'completion_rate': 0.0
         }
+        
+    async def soft_delete(self, kuisioner_id: str) -> bool:
+        """Soft delete kuisioner by ID."""
+        from datetime import datetime
+        
+        kuisioner = await self.get_by_id(kuisioner_id)
+        if not kuisioner:
+            return False
+        
+        kuisioner.deleted_at = datetime.utcnow()
+        kuisioner.updated_at = datetime.utcnow()
+        # JANGAN COMMIT - biarkan transaction context yang handle
+        return True

@@ -136,10 +136,19 @@ class SuratTugasService:
             auto_generated["surat_pemberitahuan_id"] = surat_pemberitahuan.id
             
             # 2. Generate 3 meetings
-            meetings = await self.meeting_repo.create_all_meetings_for_surat_tugas(surat_tugas_id)
-            for meeting in meetings:
-                auto_generated[f"{meeting.meeting_type.value}_meeting_id"] = meeting.id
+            from src.models.evaluasi_enums import MeetingType
+            from src.schemas.meeting import MeetingCreate
             
+            meeting_types = [MeetingType.ENTRY, MeetingType.KONFIRMASI, MeetingType.EXIT]
+            
+            for meeting_type in meeting_types:
+                meeting_data = MeetingCreate(
+                    surat_tugas_id=surat_tugas_id,
+                    meeting_type=meeting_type
+                )
+                meeting = await self.meeting_repo.create(meeting_data)
+                auto_generated[f"{meeting.meeting_type.value}_meeting_id"] = meeting.id
+
             # 3. Generate matriks
             matriks = await self.matriks_repo.create(
                 MatriksCreate(surat_tugas_id=surat_tugas_id)
@@ -262,7 +271,7 @@ class SuratTugasService:
         if not surat_tugas:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Surat tugas not found"
+                detail="Surat tugas tidak ditemukan"
             )
         
         try:
@@ -270,80 +279,153 @@ class SuratTugasService:
             file_paths_to_delete = await self._get_all_file_paths_for_surat_tugas(surat_tugas_id)
             
             # 3. Delete all files from storage
+            file_deletion_result = {"deleted": 0, "failed": 0, "total": 0}
             if file_paths_to_delete:
-                deletion_result = evaluasi_file_manager.delete_multiple_files(file_paths_to_delete)
+                # Handle potential errors in file deletion
+                try:
+                    file_deletion_result = evaluasi_file_manager.delete_multiple_files(file_paths_to_delete)
+                except Exception as file_error:
+                    # Log file deletion errors but don't fail the entire operation
+                    print(f"Warning: Some files could not be deleted: {str(file_error)}")
+                    file_deletion_result = {"deleted": 0, "failed": len(file_paths_to_delete), "total": len(file_paths_to_delete)}
             
             # 4. Cascade soft delete all related records
-            await self._cascade_delete_related_records(surat_tugas_id)
+            cascade_result = await self._cascade_delete_related_records(surat_tugas_id)
             
             # 5. Delete surat tugas itself
-            await self.surat_tugas_repo.soft_delete(surat_tugas_id)
+            surat_tugas_deleted = await self.surat_tugas_repo.soft_delete(surat_tugas_id)
+            
+            if not surat_tugas_deleted:
+                raise Exception("Failed to delete surat tugas record")
+            
+            # Calculate total cascade deletions
+            total_cascade_deletions = sum(cascade_result.values())
             
             return SuccessResponse(
                 success=True,
-                message=f"Surat tugas {surat_tugas.no_surat} deleted successfully with all related data",
+                message=f"Surat tugas {surat_tugas.no_surat} berhasil dihapus beserta semua data terkait",
                 data={
                     "deleted_surat_tugas_id": surat_tugas_id,
-                    "deleted_files_count": len(file_paths_to_delete),
-                    "cascade_deleted": True
+                    "file_deletion": file_deletion_result,
+                    "cascade_deleted": True,
+                    "cascade_deletions": cascade_result,
+                    "total_cascade_deletions": total_cascade_deletions
                 }
             )
             
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to delete surat tugas: {str(e)}"
+                detail=f"Gagal menghapus surat tugas: {str(e)}"
             )
-    
-    async def _cascade_delete_related_records(self, surat_tugas_id: str) -> Dict[str, int]:
-        """Cascade delete semua related records."""
-        deleted_counts = {}
-        
-        # Delete all related records
-        deleted_counts["surat_pemberitahuan"] = await self.surat_pemberitahuan_repo.soft_delete_by_surat_tugas(surat_tugas_id)
-        deleted_counts["meetings"] = await self.meeting_repo.soft_delete_by_surat_tugas(surat_tugas_id)  
-        deleted_counts["matriks"] = await self.matriks_repo.soft_delete_by_surat_tugas(surat_tugas_id)
-        deleted_counts["laporan_hasil"] = await self.laporan_hasil_repo.soft_delete_by_surat_tugas(surat_tugas_id)
-        deleted_counts["kuisioner"] = await self.kuisioner_repo.soft_delete_by_surat_tugas(surat_tugas_id)
-        
-        return deleted_counts
     
     async def _get_all_file_paths_for_surat_tugas(self, surat_tugas_id: str) -> List[str]:
         """Get semua file paths terkait surat tugas untuk deletion."""
         file_paths = []
         
-        # Get surat tugas file
-        surat_tugas = await self.surat_tugas_repo.get_by_id(surat_tugas_id)
-        if surat_tugas and surat_tugas.file_surat_tugas:
-            file_paths.append(surat_tugas.file_surat_tugas)
+        try:
+            # 1. Get surat tugas file
+            surat_tugas = await self.surat_tugas_repo.get_by_id(surat_tugas_id)
+            if surat_tugas and surat_tugas.file_surat_tugas:
+                file_paths.append(surat_tugas.file_surat_tugas)
+            
+            # 2. Get surat pemberitahuan file
+            surat_pemberitahuan = await self.surat_pemberitahuan_repo.get_by_surat_tugas_id(surat_tugas_id)
+            if surat_pemberitahuan and surat_pemberitahuan.file_dokumen:
+                file_paths.append(surat_pemberitahuan.file_dokumen)
+            
+            # 3. Get all meeting files (PERBAIKAN: gunakan method yang benar)
+            meetings = await self.meeting_repo.get_all_by_surat_tugas_id(surat_tugas_id)
+            for meeting in meetings:
+                # Check file_bukti_hadir yang mungkin berisi JSON array
+                if meeting.file_bukti_hadir:
+                    try:
+                        # Coba parse sebagai JSON jika berisi multiple files
+                        import json
+                        files_data = json.loads(meeting.file_bukti_hadir)
+                        if isinstance(files_data, list):
+                            # Multiple files format
+                            for file_data in files_data:
+                                if isinstance(file_data, dict) and 'path' in file_data:
+                                    file_paths.append(file_data['path'])
+                        elif isinstance(files_data, dict) and 'path' in files_data:
+                            # Single file format
+                            file_paths.append(files_data['path'])
+                    except (json.JSONDecodeError, TypeError):
+                        # Single file path format (string)
+                        file_paths.append(meeting.file_bukti_hadir)
+            
+            # 4. Get matriks file
+            matriks = await self.matriks_repo.get_by_surat_tugas_id(surat_tugas_id)
+            if matriks and matriks.file_dokumen_matriks:
+                file_paths.append(matriks.file_dokumen_matriks)
+            
+            # 5. Get laporan hasil file
+            laporan_hasil = await self.laporan_hasil_repo.get_by_surat_tugas_id(surat_tugas_id)
+            if laporan_hasil and laporan_hasil.file_laporan_hasil:
+                file_paths.append(laporan_hasil.file_laporan_hasil)
+            
+            # 6. Get kuisioner file
+            kuisioner = await self.kuisioner_repo.get_by_surat_tugas_id(surat_tugas_id)
+            if kuisioner and kuisioner.file_kuisioner:
+                file_paths.append(kuisioner.file_kuisioner)
+            
+            return file_paths
+            
+        except Exception as e:
+            # Log error but don't fail the delete process
+            print(f"Warning: Error getting file paths for surat tugas {surat_tugas_id}: {str(e)}")
+            return file_paths
+
+    async def _cascade_delete_related_records(self, surat_tugas_id: str) -> Dict[str, int]:
+        """Cascade delete semua related records."""
+        deleted_counts = {}
         
-        # Get surat pemberitahuan file
-        surat_pemberitahuan = await self.surat_pemberitahuan_repo.get_by_surat_tugas_id(surat_tugas_id)
-        if surat_pemberitahuan and surat_pemberitahuan.file_dokumen:
-            file_paths.append(surat_pemberitahuan.file_dokumen)
-        
-        # Get all meeting files
-        meetings = await self.meeting_repo.get_all_by_surat_tugas(surat_tugas_id)
-        for meeting in meetings:
-            meeting_file_paths = await self.meeting_repo.get_file_paths_for_deletion(meeting.id)
-            file_paths.extend(meeting_file_paths)
-        
-        # Get matriks file
-        matriks = await self.matriks_repo.get_by_surat_tugas_id(surat_tugas_id)
-        if matriks and matriks.file_dokumen_matriks:
-            file_paths.append(matriks.file_dokumen_matriks)
-        
-        # Get laporan hasil file
-        laporan_hasil = await self.laporan_hasil_repo.get_by_surat_tugas_id(surat_tugas_id)
-        if laporan_hasil and laporan_hasil.file_laporan_hasil:
-            file_paths.append(laporan_hasil.file_laporan_hasil)
-        
-        # Get kuisioner file
-        kuisioner = await self.kuisioner_repo.get_by_surat_tugas_id(surat_tugas_id)
-        if kuisioner and kuisioner.file_kuisioner:
-            file_paths.append(kuisioner.file_kuisioner)
-        
-        return file_paths
+        try:
+            # 1. Delete surat pemberitahuan
+            surat_pemberitahuan = await self.surat_pemberitahuan_repo.get_by_surat_tugas_id(surat_tugas_id)
+            if surat_pemberitahuan:
+                await self.surat_pemberitahuan_repo.soft_delete(surat_pemberitahuan.id)
+                deleted_counts["surat_pemberitahuan"] = 1
+            else:
+                deleted_counts["surat_pemberitahuan"] = 0
+            
+            # 2. Delete all meetings
+            meetings = await self.meeting_repo.get_all_by_surat_tugas_id(surat_tugas_id)
+            meeting_count = 0
+            for meeting in meetings:
+                await self.meeting_repo.soft_delete(meeting.id)
+                meeting_count += 1
+            deleted_counts["meetings"] = meeting_count
+            
+            # 3. Delete matriks
+            matriks = await self.matriks_repo.get_by_surat_tugas_id(surat_tugas_id)
+            if matriks:
+                await self.matriks_repo.soft_delete(matriks.id)
+                deleted_counts["matriks"] = 1
+            else:
+                deleted_counts["matriks"] = 0
+            
+            # 4. Delete laporan hasil
+            laporan_hasil = await self.laporan_hasil_repo.get_by_surat_tugas_id(surat_tugas_id)
+            if laporan_hasil:
+                await self.laporan_hasil_repo.soft_delete(laporan_hasil.id)
+                deleted_counts["laporan_hasil"] = 1
+            else:
+                deleted_counts["laporan_hasil"] = 0
+            
+            # 5. Delete kuisioner
+            kuisioner = await self.kuisioner_repo.get_by_surat_tugas_id(surat_tugas_id)
+            if kuisioner:
+                await self.kuisioner_repo.soft_delete(kuisioner.id)
+                deleted_counts["kuisioner"] = 1
+            else:
+                deleted_counts["kuisioner"] = 0
+            
+            return deleted_counts
+            
+        except Exception as e:
+            raise Exception(f"Failed to cascade delete related records: {str(e)}")
     
     # ===== FILE OPERATIONS =====
     
@@ -464,9 +546,9 @@ class SuratTugasService:
     async def _calculate_progress(self, surat_tugas_id: str) -> EvaluasiProgress:
         """Calculate progress evaluasi berdasarkan completion status semua related records."""
         
-        # Get all related data
+        # Get all related data dengan error handling
         surat_pemberitahuan = await self.surat_pemberitahuan_repo.get_by_surat_tugas_id(surat_tugas_id)
-        meetings = await self.meeting_repo.get_all_by_surat_tugas_id(surat_tugas_id)
+        meetings = await self.meeting_repo.get_all_by_surat_tugas_id(surat_tugas_id)  # PERBAIKAN: nama method yang benar
         matriks = await self.matriks_repo.get_by_surat_tugas_id(surat_tugas_id)
         laporan_hasil = await self.laporan_hasil_repo.get_by_surat_tugas_id(surat_tugas_id)
         kuisioner = await self.kuisioner_repo.get_by_surat_tugas_id(surat_tugas_id)

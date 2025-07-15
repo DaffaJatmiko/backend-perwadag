@@ -91,6 +91,18 @@ class SuratPemberitahuanRepository:
         await self.session.commit()
         return result.rowcount
 
+    async def soft_delete(self, surat_pemberitahuan_id: str) -> bool:
+        """Soft delete surat pemberitahuan by ID."""
+        from datetime import datetime
+        
+        surat_pemberitahuan = await self.get_by_id(surat_pemberitahuan_id)
+        if not surat_pemberitahuan:
+            return False
+        
+        surat_pemberitahuan.deleted_at = datetime.utcnow()
+        surat_pemberitahuan.updated_at = datetime.utcnow()
+        # JANGAN COMMIT - biarkan transaction context yang handle
+        return True
 
     async def get_all_filtered(
         self,
@@ -202,17 +214,17 @@ class SuratPemberitahuanRepository:
                 )
         
         # Date range filters
-        if filters.tanggal_from:
-            query = query.where(SuratPemberitahuan.tanggal_surat_pemberitahuan >= filters.tanggal_from)
+        # if filters.tanggal_from:
+        #     query = query.where(SuratPemberitahuan.tanggal_surat_pemberitahuan >= filters.tanggal_from)
         
-        if filters.tanggal_to:
-            query = query.where(SuratPemberitahuan.tanggal_surat_pemberitahuan <= filters.tanggal_to)
+        # if filters.tanggal_to:
+        #     query = query.where(SuratPemberitahuan.tanggal_surat_pemberitahuan <= filters.tanggal_to)
         
-        if filters.created_from:
-            query = query.where(SuratPemberitahuan.created_at >= filters.created_from)
+        # if filters.created_from:
+        #     query = query.where(SuratPemberitahuan.created_at >= filters.created_from)
         
-        if filters.created_to:
-            query = query.where(SuratPemberitahuan.created_at <= filters.created_to)
+        # if filters.created_to:
+        #     query = query.where(SuratPemberitahuan.created_at <= filters.created_to)
         
         # Get total count
         count_query = select(func.count()).select_from(query.subquery())

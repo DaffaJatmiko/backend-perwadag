@@ -22,6 +22,8 @@ from src.schemas.filters import MeetingFilterParams
 from src.models.surat_tugas import SuratTugas
 from src.models.user import User
 from src.models.evaluasi_enums import MeetingType
+from src.utils.evaluation_date_validator import validate_meeting_date_access
+
 
 
 class MeetingService:
@@ -182,16 +184,33 @@ class MeetingService:
         update_data: MeetingUpdate, 
         updated_by: str
     ) -> MeetingResponse:
-        """Update meeting."""
-        meeting = await self.meeting_repo.update(meeting_id, update_data)
+        """Update meeting dengan date validation."""
+        
+        # 1. Get meeting dan surat tugas info
+        meeting = await self.meeting_repo.get_by_id(meeting_id)
         if not meeting:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Meeting not found"
             )
         
-        # Set updated_by
-        meeting.updated_by = updated_by
+        # 2. Get tanggal evaluasi dari surat tugas
+        surat_tugas_data = await self._get_surat_tugas_basic_info(meeting.surat_tugas_id)
+        if not surat_tugas_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Related surat tugas not found"
+            )
+        
+        # 3. 🔥 VALIDASI AKSES TANGGAL - CEK APAKAH MASIH BISA EDIT
+        validate_meeting_date_access(
+            tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
+            operation="update"
+        )
+        
+        # 4. Lanjutkan update jika validasi berhasil
+        updated_meeting = await self.meeting_repo.update(meeting_id, update_data)
+        updated_meeting.updated_by = updated_by
         await self.meeting_repo.session.commit()
         
         return await self.get_meeting_or_404(meeting_id)
@@ -206,12 +225,27 @@ class MeetingService:
     ) -> MeetingFileUploadResponse:
         """Upload multiple files ke meeting."""
         
+        # 1. Get meeting dan surat tugas info
         meeting = await self.meeting_repo.get_by_id(meeting_id)
         if not meeting:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Meeting not found"
             )
+        
+        surat_tugas_data = await self._get_surat_tugas_basic_info(meeting.surat_tugas_id)
+        if not surat_tugas_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Related surat tugas not found"
+            )
+        
+        # 2. 🔥 VALIDASI AKSES TANGGAL - CEK APAKAH MASIH BISA UPLOAD
+        validate_meeting_date_access(
+            tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
+            operation="upload"
+        )
+
         
         try:
             # Get existing files

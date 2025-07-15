@@ -4,6 +4,9 @@
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, status, UploadFile
 from fastapi.responses import FileResponse
+from src.models.surat_tugas import SuratTugas
+from src.models.user import User
+from sqlalchemy import select, and_
 
 from src.repositories.surat_pemberitahuan import SuratPemberitahuanRepository
 from src.schemas.surat_pemberitahuan import (
@@ -17,6 +20,8 @@ from src.schemas.shared import (
     PaginationInfo, ModuleStatistics
 )
 from src.schemas.filters import SuratPemberitahuanFilterParams
+from src.utils.evaluation_date_validator import validate_surat_pemberitahuan_date_access
+
 
 class SuratPemberitahuanService:
     """Service untuk surat pemberitahuan operations."""
@@ -108,16 +113,47 @@ class SuratPemberitahuanService:
         self, 
         surat_pemberitahuan_id: str,
         update_data: SuratPemberitahuanUpdate,
-        user_id: str
+        updated_by: str
     ) -> SuratPemberitahuanResponse:
-        """Update surat pemberitahuan."""
-        updated = await self.surat_pemberitahuan_repo.update(surat_pemberitahuan_id, update_data)
-        if not updated:
+        """Update surat pemberitahuan dengan date validation."""
+        
+        # 1. Get surat pemberitahuan
+        surat_pemberitahuan = await self.surat_pemberitahuan_repo.get_by_id(surat_pemberitahuan_id)
+        if not surat_pemberitahuan:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Surat pemberitahuan not found"
+                detail="Surat pemberitahuan tidak ditemukan"
             )
-        return self._build_response(updated)
+        
+        # 2. Get surat tugas info untuk date validation
+        surat_tugas_data = await self._get_surat_tugas_basic_info(surat_pemberitahuan.surat_tugas_id)
+        if not surat_tugas_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Surat tugas terkait tidak ditemukan"
+            )
+        
+        # 3. 🔥 VALIDASI AKSES TANGGAL
+        from src.utils.evaluation_date_validator import validate_surat_pemberitahuan_date_access
+        validate_surat_pemberitahuan_date_access(
+            tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
+            operation="update"
+        )
+        
+        # 4. Update surat pemberitahuan
+        updated_surat_pemberitahuan = await self.surat_pemberitahuan_repo.update(surat_pemberitahuan_id, update_data)
+        if not updated_surat_pemberitahuan:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Gagal mengupdate surat pemberitahuan"
+            )
+        
+        # Set updated_by
+        updated_surat_pemberitahuan.updated_by = updated_by
+        await self.surat_pemberitahuan_repo.session.commit()
+        
+        # 5. Return enriched response
+        return await self._build_enriched_response(updated_surat_pemberitahuan, surat_tugas_data)
     
     async def upload_file(
         self,
@@ -132,7 +168,14 @@ class SuratPemberitahuanService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Surat pemberitahuan not found"
             )
+        surat_tugas_data = await self._get_surat_tugas_basic_info(surat_pemberitahuan.surat_tugas_id)
         
+        # 🔥 VALIDASI AKSES TANGGAL
+        validate_surat_pemberitahuan_date_access(
+            tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
+            operation="upload"
+        )
+
         # Delete old file if exists
         if surat_pemberitahuan.file_dokumen:
             evaluasi_file_manager.delete_file(surat_pemberitahuan.file_dokumen)
@@ -191,49 +234,89 @@ class SuratPemberitahuanService:
             download_type=download_type
         )
     
+    async def _get_surat_tugas_basic_info(self, surat_tugas_id: str) -> Optional[Dict[str, Any]]:
+        """Get basic surat tugas information untuk enriched response."""
+        query = (
+            select(
+                SuratTugas.no_surat,
+                SuratTugas.nama_perwadag,
+                SuratTugas.inspektorat,
+                SuratTugas.tanggal_evaluasi_mulai,
+                SuratTugas.tanggal_evaluasi_selesai,
+                User.nama.label('perwadag_nama')
+            )
+            .join(User, SuratTugas.user_perwadag_id == User.id)
+            .where(
+                and_(
+                    SuratTugas.id == surat_tugas_id,
+                    SuratTugas.deleted_at.is_(None)
+                )
+            )
+        )
+        
+        result = await self.surat_pemberitahuan_repo.session.execute(query)
+        row = result.fetchone()
+        
+        if not row:
+            return None
+        
+        return {
+            'no_surat': row[0],
+            'nama_perwadag': row[1],
+            'inspektorat': row[2],
+            'tanggal_evaluasi_mulai': row[3],
+            'tanggal_evaluasi_selesai': row[4],
+            'tahun_evaluasi': row[3].year,
+            'perwadag_nama': row[5],
+            'evaluation_status': 'active'
+        }
+
     async def _build_enriched_response(
         self, 
         surat_pemberitahuan, 
         surat_tugas_data: Dict[str, Any]
     ) -> SuratPemberitahuanResponse:
-        """Build enriched response dengan surat tugas data."""
+        """Build enriched response dengan surat tugas data dan file information."""
+        
+        # Build file information
+        file_urls = None
+        file_metadata = None
+        
+        if surat_pemberitahuan.file_dokumen:
+            file_info = evaluasi_file_manager.get_file_info(surat_pemberitahuan.file_dokumen)
+            
+            file_urls = FileUrls(
+                download_url=evaluasi_file_manager.get_file_url(surat_pemberitahuan.file_dokumen, url_type="download"),
+                view_url=evaluasi_file_manager.get_file_url(surat_pemberitahuan.file_dokumen, url_type="view"),
+                is_viewable=file_info.get('content_type', '').startswith(('image/', 'application/pdf'))
+            )
+            
+            if file_info:
+                file_metadata = FileMetadata(
+                    filename=file_info['filename'],
+                    original_filename=file_info.get('original_filename'),
+                    size=file_info['size'],
+                    size_mb=round(file_info['size'] / 1024 / 1024, 2),
+                    content_type=file_info.get('content_type', 'application/octet-stream'),
+                    extension=file_info.get('extension', ''),
+                    uploaded_at=surat_pemberitahuan.updated_at or surat_pemberitahuan.created_at,
+                    uploaded_by=surat_pemberitahuan.updated_by,
+                    is_viewable=file_info.get('content_type', '').startswith(('image/', 'application/pdf'))
+                )
         
         # Build surat tugas basic info
         surat_tugas_info = SuratTugasBasicInfo(
-            id=surat_tugas_data['id'],
+            id=surat_pemberitahuan.surat_tugas_id,
             no_surat=surat_tugas_data['no_surat'],
             nama_perwadag=surat_tugas_data['nama_perwadag'],
             inspektorat=surat_tugas_data['inspektorat'],
             tanggal_evaluasi_mulai=surat_tugas_data['tanggal_evaluasi_mulai'],
             tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
             tahun_evaluasi=surat_tugas_data['tahun_evaluasi'],
-            durasi_evaluasi=surat_tugas_data['durasi_evaluasi'],
-            evaluation_status=surat_tugas_data['evaluation_status'],
-            is_evaluation_active=surat_tugas_data['is_evaluation_active']
+            durasi_evaluasi=(surat_tugas_data['tanggal_evaluasi_selesai'] - surat_tugas_data['tanggal_evaluasi_mulai']).days + 1,
+            evaluation_status=surat_tugas_data.get('evaluation_status', 'active'),
+            is_evaluation_active=True
         )
-        
-        # Build file URLs and metadata
-        file_urls = None
-        file_metadata = None
-        
-        if surat_pemberitahuan.file_dokumen:
-            file_info = evaluasi_file_manager.get_file_info(surat_pemberitahuan.file_dokumen)
-            if file_info:
-                file_urls = FileUrls(
-                    file_url=file_info['url'],
-                    download_url=f"/api/v1/evaluasi/surat-pemberitahuan/{surat_pemberitahuan.id}/download",
-                    view_url=f"/api/v1/evaluasi/surat-pemberitahuan/{surat_pemberitahuan.id}/view"
-                )
-                
-                file_metadata = FileMetadata(
-                    filename=file_info['filename'],
-                    size=file_info['size'],
-                    size_mb=file_info['size_mb'],
-                    content_type=file_info['content_type'],
-                    extension=file_info['extension'],
-                    uploaded_at=surat_pemberitahuan.created_at,
-                    is_viewable=file_info['is_viewable']
-                )
         
         return SuratPemberitahuanResponse(
             id=surat_pemberitahuan.id,
@@ -247,7 +330,7 @@ class SuratPemberitahuanService:
             has_date=surat_pemberitahuan.has_date(),
             completion_percentage=surat_pemberitahuan.get_completion_percentage(),
             surat_tugas_info=surat_tugas_info,
-            nama_perwadag=surat_tugas_data['nama_perwadag'],
+            nama_perwadag=surat_tugas_data['perwadag_nama'],
             inspektorat=surat_tugas_data['inspektorat'],
             tanggal_evaluasi_mulai=surat_tugas_data['tanggal_evaluasi_mulai'],
             tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],

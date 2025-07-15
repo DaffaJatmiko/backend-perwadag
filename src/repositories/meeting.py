@@ -246,3 +246,16 @@ class MeetingRepository:
                 'exit': 0
             }
         }
+
+    async def soft_delete(self, meeting_id: str) -> bool:
+        """Soft delete meeting by ID."""
+        from datetime import datetime
+        
+        meeting = await self.get_by_id(meeting_id)
+        if not meeting:
+            return False
+        
+        meeting.deleted_at = datetime.utcnow()
+        meeting.updated_at = datetime.utcnow()
+        # JANGAN COMMIT - biarkan transaction context yang handle
+        return True

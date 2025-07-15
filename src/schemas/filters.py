@@ -32,8 +32,8 @@ class UserFilterParams(BaseModel):
     is_active: Optional[bool] = Field(None, description="Filter by active status")
     
     # Age filters
-    min_age: Optional[int] = Field(None, ge=17, le=70, description="Minimum age filter")
-    max_age: Optional[int] = Field(None, ge=17, le=70, description="Maximum age filter")
+    # min_age: Optional[int] = Field(None, ge=17, le=70, description="Minimum age filter")
+    # max_age: Optional[int] = Field(None, ge=17, le=70, description="Maximum age filter")
     
     @field_validator('search')
     @classmethod
@@ -120,14 +120,14 @@ class SuratTugasFilterParams(BaseModel):
         le=2030, 
         description="Filter by tahun evaluasi"
     )
-    tanggal_mulai_from: Optional[date] = Field(
-        None, 
-        description="Filter evaluasi mulai dari tanggal"
-    )
-    tanggal_mulai_to: Optional[date] = Field(
-        None, 
-        description="Filter evaluasi mulai sampai tanggal"
-    )
+    # tanggal_mulai_from: Optional[date] = Field(
+    #     None, 
+    #     description="Filter evaluasi mulai dari tanggal"
+    # )
+    # tanggal_mulai_to: Optional[date] = Field(
+    #     None, 
+    #     description="Filter evaluasi mulai sampai tanggal"
+    # )
     
     # Status filters
     is_active: Optional[bool] = Field(
@@ -140,16 +140,16 @@ class SuratTugasFilterParams(BaseModel):
     )
     
     # Progress filters
-    is_completed: Optional[bool] = Field(
-        None, 
-        description="Filter by completion status"
-    )
-    min_progress: Optional[int] = Field(
-        None, 
-        ge=0, 
-        le=100, 
-        description="Minimum progress percentage"
-    )
+    # is_completed: Optional[bool] = Field(
+    #     None, 
+    #     description="Filter by completion status"
+    # )
+    # min_progress: Optional[int] = Field(
+    #     None, 
+    #     ge=0, 
+    #     le=100, 
+    #     description="Minimum progress percentage"
+    # )
     
     @field_validator('search')
     @classmethod
@@ -163,15 +163,15 @@ class SuratTugasFilterParams(BaseModel):
                 raise ValueError("Search term too long (max 100 characters)")
         return search
     
-    @field_validator('tanggal_mulai_to')
-    @classmethod
-    def validate_date_range(cls, tanggal_to: Optional[date], info) -> Optional[date]:
-        """Validate date range."""
-        if tanggal_to and hasattr(info, 'data') and 'tanggal_mulai_from' in info.data:
-            tanggal_from = info.data['tanggal_mulai_from']
-            if tanggal_from and tanggal_to < tanggal_from:
-                raise ValueError("End date must be after start date")
-        return tanggal_to
+    # @field_validator('tanggal_mulai_to')
+    # @classmethod
+    # def validate_date_range(cls, tanggal_to: Optional[date], info) -> Optional[date]:
+    #     """Validate date range."""
+    #     if tanggal_to and hasattr(info, 'data') and 'tanggal_mulai_from' in info.data:
+    #         tanggal_from = info.data['tanggal_mulai_from']
+    #         if tanggal_from and tanggal_to < tanggal_from:
+    #             raise ValueError("End date must be after start date")
+    #     return tanggal_to
 
 
 class MeetingFilterParams(BaseModel):
@@ -202,14 +202,14 @@ class MeetingFilterParams(BaseModel):
     )
     
     # Date filters
-    tanggal_from: Optional[date] = Field(
-        None, 
-        description="Filter meeting dari tanggal"
-    )
-    tanggal_to: Optional[date] = Field(
-        None, 
-        description="Filter meeting sampai tanggal"
-    )
+    # tanggal_from: Optional[date] = Field(
+    #     None, 
+    #     description="Filter meeting dari tanggal"
+    # )
+    # tanggal_to: Optional[date] = Field(
+    #     None, 
+    #     description="Filter meeting sampai tanggal"
+    # )
     tahun: Optional[int] = Field(
         None, 
         ge=2020, 
@@ -269,10 +269,10 @@ class SuratPemberitahuanFilterParams(BaseModel):
     is_completed: Optional[bool] = Field(None, description="Filter by completion status")
     
     # Date range filters
-    tanggal_from: Optional[date] = Field(None, description="Filter from tanggal surat")
-    tanggal_to: Optional[date] = Field(None, description="Filter to tanggal surat")
-    created_from: Optional[date] = Field(None, description="Filter created from date")
-    created_to: Optional[date] = Field(None, description="Filter created to date")
+    # tanggal_from: Optional[date] = Field(None, description="Filter from tanggal surat")
+    # tanggal_to: Optional[date] = Field(None, description="Filter to tanggal surat")
+    # created_from: Optional[date] = Field(None, description="Filter created from date")
+    # created_to: Optional[date] = Field(None, description="Filter created to date")
     
     @field_validator('search')
     @classmethod
@@ -341,8 +341,8 @@ class MatriksFilterParams(BaseModel):
     is_completed: Optional[bool] = Field(None, description="Filter by completion status")
     
     # Date filters
-    created_from: Optional[date] = Field(None, description="Filter created from date")
-    created_to: Optional[date] = Field(None, description="Filter created to date")
+    # created_from: Optional[date] = Field(None, description="Filter created from date")
+    # created_to: Optional[date] = Field(None, description="Filter created to date")
     
     include_statistics: bool = Field(default=False, description="Include statistics in response")
 
@@ -383,10 +383,10 @@ class LaporanHasilFilterParams(BaseModel):
     is_completed: Optional[bool] = Field(None, description="Filter by completion status")
     
     # Date filters specific to laporan
-    tanggal_laporan_from: Optional[date] = Field(None, description="Filter from tanggal laporan")
-    tanggal_laporan_to: Optional[date] = Field(None, description="Filter to tanggal laporan")
-    created_from: Optional[date] = Field(None, description="Filter created from date")
-    created_to: Optional[date] = Field(None, description="Filter created to date")
+    # tanggal_laporan_from: Optional[date] = Field(None, description="Filter from tanggal laporan")
+    # tanggal_laporan_to: Optional[date] = Field(None, description="Filter to tanggal laporan")
+    # created_from: Optional[date] = Field(None, description="Filter created from date")
+    # created_to: Optional[date] = Field(None, description="Filter created to date")
     
     @field_validator('search')
     @classmethod

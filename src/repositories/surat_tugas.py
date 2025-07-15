@@ -110,11 +110,11 @@ class SuratTugasRepository:
                 func.extract('year', SuratTugas.tanggal_evaluasi_mulai) == filters.tahun_evaluasi
             )
         
-        if filters.tanggal_mulai_from:
-            query = query.where(SuratTugas.tanggal_evaluasi_mulai >= filters.tanggal_mulai_from)
+        # if filters.tanggal_mulai_from:
+        #     query = query.where(SuratTugas.tanggal_evaluasi_mulai >= filters.tanggal_mulai_from)
         
-        if filters.tanggal_mulai_to:
-            query = query.where(SuratTugas.tanggal_evaluasi_mulai <= filters.tanggal_mulai_to)
+        # if filters.tanggal_mulai_to:
+        #     query = query.where(SuratTugas.tanggal_evaluasi_mulai <= filters.tanggal_mulai_to)
         
         # Status filters
         if filters.is_active is not None:
@@ -222,17 +222,18 @@ class SuratTugasRepository:
     
     # ===== DELETE OPERATIONS =====
     
-    async def soft_delete(self, surat_tugas_id: str) -> Optional[SuratTugas]:
-        """Soft delete surat tugas."""
+    async def soft_delete(self, surat_tugas_id: str) -> bool:
+        """Soft delete surat tugas by ID."""
+        from datetime import datetime
+        
         surat_tugas = await self.get_by_id(surat_tugas_id)
         if not surat_tugas:
-            return None
+            return False
         
         surat_tugas.deleted_at = datetime.utcnow()
         surat_tugas.updated_at = datetime.utcnow()
-        
-        await self.session.commit()
-        return surat_tugas
+        # JANGAN COMMIT - biarkan transaction context yang handle
+        return True
     
     async def hard_delete(self, surat_tugas_id: str) -> bool:
         """Hard delete surat tugas."""

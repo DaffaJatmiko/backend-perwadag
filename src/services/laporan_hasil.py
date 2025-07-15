@@ -19,6 +19,8 @@ from src.schemas.shared import (
 from src.schemas.filters import LaporanHasilFilterParams
 from src.models.surat_tugas import SuratTugas
 from src.models.user import User
+from src.utils.evaluation_date_validator import validate_laporan_hasil_date_access
+
 
 
 class LaporanHasilService:
@@ -116,7 +118,15 @@ class LaporanHasilService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Laporan hasil not found"
             )
+
+        surat_tugas_data = await self._get_surat_tugas_basic_info(laporan_hasil.surat_tugas_id)
         
+        # 🔥 VALIDASI AKSES TANGGAL
+        validate_laporan_hasil_date_access(
+            tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
+            operation="update"
+        )
+
         # Set updated_by
         laporan_hasil.updated_by = updated_by
         await self.laporan_hasil_repo.session.commit()
@@ -138,6 +148,15 @@ class LaporanHasilService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Laporan hasil not found"
             )
+
+        surat_tugas_data = await self._get_surat_tugas_basic_info(laporan_hasil.surat_tugas_id)
+        
+        # 🔥 VALIDASI AKSES TANGGAL
+        validate_laporan_hasil_date_access(
+            tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
+            operation="upload"
+        )
+
         # 🔥 ADD: Permission check untuk PERWADAG
         if current_user and current_user.get("role") == "PERWADAG":
             # Get surat tugas info untuk check nama_perwadag

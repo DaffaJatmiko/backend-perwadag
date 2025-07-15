@@ -166,26 +166,26 @@ async def get_surat_tugas(
     return await surat_tugas_service.get_surat_tugas_or_404(surat_tugas_id)
 
 
-@router.get("/{surat_tugas_id}/overview", response_model=SuratTugasOverview)
-async def get_surat_tugas_overview(
-    surat_tugas_id: str,
-    current_user: dict = Depends(require_evaluasi_read_access()),
-    surat_tugas_service: SuratTugasService = Depends(get_surat_tugas_service)
-):
-    """
-    Get complete overview surat tugas dengan SEMUA related data.
+# @router.get("/{surat_tugas_id}/overview", response_model=SuratTugasOverview)
+# async def get_surat_tugas_overview(
+#     surat_tugas_id: str,
+#     current_user: dict = Depends(require_evaluasi_read_access()),
+#     surat_tugas_service: SuratTugasService = Depends(get_surat_tugas_service)
+# ):
+#     """
+#     Get complete overview surat tugas dengan SEMUA related data.
     
-    **Returns**: 
-    - Surat tugas data
-    - Surat pemberitahuan data
-    - All 3 meetings data
-    - Matriks data
-    - Laporan hasil data
-    - Kuisioner data
+#     **Returns**: 
+#     - Surat tugas data
+#     - Surat pemberitahuan data
+#     - All 3 meetings data
+#     - Matriks data
+#     - Laporan hasil data
+#     - Kuisioner data
     
-    **Use case**: Detail page yang menampilkan semua informasi evaluasi
-    """
-    return await surat_tugas_service.get_surat_tugas_overview(surat_tugas_id)
+#     **Use case**: Detail page yang menampilkan semua informasi evaluasi
+#     """
+#     return await surat_tugas_service.get_surat_tugas_overview(surat_tugas_id)
 
 
 # ===== UPDATE OPERATIONS =====
@@ -270,62 +270,62 @@ async def delete_surat_tugas(
 
 # ===== STATISTICS & REPORTS =====
 
-@router.get("/statistics/overview", response_model=SuratTugasStats)
-async def get_surat_tugas_statistics(
-    current_user: dict = Depends(require_statistics_access()),
-    surat_tugas_service: SuratTugasService = Depends(get_surat_tugas_service)
-):
-    """
-    Get comprehensive statistics surat tugas.
+# @router.get("/statistics/overview", response_model=SuratTugasStats)
+# async def get_surat_tugas_statistics(
+#     current_user: dict = Depends(require_statistics_access()),
+#     surat_tugas_service: SuratTugasService = Depends(get_surat_tugas_service)
+# ):
+#     """
+#     Get comprehensive statistics surat tugas.
     
-    **Role-based Statistics**:
-    - **Admin**: Statistics semua surat tugas
-    - **Inspektorat**: Statistics untuk wilayah kerjanya
-    - **Perwadag**: Statistics milik sendiri
+#     **Role-based Statistics**:
+#     - **Admin**: Statistics semua surat tugas
+#     - **Inspektorat**: Statistics untuk wilayah kerjanya
+#     - **Perwadag**: Statistics milik sendiri
     
-    **Returns**:
-    - Total surat tugas
-    - Breakdown by tahun
-    - Breakdown by inspektorat (admin only)
-    - Evaluasi status (completed, in_progress, upcoming)
-    - Completion rate
-    """
-    filter_scope = get_evaluasi_filter_scope(current_user)
+#     **Returns**:
+#     - Total surat tugas
+#     - Breakdown by tahun
+#     - Breakdown by inspektorat (admin only)
+#     - Evaluasi status (completed, in_progress, upcoming)
+#     - Completion rate
+#     """
+#     filter_scope = get_evaluasi_filter_scope(current_user)
     
-    return await surat_tugas_service.get_statistics(
-        filter_scope["user_role"],
-        filter_scope.get("user_inspektorat"),
-        filter_scope.get("user_id")
-    )
+#     return await surat_tugas_service.get_statistics(
+#         filter_scope["user_role"],
+#         filter_scope.get("user_inspektorat"),
+#         filter_scope.get("user_id")
+#     )
 
 
 # ===== UTILITY ENDPOINTS =====
 
-@router.get("/check/no-surat-availability")
-async def check_no_surat_availability(
-    no_surat: str = Query(..., description="Nomor surat yang akan dicek"),
-    exclude_id: Optional[str] = Query(None, description="ID yang dikecualikan (untuk update)"),
-    current_user: dict = Depends(require_surat_tugas_create_access()),
-    session: AsyncSession = Depends(get_db)
-):
-    """
-    Check availability nomor surat.
+# @router.get("/check/no-surat-availability")
+# async def check_no_surat_availability(
+#     no_surat: str = Query(..., description="Nomor surat yang akan dicek"),
+#     exclude_id: Optional[str] = Query(None, description="ID yang dikecualikan (untuk update)"),
+#     current_user: dict = Depends(require_surat_tugas_create_access()),
+#     session: AsyncSession = Depends(get_db)
+# ):
+#     """
+#     Check availability nomor surat.
     
-    **Use case**: Validation saat create/update surat tugas
+#     **Use case**: Validation saat create/update surat tugas
     
-    **Returns**: 
-    - available: true/false
-    - message: explanation
-    """
-    surat_tugas_repo = SuratTugasRepository(session)
+#     **Returns**: 
+#     - available: true/false
+#     - message: explanation
+#     """
+#     surat_tugas_repo = SuratTugasRepository(session)
     
-    exists = await surat_tugas_repo.no_surat_exists(no_surat, exclude_id)
+#     exists = await surat_tugas_repo.no_surat_exists(no_surat, exclude_id)
     
-    return {
-        "no_surat": no_surat,
-        "available": not exists,
-        "message": "Nomor surat available" if not exists else "Nomor surat already exists"
-    }
+#     return {
+#         "no_surat": no_surat,
+#         "available": not exists,
+#         "message": "Nomor surat available" if not exists else "Nomor surat already exists"
+#     }
 
 
 @router.get("/perwadag/list")
@@ -379,42 +379,42 @@ async def get_available_perwadag(
 
 # ===== BULK OPERATIONS =====
 
-@router.post("/bulk/progress-check")
-async def bulk_check_progress(
-    surat_tugas_ids: list[str],
-    current_user: dict = Depends(require_evaluasi_read_access()),
-    surat_tugas_service: SuratTugasService = Depends(get_surat_tugas_service)
-):
-    """
-    Bulk check progress untuk multiple surat tugas.
+# @router.post("/bulk/progress-check")
+# async def bulk_check_progress(
+#     surat_tugas_ids: list[str],
+#     current_user: dict = Depends(require_evaluasi_read_access()),
+#     surat_tugas_service: SuratTugasService = Depends(get_surat_tugas_service)
+# ):
+#     """
+#     Bulk check progress untuk multiple surat tugas.
     
-    **Use case**: Dashboard overview, progress monitoring
+#     **Use case**: Dashboard overview, progress monitoring
     
-    **Returns**: Progress data untuk setiap surat tugas ID
-    """
-    progress_data = []
+#     **Returns**: Progress data untuk setiap surat tugas ID
+#     """
+#     progress_data = []
     
-    for surat_tugas_id in surat_tugas_ids:
-        try:
-            surat_tugas = await surat_tugas_service.get_surat_tugas_or_404(surat_tugas_id)
-            progress_data.append({
-                "surat_tugas_id": surat_tugas_id,
-                "no_surat": surat_tugas.no_surat,
-                "nama_perwadag": surat_tugas.nama_perwadag,
-                "progress": surat_tugas.progress,
-                "evaluation_status": surat_tugas.evaluation_status
-            })
-        except HTTPException:
-            progress_data.append({
-                "surat_tugas_id": surat_tugas_id,
-                "error": "Surat tugas not found or access denied"
-            })
+#     for surat_tugas_id in surat_tugas_ids:
+#         try:
+#             surat_tugas = await surat_tugas_service.get_surat_tugas_or_404(surat_tugas_id)
+#             progress_data.append({
+#                 "surat_tugas_id": surat_tugas_id,
+#                 "no_surat": surat_tugas.no_surat,
+#                 "nama_perwadag": surat_tugas.nama_perwadag,
+#                 "progress": surat_tugas.progress,
+#                 "evaluation_status": surat_tugas.evaluation_status
+#             })
+#         except HTTPException:
+#             progress_data.append({
+#                 "surat_tugas_id": surat_tugas_id,
+#                 "error": "Surat tugas not found or access denied"
+#             })
     
-    return {
-        "progress_data": progress_data,
-        "total_checked": len(surat_tugas_ids),
-        "successful": len([p for p in progress_data if "error" not in p])
-    }
+#     return {
+#         "progress_data": progress_data,
+#         "total_checked": len(surat_tugas_ids),
+#         "successful": len([p for p in progress_data if "error" not in p])
+#     }
 
 
 # ===== DASHBOARD ENDPOINTS =====

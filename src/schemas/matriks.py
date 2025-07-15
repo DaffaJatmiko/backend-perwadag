@@ -21,7 +21,7 @@ class MatriksCreate(BaseModel):
 
 class MatriksUpdate(BaseModel):
     """Schema untuk update matriks."""
-    nomor_matriks: Optional[str] = Field(None, max_length=100)
+    # nomor_matriks: Optional[str] = Field(None, max_length=100)
 
 
 # ===== RESPONSE SCHEMAS =====

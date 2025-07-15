@@ -83,7 +83,7 @@ async def get_laporan_hasil_by_surat_tugas(
 async def update_laporan_hasil(
     laporan_hasil_id: str,
     update_data: LaporanHasilUpdate,
-    current_user: dict = Depends(require_auto_generated_edit_access()),
+    current_user: dict = Depends(require_evaluasi_read_access()),
     service: LaporanHasilService = Depends(get_laporan_hasil_service)
 ):
     """Update laporan hasil (nomor laporan)."""

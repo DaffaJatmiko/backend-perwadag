@@ -20,6 +20,8 @@ from src.schemas.shared import (
 from src.schemas.filters import MatriksFilterParams
 from src.models.surat_tugas import SuratTugas
 from src.models.user import User
+from src.utils.evaluation_date_validator import validate_matriks_date_access
+
 
 class MatriksService:
     """Enhanced service untuk matriks operations."""
@@ -119,6 +121,14 @@ class MatriksService:
                 detail="Matriks not found"
             )
         
+        surat_tugas_data = await self._get_surat_tugas_basic_info(matriks.surat_tugas_id)
+        
+        # 🔥 VALIDASI AKSES TANGGAL
+        validate_matriks_date_access(
+            tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
+            operation="update"
+        )
+        
         # Set updated_by
         matriks.updated_by = updated_by
         await self.matriks_repo.session.commit()
@@ -140,6 +150,14 @@ class MatriksService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Matriks not found"
             )
+
+        surat_tugas_data = await self._get_surat_tugas_basic_info(matriks.surat_tugas_id)
+        
+        # 🔥 VALIDASI AKSES TANGGAL
+        validate_matriks_date_access(
+            tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
+            operation="upload"
+        )
         
         try:
             # 🔥 FIX: Correct parameter order - file first, then surat_tugas_id

@@ -179,16 +179,16 @@ class UserRepository:
                 query = query.where(or_(User.email.is_(None), User.email == ""))
         
         # Age filters
-        if filters.min_age or filters.max_age:
-            today = date.today()
+        # if filters.min_age or filters.max_age:
+        #     today = date.today()
             
-            if filters.min_age:
-                max_birth_date = date(today.year - filters.min_age, today.month, today.day)
-                query = query.where(User.tanggal_lahir <= max_birth_date)
+        #     if filters.min_age:
+        #         max_birth_date = date(today.year - filters.min_age, today.month, today.day)
+        #         query = query.where(User.tanggal_lahir <= max_birth_date)
             
-            if filters.max_age:
-                min_birth_date = date(today.year - filters.max_age, today.month, today.day)
-                query = query.where(User.tanggal_lahir >= min_birth_date)
+        #     if filters.max_age:
+        #         min_birth_date = date(today.year - filters.max_age, today.month, today.day)
+        #         query = query.where(User.tanggal_lahir >= min_birth_date)
         
         # Get total count
         count_query = select(func.count()).select_from(query.subquery())
