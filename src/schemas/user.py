@@ -220,3 +220,28 @@ class ErrorResponse(BaseModel):
     """Standard error response."""
     detail: str
     error_code: Optional[str] = None
+
+
+class PerwadagSummary(BaseModel):
+    """Schema ringkas khusus untuk daftar perwadag."""
+    id: str
+    nama: str = Field(..., description="Nama perwadag/perwakilan dagang")
+    inspektorat: str = Field(..., description="Wilayah kerja inspektorat")
+    is_active: bool = Field(..., description="Status aktif perwadag")
+    
+    @classmethod
+    def from_user_model(cls, user) -> "PerwadagSummary":
+        """Create PerwadagSummary from User model."""
+        return cls(
+            id=user.id,
+            nama=user.nama,
+            inspektorat=user.inspektorat or "",
+            is_active=user.is_active
+        )
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PerwadagListResponse(BaseListResponse[PerwadagSummary]):
+    """Standardized perwadag list response dengan pagination."""
+    pass

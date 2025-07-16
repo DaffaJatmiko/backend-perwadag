@@ -1,6 +1,6 @@
 """User management endpoints - FINAL WORKING VERSION."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
@@ -8,7 +8,7 @@ from src.repositories.user import UserRepository
 from src.services.user import UserService
 from src.schemas.user import (
     UserCreate, UserUpdate, UserResponse, UserListResponse, UserSummary, 
-    UserChangePassword, MessageResponse
+    UserChangePassword, MessageResponse, PerwadagListResponse, PerwadagSummary
 )
 from src.schemas.filters import (
     UserFilterParams, UsernameGenerationPreview, UsernameGenerationResponse
@@ -218,8 +218,8 @@ async def create_user(
     - nama must not contain titles (Dr., Ir., etc.)
     - Username will be auto-generated and must be unique
     - Email must be unique (if provided)
-    - Role must be one of: admin, inspektorat, perwadag
-    - inspektorat field required for perwadag role
+    - Role must be one of: ADMIN, INSPEKTORAT, PERWADAG
+    - inspektorat field required for perwadag and inspektorat roles
     
     **Username Examples**:
     - admin/inspektorat: "Daffa Jatmiko" + 01-08-2003 → "daffa01082003"
@@ -227,6 +227,57 @@ async def create_user(
     """
     return await user_service.create_user(user_data)
 
+@router.get("/perwadag", response_model=PerwadagListResponse, summary="Search perwadag users")
+async def search_perwadag_users(
+    search: str = None,
+    inspektorat: str = None, 
+    is_active: bool = True,
+    page: int = 1,
+    size: int = 50,
+    current_user: dict = Depends(get_current_active_user),
+    user_service: UserService = Depends(get_user_service)
+):
+    """
+    Search dan list perwadag users dengan pagination standar.
+    
+    **Accessible by**: All authenticated users
+    
+    **Query Parameters**:
+    - **search**: Search term untuk nama perwadag atau inspektorat
+    - **inspektorat**: Filter by specific inspektorat
+    - **is_active**: Filter by active status (default: true)
+    - **page**: Page number (default: 1)
+    - **size**: Items per page (default: 50, max: 100)
+    
+    **Response format** (konsisten dengan endpoints lain):
+    ```json
+    {
+      "items": [...],
+      "total": 10,
+      "page": 1,
+      "size": 50,
+      "pages": 1
+    }
+    ```
+    
+    **Response fields per item**:
+    - **id**: User ID
+    - **nama**: Nama perwadag/perwakilan dagang
+    - **inspektorat**: Wilayah kerja inspektorat
+    - **is_active**: Status aktif
+    
+    **Examples**:
+    - `GET /users/perwadag?search=lagos` - Search perwadag dengan "lagos"
+    - `GET /users/perwadag?inspektorat=Inspektorat 1&page=2` - Filter + pagination
+    - `GET /users/perwadag?search=itpc&is_active=true&size=20` - Search + custom page size
+    
+    **Use case**: Untuk dropdown, autocomplete, atau list selection perwadag dengan pagination
+    """
+    # Validate page size
+    if size > 100:
+        size = 100
+    
+    return await user_service.search_perwadag_users(search, inspektorat, is_active, page, size)
 
 @router.get("/{user_id}", response_model=UserResponse, summary="Get user by ID")
 async def get_user(
@@ -351,3 +402,4 @@ async def delete_user(
         )
     
     return await user_service.delete_user(user_id)
+

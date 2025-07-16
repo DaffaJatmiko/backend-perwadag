@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from src.repositories.user import UserRepository
 from src.schemas.user import (
     UserCreate, UserUpdate, UserResponse, UserListResponse, 
-    UserChangePassword, MessageResponse
+    UserChangePassword, MessageResponse, PerwadagListResponse, PerwadagSummary
 )
 from src.schemas.filters import UserFilterParams, UsernameGenerationPreview, UsernameGenerationResponse
 from src.auth.jwt import get_password_hash, verify_password
@@ -353,3 +353,32 @@ class UserService:
                 alternatives.append(f"{base_username}{letter}")
         
         return alternatives[:count]
+
+    async def search_perwadag_users(
+        self, 
+        search: str = None,
+        inspektorat: str = None,
+        is_active: bool = True,
+        page: int = 1,
+        size: int = 50
+    ) -> PerwadagListResponse:
+        """Search perwadag users dengan response yang konsisten."""
+        
+        # Get users dari repository dengan pagination
+        users, total = await self.user_repo.search_perwadag_users_paginated(
+            search, inspektorat, is_active, page, size
+        )
+        
+        # Convert ke PerwadagSummary
+        perwadag_list = [PerwadagSummary.from_user_model(user) for user in users]
+        
+        # Calculate pages
+        pages = (total + size - 1) // size if total > 0 else 0
+        
+        return PerwadagListResponse(
+            items=perwadag_list,
+            total=total,
+            page=page,
+            size=size,
+            pages=pages
+        )

@@ -345,3 +345,54 @@ class UserRepository:
             "email_completion_rate": round(email_completion_rate, 2),
             "users_by_role": users_by_role
         }
+
+    async def search_perwadag_users_paginated(
+        self, 
+        search: str = None,
+        inspektorat: str = None,
+        is_active: bool = True,
+        page: int = 1,
+        size: int = 50  # Default size untuk search
+    ) -> Tuple[List[User], int]:
+        """Search perwadag users dengan pagination."""
+        
+        # Base query hanya untuk perwadag
+        query = select(User).where(
+            and_(
+                User.role == UserRole.PERWADAG,
+                User.deleted_at.is_(None)
+            )
+        )
+        
+        # Filter by active status
+        if is_active is not None:
+            query = query.where(User.is_active == is_active)
+        
+        # Search filter (nama dan inspektorat)
+        if search:
+            search_term = f"%{search.strip()}%"
+            query = query.where(
+                or_(
+                    User.nama.ilike(search_term),
+                    User.inspektorat.ilike(search_term)
+                )
+            )
+        
+        # Inspektorat filter
+        if inspektorat:
+            query = query.where(User.inspektorat.ilike(f"%{inspektorat.strip()}%"))
+        
+        # Get total count
+        count_query = select(func.count()).select_from(query.subquery())
+        total_result = await self.session.execute(count_query)
+        total = total_result.scalar()
+        
+        # Apply pagination
+        offset = (page - 1) * size
+        query = query.offset(offset).limit(size).order_by(User.nama)
+        
+        # Execute query
+        result = await self.session.execute(query)
+        users = list(result.scalars().all())
+        
+        return users, total
