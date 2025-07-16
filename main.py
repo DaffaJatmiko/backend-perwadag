@@ -4,6 +4,8 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 from src.core.config import settings
 from src.core.database import init_db
@@ -105,6 +107,12 @@ def create_application() -> FastAPI:
 
     # # Add rate limiting middleware
     # add_rate_limiting(app)
+
+    # Di dalam create_application()
+    uploads_path = Path(settings.UPLOADS_PATH)  # "static/uploads"
+    uploads_path.mkdir(parents=True, exist_ok=True)  # Create if not exists
+
+    app.mount("/static/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
     # Add error handlers
     add_error_handlers(app)

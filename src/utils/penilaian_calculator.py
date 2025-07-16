@@ -281,7 +281,7 @@ class PenilaianRisikoCalculator:
             nilai_potensi = float(data["nilai_potensi"])
             
             # Special case: both zero
-            if nilai_potensi == 0 and nilai_realisasi == 0:
+            if nilai_potensi == 0 or nilai_realisasi == 0:
                 data["deskripsi"] = 0
                 data["pilihan"] = "Belum Ada Realisasi"
                 data["nilai"] = 5

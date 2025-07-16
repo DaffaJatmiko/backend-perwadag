@@ -32,7 +32,7 @@ class MatriksResponse(BaseModel):
     # Basic fields
     id: str
     surat_tugas_id: str
-    nomor_matriks: Optional[str] = None
+    # nomor_matriks: Optional[str] = None
     file_dokumen: Optional[str] = None
     
     # Enhanced file information

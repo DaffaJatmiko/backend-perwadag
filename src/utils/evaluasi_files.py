@@ -18,7 +18,7 @@ class EvaluasiFileManager:
     
     def __init__(self):
         self.base_path = Path(settings.UPLOADS_PATH) / "evaluasi"
-        self.base_url = f"/{settings.STATIC_FILES_PATH}/evaluasi"
+        self.base_url = "/static/uploads/evaluasi"
         
         # Ensure directories exist
         self._create_directories()
