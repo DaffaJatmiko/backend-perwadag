@@ -573,6 +573,7 @@ class MeetingService:
                     content_type=file_data.get('content_type', 'application/octet-stream'),
                     uploaded_at=datetime.fromisoformat(file_data.get('uploaded_at', meeting_data['created_at'].isoformat())),
                     uploaded_by=file_data.get('uploaded_by'),
+                    file_url=evaluasi_file_manager.get_file_url(file_data['path']),
                     download_url=f"/api/v1/meetings/{meeting_data['id']}/files/{file_data['filename']}/download",
                     view_url=f"/api/v1/meetings/{meeting_data['id']}/files/{file_data['filename']}/view" if file_data.get('content_type', '').startswith(('image/', 'application/pdf')) else None,
                     is_viewable=file_data.get('content_type', '').startswith(('image/', 'application/pdf'))

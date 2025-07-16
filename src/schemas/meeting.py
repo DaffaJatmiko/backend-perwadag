@@ -74,6 +74,7 @@ class MeetingFileInfo(BaseModel):
     uploaded_by: Optional[str] = None
     
     # Download URLs
+    file_url: str 
     download_url: str
     view_url: Optional[str] = None
     is_viewable: bool
