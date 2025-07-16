@@ -290,9 +290,9 @@ class SuratPemberitahuanService:
             file_info = evaluasi_file_manager.get_file_info(surat_pemberitahuan.file_dokumen)
             
             file_urls = FileUrls(
-                download_url=evaluasi_file_manager.get_file_url(surat_pemberitahuan.file_dokumen, url_type="download"),
-                view_url=evaluasi_file_manager.get_file_url(surat_pemberitahuan.file_dokumen, url_type="view"),
-                is_viewable=file_info.get('content_type', '').startswith(('image/', 'application/pdf'))
+                file_url=evaluasi_file_manager.get_file_url(surat_pemberitahuan.file_dokumen),
+                download_url=f"/api/v1/evaluasi/surat-pemberitahuan/{surat_pemberitahuan.id}/download",
+                view_url=f"/api/v1/evaluasi/surat-pemberitahuan/{surat_pemberitahuan.id}/view"
             )
             
             if file_info:
