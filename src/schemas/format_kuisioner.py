@@ -8,7 +8,7 @@ from datetime import datetime
 from src.schemas.common import SuccessResponse
 from src.schemas.shared import (
     SuratTugasBasicInfo, FileMetadata, FileUrls, 
-    PaginationInfo, ModuleStatistics, AuditInfo
+    PaginationInfo, ModuleStatistics, AuditInfo, BaseListResponse
 )
 
 
@@ -78,18 +78,11 @@ class FormatKuisionerResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class FormatKuisionerListResponse(BaseModel):
-    """Enhanced list response untuk format kuisioner."""
+class FormatKuisionerListResponse(BaseListResponse[FormatKuisionerResponse]):
+    """Standardized format kuisioner list response."""
     
-    format_kuisioner: List[FormatKuisionerResponse]
-    pagination: PaginationInfo
     statistics: Optional[ModuleStatistics] = None
-    
-    # Template-specific summaries
-    by_year_summary: Dict[int, int] = Field(description="Count by year")
-    current_year_templates: int = 0
-    
-    model_config = ConfigDict(from_attributes=True)
+    # by_year_summary: Optional[Dict[int, int]] = None
 
 
 class FormatKuisionerFileUploadResponse(SuccessResponse):

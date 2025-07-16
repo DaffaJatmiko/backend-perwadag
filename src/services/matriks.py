@@ -53,7 +53,6 @@ class MatriksService:
             matriks_responses.append(response)
         
         # Build pagination
-        pagination = PaginationInfo.create(filters.page, filters.size, total)
         
         # Get statistics
         statistics = None
@@ -69,11 +68,20 @@ class MatriksService:
                 module_specific_stats={}
             )
         
-        return MatriksListResponse(
-            matriks=matriks_responses,
-            pagination=pagination,
-            statistics=statistics
+        pages = (total + filters.size - 1) // filters.size if total > 0 else 0
+
+        response = MatriksListResponse(
+            items=matriks_responses,  # ✅ matriks → items
+            total=total,
+            page=filters.page,
+            size=filters.size,
+            pages=pages
         )
+
+        if filters.include_statistics:
+            response.statistics = statistics
+
+        return response
     
     async def get_matriks_or_404(self, matriks_id: str) -> MatriksResponse:
         """Get matriks by ID dengan enriched data."""

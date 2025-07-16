@@ -9,7 +9,7 @@ from src.models.evaluasi_enums import MeetingType
 from src.schemas.common import SuccessResponse
 from src.schemas.shared import (
     SuratTugasBasicInfo, FileMetadata, FileUrls, 
-    PaginationInfo, ModuleStatistics
+    PaginationInfo, ModuleStatistics, BaseListResponse
 )
 
 
@@ -151,19 +151,10 @@ class MeetingResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class MeetingListResponse(BaseModel):
-    """Simplified list response untuk meetings."""
+class MeetingListResponse(BaseListResponse[MeetingResponse]):
+    """Standardized meeting list response dengan custom fields."""
     
-    meetings: List[MeetingResponse]
-    pagination: PaginationInfo
     statistics: Optional[ModuleStatistics] = None
-    
-    # Meeting type summary (simplified)
-    meeting_type_summary: Optional[Dict[str, int]] = Field(
-        None, description="Count per meeting type"
-    )
-    
-    model_config = ConfigDict(from_attributes=True)
 
 
 class MeetingFileUploadResponse(SuccessResponse):

@@ -51,8 +51,6 @@ class LaporanHasilService:
             )
             laporan_hasil_responses.append(response)
         
-        # Build pagination
-        pagination = PaginationInfo.create(filters.page, filters.size, total)
         
         # Get statistics if available
         statistics = None
@@ -68,11 +66,20 @@ class LaporanHasilService:
                 module_specific_stats={}
             )
         
-        return LaporanHasilListResponse(
-            laporan_hasil=laporan_hasil_responses,
-            pagination=pagination,
-            statistics=statistics
+        pages = (total + filters.size - 1) // filters.size if total > 0 else 0
+
+        response = LaporanHasilListResponse(
+            items=laporan_hasil_responses,  # ✅ laporan_hasil → items
+            total=total,
+            page=filters.page,
+            size=filters.size,
+            pages=pages
         )
+
+        if hasattr(filters, 'include_statistics') and filters.include_statistics:
+            response.statistics = statistics
+
+        return response
     
     async def get_laporan_hasil_or_404(self, laporan_hasil_id: str) -> LaporanHasilResponse:
         """Get laporan hasil by ID dengan enriched data."""

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime
 
 from src.schemas.common import SuccessResponse
-from src.schemas.shared import PaginationInfo
+from src.schemas.shared import PaginationInfo, BaseListResponse
 
 
 # ===== KRITERIA DATA SCHEMAS =====
@@ -225,11 +225,9 @@ class PenilaianRisikoResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PenilaianRisikoListResponse(BaseModel):
-    """Schema untuk response list penilaian risiko."""
+class PenilaianRisikoListResponse(BaseListResponse[PenilaianRisikoResponse]):
+    """Standardized penilaian risiko list response."""
     
-    penilaian_risiko: List[PenilaianRisikoResponse]
-    pagination: PaginationInfo
     statistics: Optional[Dict[str, Any]] = None
 
 

@@ -54,34 +54,32 @@ class MeetingService:
             )
             meeting_responses.append(response)
         
-        # Build pagination
-        pagination = PaginationInfo.create(filters.page, filters.size, total)
+        # 🔥 SIMPLIFIED: Create response directly
+        pages = (total + filters.size - 1) // filters.size if total > 0 else 0
         
-        # Get statistics
-        statistics = None
-        meeting_type_summary = None
+        response = MeetingListResponse(
+            items=meeting_responses,
+            total=total,
+            page=filters.page,
+            size=filters.size,
+            pages=pages
+        )
+        
+        # 🔥 SIMPLIFIED: Add statistics only if requested
         if filters.include_statistics:
             stats_data = await self.meeting_repo.get_statistics(
                 user_role, user_inspektorat, user_id
             )
-            statistics = ModuleStatistics(
-                total=stats_data['total'],
-                completed=stats_data['completed'],
+            response.statistics = ModuleStatistics(
+                total_records=stats_data['total'],
+                completed_records=stats_data['completed'],
+                with_files=stats_data['has_files'],
+                without_files=stats_data['total'] - stats_data['has_files'],
                 completion_rate=stats_data['completion_rate'],
-                has_file=stats_data['has_files'],
-                module_specific_stats={
-                    'has_date': stats_data['has_date'],
-                    'has_links': stats_data['has_links']
-                }
+                last_updated=datetime.utcnow()
             )
-            meeting_type_summary = stats_data['meeting_type_counts']
         
-        return MeetingListResponse(
-            meetings=meeting_responses,
-            pagination=pagination,
-            statistics=statistics,
-            meeting_type_summary=meeting_type_summary
-        )
+        return response
     
     async def get_meeting_or_404(self, meeting_id: str) -> MeetingResponse:
         """Get meeting by ID dengan enriched data."""

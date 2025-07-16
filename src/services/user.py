@@ -177,15 +177,14 @@ class UserService:
         """Get users dengan simplified filters."""
         # 1. Get users from repository
         users, total = await self.user_repo.get_all_users_filtered(filters)
-        
-        # 2. Calculate pagination
-        pages = (total + filters.size - 1) // filters.size
-        
+                
         # 3. Convert semua models ke responses
         user_responses = [UserResponse.from_user_model(user) for user in users]
         
+        pages = (total + filters.size - 1) // filters.size if total > 0 else 0
+
         return UserListResponse(
-            users=user_responses,
+            items=user_responses,  # ✅ users → items
             total=total,
             page=filters.page,
             size=filters.size,

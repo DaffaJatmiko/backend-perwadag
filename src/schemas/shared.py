@@ -1,9 +1,24 @@
 """Shared schema components untuk sistem evaluasi."""
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TypeVar, Generic, List
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime, date
 
+T = TypeVar('T')
+
+class BaseListResponse(BaseModel, Generic[T]):
+    """Base class untuk semua list responses."""
+    
+    items: List[T]
+    total: int
+    page: int
+    size: int
+    pages: int
+    
+    @classmethod
+    def create(cls, items: List[T], total: int, page: int, size: int):
+        pages = (total + size - 1) // size if total > 0 else 0
+        return cls(items=items, total=total, page=page, size=size, pages=pages)
 
 class SuratTugasBasicInfo(BaseModel):
     """Basic info dari surat tugas untuk include di responses lain."""

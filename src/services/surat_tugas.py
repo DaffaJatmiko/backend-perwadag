@@ -207,10 +207,10 @@ class SuratTugasService:
             surat_tugas_responses.append(response)
         
         # Calculate pages
-        pages = (total + filters.size - 1) // filters.size
+        pages = (total + filters.size - 1) // filters.size if total > 0 else 0
         
         return SuratTugasListResponse(
-            surat_tugas=surat_tugas_responses,
+            items=surat_tugas_responses,
             total=total,
             page=filters.page,
             size=filters.size,

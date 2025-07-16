@@ -103,10 +103,10 @@ class PeriodeEvaluasiService:
             periode_responses.append(response)
         
         # Calculate pages
-        pages = (total + filters.size - 1) // filters.size
-        
+        pages = (total + filters.size - 1) // filters.size if total > 0 else 0
+
         return PeriodeEvaluasiListResponse(
-            periode_evaluasi=periode_responses,
+            items=periode_responses,  # ✅ periode_evaluasi → items
             total=total,
             page=filters.page,
             size=filters.size,

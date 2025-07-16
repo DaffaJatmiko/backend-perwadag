@@ -8,7 +8,7 @@ from datetime import datetime, date
 from src.schemas.common import SuccessResponse
 from src.schemas.shared import (
     SuratTugasBasicInfo, FileMetadata, FileUrls, 
-    PaginationInfo, ModuleStatistics
+    PaginationInfo, ModuleStatistics, BaseListResponse
 )
 
 
@@ -63,14 +63,10 @@ class MatriksResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class MatriksListResponse(BaseModel):
-    """Enhanced list response untuk matriks."""
+class MatriksListResponse(BaseListResponse[MatriksResponse]):
+    """Standardized matriks list response."""
     
-    matriks: List[MatriksResponse]
-    pagination: PaginationInfo
     statistics: Optional[ModuleStatistics] = None
-    
-    model_config = ConfigDict(from_attributes=True)
 
 
 class MatriksFileUploadResponse(SuccessResponse):

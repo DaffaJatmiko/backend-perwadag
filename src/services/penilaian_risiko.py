@@ -56,9 +56,6 @@ class PenilaianRisikoService:
             )
             penilaian_responses.append(response)
         
-        # Build pagination
-        pagination = PaginationInfo.create(filters.page, filters.size, total)
-        
         # Get statistics if requested
         statistics = None
         if hasattr(filters, 'include_statistics') and filters.include_statistics:
@@ -66,11 +63,20 @@ class PenilaianRisikoService:
                 user_role, user_inspektorat, user_id
             )
         
-        return PenilaianRisikoListResponse(
-            penilaian_risiko=penilaian_responses,
-            pagination=pagination,
-            statistics=statistics
+        pages = (total + filters.size - 1) // filters.size if total > 0 else 0
+
+        response = PenilaianRisikoListResponse(
+            items=penilaian_responses,  # ✅ penilaian_risiko → items
+            total=total,
+            page=filters.page,
+            size=filters.size,
+            pages=pages
         )
+
+        if hasattr(filters, 'include_statistics') and filters.include_statistics:
+            response.statistics = statistics
+
+        return response
     
     async def get_penilaian_or_404(self, penilaian_id: str) -> PenilaianRisikoResponse:
         """Get penilaian risiko by ID or raise 404."""

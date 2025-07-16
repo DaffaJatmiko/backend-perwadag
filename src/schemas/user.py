@@ -6,6 +6,7 @@ from datetime import datetime, date
 import re
 
 from src.models.enums import UserRole
+from src.schemas.shared import BaseListResponse
 
 
 # ===== BASE SCHEMAS =====
@@ -153,13 +154,9 @@ class UserResponse(UserBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class UserListResponse(BaseModel):
-    """Schema for paginated user list response."""
-    users: List[UserResponse]
-    total: int
-    page: int
-    size: int
-    pages: int
+class UserListResponse(BaseListResponse[UserResponse]):
+    """Standardized user list response."""
+    pass
 
 
 class UserSummary(BaseModel):

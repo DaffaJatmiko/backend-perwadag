@@ -8,7 +8,7 @@ from datetime import datetime, date
 from src.schemas.common import SuccessResponse
 from src.schemas.shared import (
     SuratTugasBasicInfo, FileMetadata, FileUrls, 
-    PaginationInfo, ModuleStatistics
+    PaginationInfo, ModuleStatistics, BaseListResponse
 )
 
 
@@ -63,14 +63,10 @@ class KuisionerResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class KuisionerListResponse(BaseModel):
-    """Enhanced list response untuk kuisioner."""
+class KuisionerListResponse(BaseListResponse[KuisionerResponse]):
+    """Standardized kuisioner list response."""
     
-    kuisioner: List[KuisionerResponse]
-    pagination: PaginationInfo
     statistics: Optional[ModuleStatistics] = None
-    
-    model_config = ConfigDict(from_attributes=True)
 
 
 class KuisionerFileUploadResponse(SuccessResponse):

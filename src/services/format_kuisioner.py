@@ -73,9 +73,6 @@ class FormatKuisionerService:
         # Build responses
         responses = [self._build_response(fk) for fk in format_kuisioner_list]
         
-        # 🔥 FIX: Build proper pagination using PaginationInfo
-        pagination = PaginationInfo.create(filters.page, filters.size, total)
-        
         # 🔥 FIX: Build by_year_summary
         by_year_summary = {}
         current_year = datetime.now().year
@@ -101,13 +98,23 @@ class FormatKuisionerService:
                 }
             )
         
-        return FormatKuisionerListResponse(
-            format_kuisioner=responses,
-            pagination=pagination,  # ✅ Proper PaginationInfo object
-            statistics=statistics,
-            by_year_summary=by_year_summary,  # ✅ Required field
-            current_year_templates=current_year_count
+        pages = (total + filters.size - 1) // filters.size if total > 0 else 0
+
+        response = FormatKuisionerListResponse(
+            items=responses,  # ✅ format_kuisioner → items
+            total=total,
+            page=filters.page,
+            size=filters.size,
+            pages=pages
         )
+
+        if hasattr(filters, 'include_statistics') and filters.include_statistics:
+            response.statistics = statistics
+
+        # response.by_year_summary = by_year_summary
+        # ❌ HAPUS: current_year_templates
+
+        return response
     
     async def get_by_tahun(self, tahun: int) -> List[FormatKuisionerResponse]:
         """Get all format kuisioner untuk tahun tertentu."""

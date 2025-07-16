@@ -68,13 +68,17 @@ class SuratPemberitahuanService:
         )
         
         # Build pagination info
-        pagination = PaginationInfo.create(filters.page, filters.size, total)
-        
-        return SuratPemberitahuanListResponse(
-            surat_pemberitahuan=responses,
-            pagination=pagination,
-            statistics=module_stats
+        pages = (total + filters.size - 1) // filters.size if total > 0 else 0
+
+        response = SuratPemberitahuanListResponse(
+            items=responses,  # ✅ surat_pemberitahuan → items
+            total=total,
+            page=filters.page,
+            size=filters.size,
+            pages=pages
         )
+        response.statistics = module_stats
+        return response
     
     async def get_surat_pemberitahuan_or_404(
         self, 

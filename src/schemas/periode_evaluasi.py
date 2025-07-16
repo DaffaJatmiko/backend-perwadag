@@ -7,6 +7,7 @@ from datetime import datetime
 
 from src.models.penilaian_enums import StatusPeriode
 from src.schemas.common import SuccessResponse
+from src.schemas.shared import BaseListResponse
 
 
 # ===== REQUEST SCHEMAS =====
@@ -83,14 +84,9 @@ class PeriodeEvaluasiResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PeriodeEvaluasiListResponse(BaseModel):
-    """Schema untuk response list periode evaluasi."""
-    
-    periode_evaluasi: List[PeriodeEvaluasiResponse]
-    total: int
-    page: int
-    size: int
-    pages: int
+class PeriodeEvaluasiListResponse(BaseListResponse[PeriodeEvaluasiResponse]):
+    """Standardized periode evaluasi list response."""
+    pass
 
 
 class PeriodeEvaluasiCreateResponse(SuccessResponse):

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime, date
 
 from src.schemas.common import SuccessResponse
+from src.schemas.shared import BaseListResponse
 
 
 # ===== REQUEST SCHEMAS =====
@@ -189,14 +190,9 @@ class SuratTugasResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class SuratTugasListResponse(BaseModel):
-    """Schema untuk response list surat tugas dengan pagination."""
-    
-    surat_tugas: List[SuratTugasResponse]
-    total: int
-    page: int
-    size: int
-    pages: int
+class SuratTugasListResponse(BaseListResponse[SuratTugasResponse]):
+    """Standardized surat tugas list response."""
+    pass
 
 
 class SuratTugasCreateResponse(SuccessResponse):

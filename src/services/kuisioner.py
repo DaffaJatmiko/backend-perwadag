@@ -51,16 +51,22 @@ class KuisionerService:
             kuisioner_responses.append(response)
         
         # Build pagination
-        pagination = PaginationInfo.create(filters.page, filters.size, total)
         
         # 🔥 FIX: Remove include_statistics (not available in filter params)
         statistics = None
         
-        return KuisionerListResponse(
-            kuisioner=kuisioner_responses,
-            pagination=pagination,
-            statistics=statistics
+        pages = (total + filters.size - 1) // filters.size if total > 0 else 0
+
+        response = KuisionerListResponse(
+            items=kuisioner_responses,  # ✅ kuisioner → items
+            total=total,
+            page=filters.page,
+            size=filters.size,
+            pages=pages
         )
+
+        # Statistics biasanya None di kuisioner, jadi bisa skip
+        return response
 
     
     async def get_kuisioner_or_404(self, kuisioner_id: str) -> KuisionerResponse:

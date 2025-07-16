@@ -8,7 +8,7 @@ from datetime import datetime, date
 from src.schemas.common import SuccessResponse
 from src.schemas.shared import (
     SuratTugasBasicInfo, FileMetadata, FileUrls, 
-    PaginationInfo, ModuleStatistics, AuditInfo
+    PaginationInfo, ModuleStatistics, AuditInfo, BaseListResponse
 )
 
 class SuratPemberitahuanCreate(BaseModel):
@@ -58,14 +58,10 @@ class SuratPemberitahuanResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class SuratPemberitahuanListResponse(BaseModel):
-    """Enhanced list response untuk surat pemberitahuan."""
+class SuratPemberitahuanListResponse(BaseListResponse[SuratPemberitahuanResponse]):
+    """Standardized surat pemberitahuan list response."""
     
-    surat_pemberitahuan: List[SuratPemberitahuanResponse]
-    pagination: PaginationInfo
     statistics: Optional[ModuleStatistics] = None
-    
-    model_config = ConfigDict(from_attributes=True)
 
 
 class SuratPemberitahuanFileUploadResponse(SuccessResponse):
