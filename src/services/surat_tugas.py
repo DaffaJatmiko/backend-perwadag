@@ -2,6 +2,7 @@
 
 from typing import Optional, Dict, Any, List
 from fastapi import HTTPException, status, UploadFile
+from fastapi.responses import FileResponse
 
 from src.repositories.surat_tugas import SuratTugasRepository
 from src.repositories.surat_pemberitahuan import SuratPemberitahuanRepository
@@ -595,4 +596,27 @@ class SuratTugasService:
             laporan_completed=laporan_completed,
             kuisioner_completed=kuisioner_completed,
             overall_percentage=overall_percentage
+        )
+
+    async def download_file(
+        self, 
+        surat_tugas_id: str, 
+        download_type: str = "download"
+    ) -> FileResponse:
+        """Download surat tugas file."""
+        
+        surat_tugas = await self.surat_tugas_repo.get_by_id(surat_tugas_id)
+        if not surat_tugas or not surat_tugas.file_surat_tugas:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File not found"
+            )
+        
+        # Get original filename untuk download
+        original_filename = f"surat_tugas_{surat_tugas.no_surat}_{surat_tugas_id}"
+        
+        return evaluasi_file_manager.get_file_download_response(
+            file_path=surat_tugas.file_surat_tugas,
+            original_filename=original_filename,
+            download_type=download_type
         )

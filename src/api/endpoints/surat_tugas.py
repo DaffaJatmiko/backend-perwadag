@@ -1,7 +1,8 @@
 """API endpoints untuk surat tugas dengan auto-generate workflow."""
 
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Form, Path
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
@@ -472,3 +473,19 @@ async def get_dashboard_summary(
             "total_evaluasi": stats.total_surat_tugas
         }
     }
+
+@router.get("/{surat_tugas_id}/download", response_class=FileResponse)
+async def download_surat_tugas_file(
+    surat_tugas_id: str = Path(..., description="Surat tugas ID"),
+    current_user: dict = Depends(require_evaluasi_read_access()),
+    surat_tugas_service: SuratTugasService = Depends(get_surat_tugas_service)
+):
+    """
+    Download surat tugas file.
+    
+    **Accessible by**: Semua roles dengan scope filtering
+    
+    **Response**: File download dengan proper headers
+    **Access Control**: Role-based access dengan ownership validation
+    """
+    return await surat_tugas_service.download_file(surat_tugas_id, download_type="download")
