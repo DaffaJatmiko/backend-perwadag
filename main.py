@@ -114,6 +114,19 @@ def create_application() -> FastAPI:
 
     app.mount("/static/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
+    @app.middleware("http")
+    async def add_cors_headers_for_static(request, call_next):
+        response = await call_next(request)
+        
+        # Add CORS headers hanya untuk static files
+        if request.url.path.startswith("/static/"):
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+        
+        return response
+
     # Add error handlers
     add_error_handlers(app)
 
