@@ -25,9 +25,9 @@ class UserFilterParams(BaseModel):
     # Filters - UPDATED: role sekarang ENUM bukan string
     role: Optional[UserRole] = Field(None, description="Filter by role: admin, inspektorat, atau perwadag")
     inspektorat: Optional[str] = Field(None, description="Filter by inspektorat (untuk perwadag)")
-    pangkat: Optional[str] = Field(None, description="Filter by pangkat")
+    # pangkat: Optional[str] = Field(None, description="Filter by pangkat")
     jabatan: Optional[str] = Field(None, description="Filter by jabatan")
-    tempat_lahir: Optional[str] = Field(None, description="Filter by tempat lahir")
+    # tempat_lahir: Optional[str] = Field(None, description="Filter by tempat lahir")
     
     # Status filters
     has_email: Optional[bool] = Field(None, description="Filter by email status (true=has email, false=no email)")
@@ -54,7 +54,7 @@ class UsernameGenerationPreview(BaseModel):
     """Schema for username generation preview."""
     
     nama: str = Field(..., min_length=1, max_length=200, description="Full name atau nama perwadag")
-    tanggal_lahir: str = Field(..., description="Birth date in YYYY-MM-DD format")
+    # tanggal_lahir: str = Field(..., description="Birth date in YYYY-MM-DD format")
     role: UserRole = Field(..., description="Role untuk menentukan format username")
     
     @field_validator('nama')
@@ -71,7 +71,7 @@ class UsernameGenerationResponse(BaseModel):
     """Schema for username generation response."""
     
     original_nama: str
-    tanggal_lahir: str
+    # tanggal_lahir: str
     role: UserRole
     generated_username: str
     is_available: bool

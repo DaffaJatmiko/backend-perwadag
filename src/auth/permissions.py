@@ -85,7 +85,7 @@ async def get_current_user(
             "role": user_role,           # Single role string
             "roles": [user_role],        # Array with single role for compatibility
             "is_active": user.is_active,
-            "pangkat": user.pangkat,
+            # "pangkat": user.pangkat,
             "jabatan": user.jabatan
         }
 
@@ -210,7 +210,7 @@ async def log_access_attempt(user: Dict, resource: str, success: bool = True):
         "role": user.get("role"),        # Single role
         "resource": resource,
         "success": success,
-        "pangkat": user.get("pangkat"),
+        # "pangkat": user.get("pangkat"),
         "jabatan": user.get("jabatan")
     }
     

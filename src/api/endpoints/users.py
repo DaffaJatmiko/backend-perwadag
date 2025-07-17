@@ -90,29 +90,17 @@ async def get_all_users(
     """
     Get all users with pagination and comprehensive filters.
     
-    **Accessible by**: Admin and Inspektorat roles
-    
-    **Query Parameters** (via UserFilterParams schema):
-    - **page**: Page number (default: 1)
-    - **size**: Items per page (default: 20, max: 100)
-    - **search**: Search in nama, username, tempat_lahir, pangkat, jabatan, email, inspektorat
+    **Query Parameters**:
+    - **search**: Search in nama, username, jabatan, email, inspektorat
     - **role**: Filter by role (admin/inspektorat/perwadag)
-    - **inspektorat**: Filter by inspektorat (for perwadag)
-    - **pangkat**: Filter by pangkat
+    - **inspektorat**: Filter by inspektorat
     - **jabatan**: Filter by jabatan
-    - **tempat_lahir**: Filter by tempat lahir
     - **has_email**: Filter by email status (true/false)
     - **is_active**: Filter by active status (true/false)
-    - **min_age**: Minimum age filter (17-70)
-    - **max_age**: Maximum age filter (17-70)
     
     **Examples**:
-    - `GET /users?has_email=false` - Users without email
     - `GET /users?role=admin&is_active=true` - Active admin users
-    - `GET /users?search=daffa&pangkat=penata` - Search with filters
-    - `GET /users?role=perwadag&inspektorat=Inspektorat 1` - Perwadag in specific inspektorat
-    
-    **Returns**: Paginated list with total count and page info
+    - `GET /users?search=daffa&jabatan=kepala` - Search with filters
     """
     return await user_service.get_all_users_with_filters(filters)
 
@@ -171,19 +159,15 @@ async def preview_username_generation(
     user_service: UserService = Depends(get_user_service)
 ):
     """
-    Preview username generation from nama and tanggal_lahir.
-    
-    **Accessible by**: Admin only
+    Preview username generation from nama and inspektorat.
     
     **Format depends on role**:
-    - admin/inspektorat: {nama_depan}{dd}{mm}{yyyy}
+    - admin/inspektorat: {nama_depan}_ir{nomor}
     - perwadag: extracted from nama
     
     **Examples**:
-    - Input: "Daffa Jatmiko", "2003-08-01", role="admin"
-    - Output: "daffa01082003"
-    
-    Shows what username would be generated and if it's available.
+    - Input: "Daffa Jatmiko", "Inspektorat 1", role="admin"
+    - Output: "daffa_ir1"
     """
     return await user_service.preview_username_generation(preview_data)
 
@@ -197,35 +181,24 @@ async def create_user(
     """
     Create a new user.
     
-    **Accessible by**: Admin only
-    
     **Required fields**:
     - nama (without titles/degrees)
-    - tempat_lahir, tanggal_lahir, pangkat, jabatan
+    - jabatan
     - role (admin/inspektorat/perwadag)
-    - inspektorat (required for perwadag role)
-    
-    **Optional fields**:
-    - email (can be set later by user via PUT /users/me)
+    - inspektorat (required for admin/inspektorat roles)
     
     **Auto-generated**:
     - username (format depends on role)
-      - admin/inspektorat: nama_depan + ddmmyyyy
+      - admin/inspektorat: nama_depan_ir{nomor}
       - perwadag: extracted from nama (e.g., "ITPC Lagos" → "itpc_lagos")
     - password (@Kemendag123 for all users)
     
-    **Validation**:
-    - nama must not contain titles (Dr., Ir., etc.)
-    - Username will be auto-generated and must be unique
-    - Email must be unique (if provided)
-    - Role must be one of: ADMIN, INSPEKTORAT, PERWADAG
-    - inspektorat field required for perwadag and inspektorat roles
-    
     **Username Examples**:
-    - admin/inspektorat: "Daffa Jatmiko" + 01-08-2003 → "daffa01082003"
+    - admin/inspektorat: "Daffa Jatmiko" + "Inspektorat 1" → "daffa_ir1"
     - perwadag: "ITPC Lagos – Nigeria" → "itpc_lagos"
     """
     return await user_service.create_user(user_data)
+
 
 @router.get("/perwadag", response_model=PerwadagListResponse, summary="Search perwadag users")
 async def search_perwadag_users(

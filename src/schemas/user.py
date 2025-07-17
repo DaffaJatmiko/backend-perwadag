@@ -14,9 +14,9 @@ from src.schemas.shared import BaseListResponse
 class UserBase(BaseModel):
     """Base user schema dengan role field."""
     nama: str = Field(..., min_length=1, max_length=200, description="Nama lengkap atau nama perwadag")
-    tempat_lahir: str = Field(..., min_length=1, max_length=100)
-    tanggal_lahir: date
-    pangkat: str = Field(..., min_length=1, max_length=100)
+    # tempat_lahir: str = Field(..., min_length=1, max_length=100)
+    # tanggal_lahir: date
+    # pangkat: str = Field(..., min_length=1, max_length=100)
     jabatan: str = Field(..., min_length=1, max_length=200)
     email: Optional[EmailStr] = Field(None, description="Email is optional")
     is_active: bool = True
@@ -53,26 +53,26 @@ class UserBase(BaseModel):
         
         return inspektorat.strip() if inspektorat else None
     
-    @field_validator('tanggal_lahir')
-    @classmethod
-    def validate_tanggal_lahir(cls, tanggal_lahir: date) -> date:
-        """Validate birth date."""
-        today = date.today()
+    # @field_validator('tanggal_lahir')
+    # @classmethod
+    # def validate_tanggal_lahir(cls, tanggal_lahir: date) -> date:
+    #     """Validate birth date."""
+    #     today = date.today()
         
-        if tanggal_lahir > today:
-            raise ValueError("Tanggal lahir cannot be in the future")
+    #     if tanggal_lahir > today:
+    #         raise ValueError("Tanggal lahir cannot be in the future")
         
-        # Check age range (17-70 years)
-        age = today.year - tanggal_lahir.year - (
-            (today.month, today.day) < (tanggal_lahir.month, tanggal_lahir.day)
-        )
+    #     # Check age range (17-70 years)
+    #     age = today.year - tanggal_lahir.year - (
+    #         (today.month, today.day) < (tanggal_lahir.month, tanggal_lahir.day)
+    #     )
         
-        if age < 17:
-            raise ValueError("Minimum age is 17 years old")
-        if age > 70:
-            raise ValueError("Maximum age is 70 years old")
+    #     if age < 17:
+    #         raise ValueError("Minimum age is 17 years old")
+    #     if age > 70:
+    #         raise ValueError("Maximum age is 70 years old")
         
-        return tanggal_lahir
+    #     return tanggal_lahir
 
 
 # ===== REQUEST SCHEMAS =====
@@ -85,9 +85,9 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     """Schema for updating a user."""
     nama: Optional[str] = Field(None, min_length=1, max_length=200)
-    tempat_lahir: Optional[str] = Field(None, min_length=1, max_length=100)
-    tanggal_lahir: Optional[date] = None
-    pangkat: Optional[str] = Field(None, min_length=1, max_length=100)
+    # tempat_lahir: Optional[str] = Field(None, min_length=1, max_length=100)
+    # tanggal_lahir: Optional[date] = None
+    # pangkat: Optional[str] = Field(None, min_length=1, max_length=100)
     jabatan: Optional[str] = Field(None, min_length=1, max_length=200)
     email: Optional[EmailStr] = None
     is_active: Optional[bool] = None
@@ -120,7 +120,7 @@ class UserResponse(UserBase):
     id: str
     username: str
     display_name: str
-    age: int
+    # age: int
     has_email: bool
     last_login: Optional[datetime] = None
     role_display: str = Field(..., description="Human-readable role name")
@@ -134,16 +134,16 @@ class UserResponse(UserBase):
             id=user.id,
             nama=user.nama,
             username=user.username,
-            tempat_lahir=user.tempat_lahir,
-            tanggal_lahir=user.tanggal_lahir,
-            pangkat=user.pangkat,
+            # tempat_lahir=user.tempat_lahir,
+            # tanggal_lahir=user.tanggal_lahir,
+            # pangkat=user.pangkat,
             jabatan=user.jabatan,
             email=user.email,
             is_active=user.is_active,
             role=user.role,
             inspektorat=user.inspektorat,
             display_name=user.display_name,
-            age=user.age,
+            # age=user.age,
             has_email=user.has_email(),
             last_login=user.last_login,
             role_display=user.get_role_display(),
@@ -164,7 +164,7 @@ class UserSummary(BaseModel):
     id: str
     nama: str
     username: str
-    pangkat: str
+    # pangkat: str
     jabatan: str
     role: UserRole
     role_display: str

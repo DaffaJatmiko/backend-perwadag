@@ -41,6 +41,68 @@ def normalize_name(nama: str) -> str:
     
     return nama
 
+def generate_username_from_name_and_inspektorat(nama: str, inspektorat: str) -> str:
+    """
+    Generate username: nama_depan + _ir{nomor}
+    
+    Examples:
+    - "Daffa Jatmiko" + "Inspektorat 1" = "daffa_ir1"
+    - "Siti Rahayu" + "Inspektorat 2" = "siti_ir2"
+    """
+    # Normalize nama and get first word
+    normalized = normalize_name(nama)
+    words = normalized.split()
+    
+    if not words:
+        first_name = "user"
+    else:
+        first_name = words[0]
+    
+    # Extract inspektorat number
+    inspektorat_num = "1"  # default
+    if "inspektorat" in inspektorat.lower():
+        import re
+        match = re.search(r'(\d+)', inspektorat)
+        if match:
+            inspektorat_num = match.group(1)
+    
+    # Combine: nama_depan + _ir + nomor
+    username = f"{first_name}_ir{inspektorat_num}"
+    
+    return username
+
+def generate_username_with_conflict_resolution(nama: str, inspektorat: str) -> str:
+    """
+    Generate username with conflict resolution using second name.
+    
+    Examples:
+    - "Ayu Marin" + "Inspektorat 1" = "ayu_marin_ir1"
+    - "Ayu Siti" + "Inspektorat 1" = "ayu_siti_ir1"
+    """
+    # Normalize nama and get words
+    normalized = normalize_name(nama)
+    words = normalized.split()
+    
+    if len(words) < 2:
+        # If only one word, use original logic
+        return generate_username_from_name_and_inspektorat(nama, inspektorat)
+    
+    first_name = words[0]
+    second_name = words[1]
+    
+    # Extract inspektorat number
+    inspektorat_num = "1"
+    if "inspektorat" in inspektorat.lower():
+        import re
+        match = re.search(r'(\d+)', inspektorat)
+        if match:
+            inspektorat_num = match.group(1)
+    
+    # Combine: nama_depan + _nama_kedua + _ir + nomor
+    username = f"{first_name}_{second_name}_ir{inspektorat_num}"
+    
+    return username
+
 
 def generate_username_from_name_and_date(nama: str, tanggal_lahir: date) -> str:
     """
@@ -115,21 +177,19 @@ def generate_username_alternatives(base_username: str, count: int = 5) -> List[s
 
 async def generate_available_username(
     nama: str, 
-    tanggal_lahir: date,
+    inspektorat: str,
+    role: 'UserRole',
     check_availability: Callable[[str], Awaitable[bool]]
 ) -> dict:
     """
-    Generate available username from nama and tanggal lahir.
-    
-    Args:
-        nama: Full name of the person
-        tanggal_lahir: Birth date
-        check_availability: Async function to check if username is available
-        
-    Returns:
-        dict with generated username and alternatives if needed
+    Generate available username with conflict resolution.
     """
-    base_username = generate_username_from_name_and_date(nama, tanggal_lahir)
+    if role.value == "PERWADAG":
+        # Use existing perwadag logic
+        base_username = generate_perwadag_username(nama)
+    else:
+        # Use new inspektorat logic
+        base_username = generate_username_from_name_and_inspektorat(nama, inspektorat)
     
     # Check if base username is available
     is_available = await check_availability(base_username)
@@ -142,10 +202,23 @@ async def generate_available_username(
             "alternatives": []
         }
     
-    # Generate alternatives
+    # Try with second name for conflict resolution
+    if role.value != "PERWADAG":
+        conflict_username = generate_username_with_conflict_resolution(nama, inspektorat)
+        is_conflict_available = await check_availability(conflict_username)
+        
+        if is_conflict_available:
+            return {
+                "username": conflict_username,
+                "is_base_available": False,
+                "alternatives_used": True,
+                "base_username": base_username,
+                "alternatives": [conflict_username]
+            }
+    
+    # Generate alternatives with numbers
     alternatives = generate_username_alternatives(base_username)
     
-    # Check alternatives
     for alt_username in alternatives:
         is_alt_available = await check_availability(alt_username)
         if is_alt_available:
@@ -157,7 +230,7 @@ async def generate_available_username(
                 "alternatives": alternatives[:5]
             }
     
-    # If all alternatives are taken, use timestamp-based username
+    # Fallback with timestamp
     import time
     timestamp_username = f"{base_username}{int(time.time()) % 1000}"
     

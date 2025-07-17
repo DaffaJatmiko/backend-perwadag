@@ -30,9 +30,9 @@ class UserRepository:
         user = User(
             nama=user_data.nama,
             username=username,
-            tempat_lahir=user_data.tempat_lahir,
-            tanggal_lahir=user_data.tanggal_lahir,
-            pangkat=user_data.pangkat,
+            # tempat_lahir=user_data.tempat_lahir,
+            # tanggal_lahir=user_data.tanggal_lahir,
+            # pangkat=user_data.pangkat,
             jabatan=user_data.jabatan,
             hashed_password=hashed_password,
             email=user_data.email,
@@ -142,8 +142,6 @@ class UserRepository:
                 or_(
                     User.nama.ilike(search_term),
                     User.username.ilike(search_term),
-                    User.tempat_lahir.ilike(search_term),
-                    User.pangkat.ilike(search_term),
                     User.jabatan.ilike(search_term),
                     User.email.ilike(search_term) if filters.search else False,
                     User.inspektorat.ilike(search_term) if filters.search else False
@@ -154,14 +152,8 @@ class UserRepository:
         if filters.is_active is not None:
             query = query.where(User.is_active == filters.is_active)
         
-        if filters.pangkat:
-            query = query.where(User.pangkat.ilike(f"%{filters.pangkat}%"))
-        
         if filters.jabatan:
             query = query.where(User.jabatan.ilike(f"%{filters.jabatan}%"))
-        
-        if filters.tempat_lahir:
-            query = query.where(User.tempat_lahir.ilike(f"%{filters.tempat_lahir}%"))
         
         # Role filter (ENUM field - MUCH SIMPLER!)
         if filters.role:

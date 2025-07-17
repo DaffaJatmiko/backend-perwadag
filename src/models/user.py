@@ -24,11 +24,11 @@ class User(BaseModel, SQLModel, table=True):
     # Personal Information
     nama: str = Field(max_length=200, index=True, description="Nama lengkap atau nama perwadag")
     username: str = Field(max_length=50, unique=True, index=True, description="Auto-generated username")
-    tempat_lahir: str = Field(max_length=100)
-    tanggal_lahir: date
+    # tempat_lahir: str = Field(max_length=100)
+    # tanggal_lahir: date
     
     # Government Position
-    pangkat: str = Field(max_length=100, description="Pangkat/golongan pegawai")
+    # pangkat: str = Field(max_length=100, description="Pangkat/golongan pegawai")
     jabatan: str = Field(max_length=200, description="Jabatan/posisi pegawai")
     
     # Authentication
@@ -57,13 +57,13 @@ class User(BaseModel, SQLModel, table=True):
         """Display name adalah nama lengkap."""
         return self.nama
     
-    @property
-    def age(self) -> int:
-        """Calculate user's age."""
-        today = date.today()
-        return today.year - self.tanggal_lahir.year - (
-            (today.month, today.day) < (self.tanggal_lahir.month, self.tanggal_lahir.day)
-        )
+    # @property
+    # def age(self) -> int:
+    #     """Calculate user's age."""
+    #     today = date.today()
+    #     return today.year - self.tanggal_lahir.year - (
+    #         (today.month, today.day) < (self.tanggal_lahir.month, self.tanggal_lahir.day)
+    #     )
     
     def has_email(self) -> bool:
         """Check if user has email set."""

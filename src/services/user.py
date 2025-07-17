@@ -12,8 +12,7 @@ from src.schemas.filters import UserFilterParams, UsernameGenerationPreview, Use
 from src.auth.jwt import get_password_hash, verify_password
 from src.models.user import User
 from src.models.enums import UserRole
-from src.utils.username_generator import generate_username_from_name_and_date
-
+from src.utils.username_generator import generate_username_from_name_and_inspektorat, generate_available_username
 
 class UserService:
     """Simplified user service dengan single table approach."""
@@ -24,26 +23,34 @@ class UserService:
     
     async def create_user(self, user_data: UserCreate) -> UserResponse:
         """Create user dengan simplified validation."""
-        # 1. Validate email uniqueness
+        # 1. Validate inspektorat for admin/inspektorat roles
+        if user_data.role in [UserRole.ADMIN, UserRole.INSPEKTORAT]:
+            if not user_data.inspektorat:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Inspektorat is required for admin and inspektorat roles"
+                )
+        
+        # 2. Validate email uniqueness
         if user_data.email and await self.user_repo.email_exists(user_data.email):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered"
             )
         
-        # 2. Generate username based on role
-        username = self._generate_username_by_role(user_data.nama, user_data.tanggal_lahir, user_data.role)
+        # 3. Generate username based on role
+        username = self._generate_username_by_role(user_data.nama, user_data.role, user_data.inspektorat)
         
-        # 3. Check username availability
+        # 4. Check username availability and resolve conflicts
         if await self.user_repo.username_exists(username):
             username = await self._generate_available_username(
-                user_data.nama, user_data.tanggal_lahir, user_data.role
+                user_data.nama, user_data.role, user_data.inspektorat
             )
         
-        # 4. Create user in database (NO ROLE VALIDATION NEEDED!)
+        # 5. Create user in database
         user = await self.user_repo.create(user_data, username)
         
-        # 5. Convert Model → Schema Response
+        # 6. Convert Model → Schema Response
         return UserResponse.from_user_model(user)
     
     async def get_user_or_404(self, user_id: str) -> UserResponse:
@@ -225,23 +232,20 @@ class UserService:
     
     async def preview_username_generation(self, preview_data: UsernameGenerationPreview) -> UsernameGenerationResponse:
         """Preview username generation."""
-        from datetime import datetime
-        
-        # Parse tanggal lahir
-        try:
-            tanggal_lahir = datetime.strptime(preview_data.tanggal_lahir, "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid date format. Use YYYY-MM-DD"
-            )
+        # REMOVE tanggal_lahir parsing
         
         # Generate username
-        username = self._generate_username_by_role(
-            preview_data.nama, 
-            tanggal_lahir, 
-            preview_data.role
-        )
+        if preview_data.role == UserRole.PERWADAG:
+            username = self._generate_perwadag_username(preview_data.nama)
+        else:
+            if not preview_data.inspektorat:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Inspektorat is required for admin and inspektorat roles"
+                )
+            username = generate_username_from_name_and_inspektorat(
+                preview_data.nama, preview_data.inspektorat
+            )
         
         # Check availability
         is_available = not await self.user_repo.username_exists(username)
@@ -249,13 +253,21 @@ class UserService:
         # Generate alternatives if needed
         alternatives = []
         if not is_available:
-            alternatives = await self._generate_username_alternatives(
-                preview_data.nama, tanggal_lahir, preview_data.role, count=5
+            if preview_data.role != UserRole.PERWADAG:
+                # Try conflict resolution
+                conflict_username = generate_username_with_conflict_resolution(
+                    preview_data.nama, preview_data.inspektorat
+                )
+                alternatives.append(conflict_username)
+            
+            # Add numbered alternatives
+            alternatives.extend(
+                await self._generate_username_alternatives_simple(username, count=4)
             )
         
         return UsernameGenerationResponse(
             original_nama=preview_data.nama,
-            tanggal_lahir=preview_data.tanggal_lahir,
+            inspektorat=preview_data.inspektorat,
             role=preview_data.role,
             generated_username=username,
             is_available=is_available,
@@ -285,14 +297,14 @@ class UserService:
     
     # ===== PRIVATE HELPER METHODS =====
     
-    def _generate_username_by_role(self, nama: str, tanggal_lahir, role: UserRole) -> str:
+    def _generate_username_by_role(self, nama: str, role: UserRole, inspektorat: str = None) -> str:
         """Generate username based on role."""
         if role == UserRole.PERWADAG:
-            # For perwadag: special format from nama (e.g., "ITPC Lagos" -> "itpc_lagos")
             return self._generate_perwadag_username(nama)
-        else:
-            # For admin & inspektorat: nama_depan + ddmmyyyy
-            return generate_username_from_name_and_date(nama, tanggal_lahir)
+        else:  # ADMIN or INSPEKTORAT
+            if not inspektorat:
+                raise ValueError("Inspektorat required for admin/inspektorat roles")
+            return generate_username_from_name_and_inspektorat(nama, inspektorat)
     
     def _generate_perwadag_username(self, nama: str) -> str:
         """Generate username untuk perwadag dari nama."""
@@ -323,18 +335,28 @@ class UserService:
         username = re.sub(r'[^a-z0-9_]', '', username)
         return username[:50]  # Limit length
     
-    async def _generate_available_username(self, nama: str, tanggal_lahir, role: UserRole) -> str:
+    async def _generate_available_username(self, nama: str, role: UserRole, inspektorat: str = None) -> str:
         """Generate available username dengan fallback."""
-        base_username = self._generate_username_by_role(nama, tanggal_lahir, role)
+        if role == UserRole.PERWADAG:
+            # Use existing perwadag logic
+            base_username = self._generate_perwadag_username(nama)
+            alternatives = await self._generate_username_alternatives_perwadag(nama, count=10)
+        else:
+            # Use new inspektorat logic
+            if not inspektorat:
+                raise ValueError("Inspektorat required for admin/inspektorat roles")
+            
+            result = await generate_available_username(
+                nama, inspektorat, role, self.user_repo.username_exists
+            )
+            return result["username"]
         
-        # Try alternatives
-        alternatives = await self._generate_username_alternatives(nama, tanggal_lahir, role, count=10)
-        
+        # Fallback for perwadag
         for username in alternatives:
             if not await self.user_repo.username_exists(username):
                 return username
         
-        # Ultimate fallback dengan timestamp
+        # Ultimate fallback
         import time
         return f"{base_username}{int(time.time()) % 1000}"
     
@@ -382,3 +404,10 @@ class UserService:
             size=size,
             pages=pages
         )
+
+    async def _generate_username_alternatives_simple(self, base_username: str, count: int = 5) -> List[str]:
+        """Generate simple numbered alternatives."""
+        alternatives = []
+        for i in range(1, count + 1):
+            alternatives.append(f"{base_username}{i}")
+        return alternatives
