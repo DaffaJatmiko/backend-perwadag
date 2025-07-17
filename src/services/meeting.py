@@ -255,11 +255,14 @@ class MeetingService:
                         evaluasi_file_manager.delete_file(file_info['path'])
                 existing_files = []
             
+            # 🔥 FIX: Convert enum value to lowercase untuk matching directory
+            meeting_type_folder = meeting.meeting_type.value.lower()  # ENTRY -> entry
+            
             # Upload new files menggunakan method yang sudah ada
             uploaded_file_infos = await evaluasi_file_manager.upload_meeting_files(
                 files=files,
                 meeting_id=meeting_id,
-                meeting_type=meeting.meeting_type.value,  # Convert enum to string
+                meeting_type=meeting_type_folder,  # 🔥 FIXED: lowercase
                 uploaded_by=uploaded_by
             )
             
