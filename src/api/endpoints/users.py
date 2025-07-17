@@ -64,21 +64,21 @@ async def update_my_profile(
     return await user_service.update_user(current_user["id"], user_data)
 
 
-@router.post("/me/change-password", response_model=MessageResponse, summary="Change current user password")
-async def change_my_password(
-    password_data: UserChangePassword,
-    current_user: dict = Depends(get_current_active_user),
-    user_service: UserService = Depends(get_user_service)
-):
-    """
-    Change current user's password.
+# @router.post("/me/change-password", response_model=MessageResponse, summary="Change current user password")
+# async def change_my_password(
+#     password_data: UserChangePassword,
+#     current_user: dict = Depends(get_current_active_user),
+#     user_service: UserService = Depends(get_user_service)
+# ):
+#     """
+#     Change current user's password.
     
-    - **current_password**: Current password for verification
-    - **new_password**: New password (minimum 6 characters)
+#     - **current_password**: Current password for verification
+#     - **new_password**: New password (minimum 6 characters)
     
-    Note: Default password for all users is @Kemendag123
-    """
-    return await user_service.change_password(current_user["id"], password_data)
+#     Note: Default password for all users is @Kemendag123
+#     """
+#     return await user_service.change_password(current_user["id"], password_data)
 
 
 @router.get("/", response_model=UserListResponse, summary="Get all users with comprehensive filters")
