@@ -103,6 +103,7 @@ def create_application() -> FastAPI:
         allow_credentials=True,
         allow_methods=settings.CORS_METHODS_LIST,
         allow_headers=settings.CORS_HEADERS_LIST,
+        expose_headers=["*"],
     )
 
     # # Add rate limiting middleware
@@ -124,6 +125,7 @@ def create_application() -> FastAPI:
             response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
             response.headers["Access-Control-Allow-Headers"] = "*"
             response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+            
         
         return response
 
