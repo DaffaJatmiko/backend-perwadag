@@ -95,6 +95,19 @@ class Settings(BaseSettings):
     SESSION_EXPIRE_MINUTES: int = 1440  # 24 hours
     SESSION_CLEANUP_INTERVAL_HOURS: int = 24
 
+    # Email Configuration (Gmail SMTP)
+    EMAIL_SMTP_HOST: str = "smtp.gmail.com"
+    EMAIL_SMTP_PORT: int = 587
+    EMAIL_SMTP_USERNAME: Optional[str] = None
+    EMAIL_SMTP_PASSWORD: Optional[str] = None
+    EMAIL_SENDER_EMAIL: str = "noreply@yourapp.com"
+    EMAIL_SENDER_NAME: str = "Government Auth System"
+    EMAIL_RESET_URL_BASE: str = "http://localhost:5173/reset-password"
+
+    # Password Reset Settings
+    PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 1
+    PASSWORD_RESET_TOKEN_LENGTH: int = 32
+
     @field_validator("DATABASE_URI", mode="before")
     def assemble_db_connection(cls, v: Optional[str], info: Dict[str, Any]) -> Any:
         """Build PostgreSQL connection string from components."""

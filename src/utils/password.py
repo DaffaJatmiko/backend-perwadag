@@ -1,67 +1,60 @@
-"""Password security utilities for STEP 1 implementation."""
+"""Enhanced password utilities for reset functionality."""
 
 import secrets
 import string
-from typing import List
-from datetime import datetime, timedelta
+from src.core.config import settings
 
 
-def generate_secure_password(length: int = 16) -> str:
-    """Generate a cryptographically secure random password."""
-    if length < 12:
-        length = 12
+def generate_password_reset_token(length: int = None) -> str:
+    """
+    Generate secure random token for password reset.
     
-    # Ensure we have at least one character from each required category
-    lowercase = secrets.choice(string.ascii_lowercase)
-    uppercase = secrets.choice(string.ascii_uppercase)
-    digit = secrets.choice(string.digits)
-    special = secrets.choice("!@#$%^&*()_+-=[]{}|;:,.<>?")
+    Args:
+        length: Token length (default from settings)
     
-    # Generate remaining characters
-    remaining_length = length - 4
-    all_chars = string.ascii_letters + string.digits + "!@#$%^&*()_+-=[]{}|;:,.<>?"
-    remaining = ''.join(secrets.choice(all_chars) for _ in range(remaining_length))
+    Returns:
+        Secure random token string
+    """
+    if length is None:
+        length = settings.PASSWORD_RESET_TOKEN_LENGTH
     
-    # Combine and shuffle
-    password_list = list(lowercase + uppercase + digit + special + remaining)
-    secrets.SystemRandom().shuffle(password_list)
-    
-    return ''.join(password_list)
+    # Use URL-safe characters (letters, numbers, -, _)
+    alphabet = string.ascii_letters + string.digits + '-_'
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 
-def generate_password_reset_token() -> str:
-    """Generate secure token for password reset."""
-    return secrets.token_urlsafe(32)
+def generate_reset_link(token: str) -> str:
+    """
+    Generate complete reset link with token.
+    
+    Args:
+        token: Password reset token
+    
+    Returns:
+        Complete reset URL
+    """
+    base_url = settings.EMAIL_RESET_URL_BASE.rstrip('/')
+    return f"{base_url}?token={token}"
 
 
-def is_password_expired(last_changed: datetime, max_age_days: int = 90) -> bool:
-    """Check if password has expired based on age policy."""
-    if not last_changed:
-        return True
+def mask_email(email: str) -> str:
+    """
+    Mask email for logging purposes.
     
-    expiry_date = last_changed + timedelta(days=max_age_days)
-    return datetime.utcnow() > expiry_date
-
-
-def get_password_strength_feedback(password: str) -> List[str]:
-    """Get user-friendly feedback for password improvement."""
-    from src.utils.validators import validate_password_strength
+    Args:
+        email: Email address to mask
     
-    result = validate_password_strength(password)
-    feedback = []
+    Returns:
+        Masked email (e.g., "u***@example.com")
+    """
+    if not email or '@' not in email:
+        return "***@***.***"
     
-    if not result["valid"]:
-        feedback.extend(result["errors"])
+    local, domain = email.split('@', 1)
     
-    # Add positive feedback based on strength score
-    score = result["strength_score"]
-    if score >= 80:
-        feedback.append("Excellent password strength!")
-    elif score >= 60:
-        feedback.append("Good password strength.")
-    elif score >= 40:
-        feedback.append("Fair password strength. Consider making it stronger.")
+    if len(local) <= 2:
+        masked_local = local[0] + '*'
     else:
-        feedback.append("Weak password. Please choose a stronger password.")
+        masked_local = local[0] + '*' * (len(local) - 2) + local[-1]
     
-    return feedback
+    return f"{masked_local}@{domain}"
