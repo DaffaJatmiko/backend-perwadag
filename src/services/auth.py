@@ -109,15 +109,15 @@ class AuthService:
                     detail="User not found or inactive"
                 )
             
-            # Get user roles
-            user_roles = [role.role.name for role in user.roles]
+            # ✅ FIXED: Use single role system
+            user_role = user.role.value  # Get from enum: "ADMIN", "INSPEKTORAT", "PERWADAG"
             
             # Create new access token
             token_data = {
                 "sub": str(user.id),
                 "username": user.username,
                 "nama": user.nama,
-                "roles": user_roles,
+                "role": user_role,  # ✅ Single role instead of array
                 "type": "access"
             }
             
@@ -127,8 +127,8 @@ class AuthService:
                 expires_delta=access_token_expires
             )
             
-            # Build user response
-            user_response = self.user_service._model_to_response(user)
+            # ✅ FIXED: Use correct method
+            user_response = UserResponse.from_user_model(user)
             
             return Token(
                 access_token=access_token,
