@@ -21,6 +21,8 @@ from src.schemas.filters import MatriksFilterParams
 from src.models.surat_tugas import SuratTugas
 from src.models.user import User
 from src.utils.evaluation_date_validator import validate_matriks_date_access
+from src.schemas.matriks import TemuanRekomendasiSummary
+
 
 
 class MatriksService:
@@ -121,8 +123,9 @@ class MatriksService:
         update_data: MatriksUpdate, 
         updated_by: str
     ) -> MatriksResponse:
-        """Update matriks."""
-        matriks = await self.matriks_repo.update(matriks_id, update_data)
+        """Update matriks dengan temuan-rekomendasi support."""
+        
+        matriks = await self.matriks_repo.get_by_id(matriks_id)
         if not matriks:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -131,14 +134,24 @@ class MatriksService:
         
         surat_tugas_data = await self._get_surat_tugas_basic_info(matriks.surat_tugas_id)
         
-        # 🔥 VALIDASI AKSES TANGGAL
+        # Date validation
         validate_matriks_date_access(
             tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
             operation="update"
         )
         
+        # Update temuan-rekomendasi if provided
+        if update_data.temuan_rekomendasi is not None:
+            items = [item.model_dump() for item in update_data.temuan_rekomendasi.items]
+            updated_matriks = await self.matriks_repo.update_temuan_rekomendasi(
+                matriks_id, items
+            )
+        else:
+            # No temuan-rekomendasi update, just refresh
+            updated_matriks = matriks
+        
         # Set updated_by
-        matriks.updated_by = updated_by
+        updated_matriks.updated_by = updated_by
         await self.matriks_repo.session.commit()
         
         return await self.get_matriks_or_404(matriks_id)
@@ -247,15 +260,23 @@ class MatriksService:
             matriks_id = matriks.get('id')
             surat_tugas_id = matriks.get('surat_tugas_id')
             file_dokumen_matriks = matriks.get('file_dokumen_matriks')
+            temuan_rekomendasi = matriks.get('temuan_rekomendasi') 
             created_at = matriks.get('created_at')
             updated_at = matriks.get('updated_at')
             created_by = matriks.get('created_by')
             updated_by = matriks.get('updated_by')
+
+            temp_matriks = None
+            if temuan_rekomendasi:
+                from src.models.matriks import Matriks
+                temp_matriks = Matriks()
+                temp_matriks.temuan_rekomendasi = temuan_rekomendasi
         else:
             # Repository return object
             matriks_id = matriks.id
             surat_tugas_id = matriks.surat_tugas_id
             file_dokumen_matriks = getattr(matriks, 'file_dokumen_matriks', None)
+            temuan_rekomendasi = getattr(matriks, 'temuan_rekomendasi', None)
             created_at = matriks.created_at
             updated_at = matriks.updated_at
             created_by = matriks.created_by
@@ -303,7 +324,16 @@ class MatriksService:
         
         # Calculate completion - model only has file, no nomor_matriks field
         has_file = bool(file_dokumen_matriks)
-        has_nomor = False  # Model doesn't have nomor_matriks field
+        has_temuan_rekomendasi = False
+        temuan_rekomendasi_summary = None
+
+        matriks_obj = temp_matriks if isinstance(matriks, dict) else matriks
+
+        if matriks_obj and hasattr(matriks_obj, 'get_temuan_rekomendasi_summary'):
+            summary_data = matriks_obj.get_temuan_rekomendasi_summary()
+            has_temuan_rekomendasi = len(summary_data.get('data', [])) > 0  # ← SIMPLIFIED
+            temuan_rekomendasi_summary = TemuanRekomendasiSummary(**summary_data)
+
         is_completed = has_file  # Completion = has file only
         
         completion_percentage = 100 if has_file else 0
@@ -314,6 +344,7 @@ class MatriksService:
             surat_tugas_id=str(surat_tugas_id),
             nomor_matriks=None,  # Model doesn't have this field
             file_dokumen=file_dokumen_matriks,  # Map to expected response field name
+            temuan_rekomendasi_summary=temuan_rekomendasi_summary,
             
             # Enhanced file information
             file_urls=file_urls,
@@ -322,7 +353,7 @@ class MatriksService:
             # Status information
             is_completed=is_completed,
             has_file=has_file,
-            has_nomor=has_nomor,
+            has_temuan_rekomendasi=has_temuan_rekomendasi,
             completion_percentage=completion_percentage,
             
             # Enriched surat tugas data

@@ -166,7 +166,6 @@ class PeriodeSummary(BaseModel):
     
     id: str
     tahun: int
-    status: str
     is_locked: bool
     is_editable: bool
     
@@ -204,7 +203,6 @@ class PenilaianRisikoResponse(BaseModel):
     # Quick access fields
     nama_perwadag: str
     periode_tahun: int
-    periode_status: str
     
     # NEW: Calculation info
     calculation_performed: bool = Field(

@@ -5,7 +5,6 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime
 
-from src.models.penilaian_enums import StatusPeriode
 from src.schemas.common import SuccessResponse
 from src.schemas.shared import BaseListResponse
 
@@ -20,11 +19,6 @@ class PeriodeEvaluasiCreate(BaseModel):
         ge=2020, 
         le=2050,
         description="Tahun periode evaluasi"
-    )
-    
-    status: StatusPeriode = Field(
-        default=StatusPeriode.AKTIF,
-        description="Status periode"
     )
     
     @field_validator('tahun')
@@ -47,10 +41,6 @@ class PeriodeEvaluasiUpdate(BaseModel):
         description="Status lock periode"
     )
     
-    status: Optional[StatusPeriode] = Field(
-        None,
-        description="Status periode"
-    )
 
 
 # ===== RESPONSE SCHEMAS =====
@@ -61,11 +51,9 @@ class PeriodeEvaluasiResponse(BaseModel):
     id: str
     tahun: int
     is_locked: bool
-    status: StatusPeriode
     
     # Computed fields
     is_editable: bool = Field(description="Apakah periode bisa diedit")
-    status_display: str = Field(description="Display name status")
     lock_status_display: str = Field(description="Display name lock status")
     tahun_pembanding_1: int = Field(description="Tahun pembanding pertama")
     tahun_pembanding_2: int = Field(description="Tahun pembanding kedua")

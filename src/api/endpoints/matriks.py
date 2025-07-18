@@ -92,7 +92,43 @@ async def update_matriks(
     current_user: dict = Depends(require_auto_generated_edit_access()),
     service: MatriksService = Depends(get_matriks_service)
 ):
-    """Update matriks (nomor matriks)."""
+    """
+    Update matriks dengan temuan-rekomendasi support.
+
+    **Accessible by**: Admin dan Inspektorat
+
+    **Features:**
+    - Update temuan dan rekomendasi (REPLACE strategy)
+    - Maksimal 20 pasang temuan-rekomendasi
+    - Date access validation
+
+    **Example Request:**
+    ```json
+    {
+        "temuan_rekomendasi": {
+            "items": [
+                {
+                    "temuan": "Belum ada prosedur standar untuk evaluasi",
+                    "rekomendasi": "Membuat SOP evaluasi yang jelas dan terstruktur"
+                },
+                {
+                    "temuan": "Dokumentasi kurang lengkap",
+                    "rekomendasi": "Melengkapi dokumentasi sesuai standar yang berlaku"
+                }
+            ]
+        }
+    }
+    ```
+
+    **Strategy**: REPLACE - Data lama akan diganti dengan data baru
+    
+    **Validation**:
+    - Temuan dan rekomendasi tidak boleh kosong
+    - Maksimal 20 pasang data
+    - Hanya bisa update jika evaluasi belum selesai
+    
+    **Response**: Enriched matriks data dengan summary temuan-rekomendasi
+    """
     return await service.update_matriks(matriks_id, update_data, current_user["id"])
 
 

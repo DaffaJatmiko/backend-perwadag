@@ -24,7 +24,6 @@ class PeriodeEvaluasiRepository:
         """Create periode evaluasi baru."""
         periode = PeriodeEvaluasi(
             tahun=periode_data.tahun,
-            status=periode_data.status,
             is_locked=False  # Default tidak terkunci
         )
         
@@ -89,8 +88,6 @@ class PeriodeEvaluasiRepository:
             )
         
         # Apply specific filters
-        if filters.status:
-            query = query.where(PeriodeEvaluasi.status == filters.status)
         
         if filters.is_locked is not None:
             query = query.where(PeriodeEvaluasi.is_locked == filters.is_locked)
@@ -104,9 +101,7 @@ class PeriodeEvaluasiRepository:
             count_query_base = count_query_base.where(
                 func.cast(PeriodeEvaluasi.tahun, func.TEXT()).ilike(search_term)
             )
-        
-        if filters.status:
-            count_query_base = count_query_base.where(PeriodeEvaluasi.status == filters.status)
+
         
         if filters.is_locked is not None:
             count_query_base = count_query_base.where(PeriodeEvaluasi.is_locked == filters.is_locked)
@@ -215,14 +210,6 @@ class PeriodeEvaluasiRepository:
         total_result = await self.session.execute(total_query)
         total_periode = total_result.scalar() or 0
         
-        # Aktif vs tutup
-        status_query = (
-            select(PeriodeEvaluasi.status, func.count(PeriodeEvaluasi.id))
-            .where(PeriodeEvaluasi.deleted_at.is_(None))
-            .group_by(PeriodeEvaluasi.status)
-        )
-        status_result = await self.session.execute(status_query)
-        status_breakdown = {row[0].value: row[1] for row in status_result.all()}
         
         # Locked vs unlocked
         locked_query = (
@@ -235,10 +222,7 @@ class PeriodeEvaluasiRepository:
         
         return {
             "total_periode": total_periode,
-            "status_breakdown": status_breakdown,
             "locked_breakdown": locked_breakdown,
-            "periode_aktif": status_breakdown.get("aktif", 0),
-            "periode_tutup": status_breakdown.get("tutup", 0),
             "periode_locked": locked_breakdown.get(True, 0),
             "periode_unlocked": locked_breakdown.get(False, 0)
         }

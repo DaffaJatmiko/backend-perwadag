@@ -206,7 +206,6 @@ class PenilaianRisikoRepository:
             select(
                 PenilaianRisiko,
                 User.nama.label('perwadag_nama'),
-                PeriodeEvaluasi.status.label('periode_status'),
                 PeriodeEvaluasi.is_locked.label('periode_locked')
             )
             .join(User, PenilaianRisiko.user_perwadag_id == User.id)
@@ -292,15 +291,13 @@ class PenilaianRisikoRepository:
         for row in rows:
             penilaian = row[0]
             perwadag_nama = row[1]
-            periode_status = row[2]
-            periode_locked = row[3]
+            periode_locked = row[2]
             
             enriched_data.append({
                 'penilaian': penilaian,
                 'perwadag_nama': perwadag_nama,
-                'periode_status': periode_status.value if periode_status else 'aktif',
                 'periode_locked': periode_locked or False,
-                'periode_editable': not periode_locked and periode_status.value == 'aktif' if periode_status else False
+                'periode_editable': not (periode_locked or False)  # ✅ SIMPLIFIED
             })
         
         return enriched_data, total

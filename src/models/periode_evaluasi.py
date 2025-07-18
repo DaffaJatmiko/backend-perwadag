@@ -7,7 +7,6 @@ from sqlalchemy import Enum as SQLEnum
 import uuid as uuid_lib
 
 from src.models.base import BaseModel
-from src.models.penilaian_enums import StatusPeriode
 
 
 class PeriodeEvaluasi(BaseModel, SQLModel, table=True):
@@ -32,15 +31,10 @@ class PeriodeEvaluasi(BaseModel, SQLModel, table=True):
         description="Status lock periode (true = tidak bisa edit)"
     )
     
-    status: StatusPeriode = Field(
-        sa_column=Column(SQLEnum(StatusPeriode), nullable=False),
-        default=StatusPeriode.AKTIF,
-        description="Status periode: aktif atau tutup"
-    )
     
     def is_editable(self) -> bool:
         """Check apakah periode masih bisa diedit."""
-        return not self.is_locked and self.status == StatusPeriode.AKTIF
+        return not self.is_locked and self.deleted_at is None
     
     def get_tahun_pembanding(self) -> dict:
         """Generate tahun pembanding untuk kriteria."""
@@ -49,18 +43,10 @@ class PeriodeEvaluasi(BaseModel, SQLModel, table=True):
             "tahun_pembanding_2": self.tahun - 1   # tahun lalu
         }
     
-    def get_status_display(self) -> str:
-        """Get display name untuk status."""
-        status_display = {
-            StatusPeriode.AKTIF: "Aktif",
-            StatusPeriode.TUTUP: "Tutup"
-        }
-        return status_display.get(self.status, self.status.value)
-    
     def get_lock_status_display(self) -> str:
         """Get display name untuk lock status."""
         return "Terkunci" if self.is_locked else "Dapat Diedit"
     
     def __repr__(self) -> str:
-        return f"<PeriodeEvaluasi(tahun={self.tahun}, status={self.status.value}, locked={self.is_locked})>"
+        return f"<PeriodeEvaluasi(tahun={self.tahun}, locked={self.is_locked})>"
 

@@ -94,8 +94,9 @@ class MatriksRepository:
             matriks_query = matriks_query.where(SuratTugas.user_perwadag_id == filters.user_perwadag_id)
         
         if filters.tahun_evaluasi:
-            matriks_query = matriks_query.where(SuratTugas.tahun_evaluasi == filters.tahun_evaluasi)
-        
+            matriks_query = matriks_query.where(
+                func.extract('year', SuratTugas.tanggal_evaluasi_mulai) == filters.tahun_evaluasi
+            )        
         # Add surat_tugas_id filter if available
         if hasattr(filters, 'surat_tugas_id') and filters.surat_tugas_id:
             matriks_query = matriks_query.where(Matriks.surat_tugas_id == filters.surat_tugas_id)
@@ -174,6 +175,7 @@ class MatriksRepository:
                 'id': matriks.id,
                 'surat_tugas_id': matriks.surat_tugas_id,
                 'file_dokumen_matriks': matriks.file_dokumen_matriks,
+                'temuan_rekomendasi': getattr(matriks, 'temuan_rekomendasi', None), 
                 'created_at': matriks.created_at,
                 'updated_at': matriks.updated_at,
                 'created_by': matriks.created_by,
@@ -221,6 +223,25 @@ class MatriksRepository:
         
         matriks.file_dokumen_matriks = file_path
         matriks.updated_at = datetime.utcnow()
+        await self.session.commit()
+        await self.session.refresh(matriks)
+        return matriks
+
+    async def update_temuan_rekomendasi(
+        self, 
+        matriks_id: str, 
+        items: List[Dict[str, str]]
+    ) -> Optional[Matriks]:
+        """Update temuan-rekomendasi dengan REPLACE strategy."""
+        
+        matriks = await self.get_by_id(matriks_id)
+        if not matriks:
+            return None
+        
+        # REPLACE strategy - replace all old data with new data
+        matriks.set_temuan_rekomendasi_items(items)
+        matriks.updated_at = datetime.utcnow()
+        
         await self.session.commit()
         await self.session.refresh(matriks)
         return matriks

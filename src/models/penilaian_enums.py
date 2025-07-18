@@ -4,24 +4,6 @@
 from enum import Enum
 
 
-class StatusPeriode(str, Enum):
-    """Status periode evaluasi."""
-    AKTIF = "aktif"
-    TUTUP = "tutup"
-    
-    @classmethod
-    def get_all_values(cls):
-        """Get all status values."""
-        return [status.value for status in cls]
-    
-    @classmethod
-    def get_display_name(cls, status: str) -> str:
-        """Get display name untuk status."""
-        display_map = {
-            cls.AKTIF.value: "Aktif",
-            cls.TUTUP.value: "Tutup"
-        }
-        return display_map.get(status, status)
 
 
 class ProfilRisiko(str, Enum):

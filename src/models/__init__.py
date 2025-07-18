@@ -27,7 +27,7 @@ from .format_kuisioner import FormatKuisioner
 
 # Penilaian risiko enums
 from .penilaian_enums import (
-    StatusPeriode, ProfilRisiko, KriteriaPenilaian
+     ProfilRisiko, KriteriaPenilaian
 )
 
 # Penilaian risiko models
@@ -65,7 +65,6 @@ __all__ = [
     "FormatKuisioner",
     
     # New penilaian risiko enums
-    "StatusPeriode",
     "ProfilRisiko",
     "KriteriaPenilaian",
     

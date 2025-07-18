@@ -51,7 +51,6 @@ class PenilaianRisikoService:
             response = await self._build_penilaian_response(
                 data['penilaian'],
                 data['perwadag_nama'],
-                data['periode_status'],
                 data['periode_locked']
             )
             penilaian_responses.append(response)
@@ -317,7 +316,6 @@ class PenilaianRisikoService:
         self, 
         penilaian,
         perwadag_nama: Optional[str] = None,
-        periode_status: Optional[str] = None,
         periode_locked: Optional[bool] = None
     ) -> PenilaianRisikoResponse:
         """Build penilaian risiko response dengan enriched data."""
@@ -329,10 +327,9 @@ class PenilaianRisikoService:
                 perwadag_nama = perwadag.nama
         
         # Get periode info jika belum ada
-        if periode_status is None or periode_locked is None:
+        if periode_locked is None:  # ✅ HAPUS check periode_status
             periode = await self.periode_repo.get_by_id(penilaian.periode_id)
             if periode:
-                periode_status = periode.status.value
                 periode_locked = periode.is_locked
         
         # Build summary objects
@@ -345,9 +342,8 @@ class PenilaianRisikoService:
         periode_info = PeriodeSummary(
             id=penilaian.periode_id,
             tahun=penilaian.tahun,
-            status=periode_status or "aktif",
             is_locked=periode_locked or False,
-            is_editable=not (periode_locked or False) and (periode_status or "aktif") == "aktif"
+            is_editable=not (periode_locked or False)  # ✅ SIMPLIFIED
         )
         
         return PenilaianRisikoResponse(
@@ -369,7 +365,6 @@ class PenilaianRisikoService:
             periode_info=periode_info,
             nama_perwadag=perwadag_nama or "Unknown",
             periode_tahun=penilaian.tahun,
-            periode_status=periode_status or "aktif",
             created_at=penilaian.created_at,
             updated_at=penilaian.updated_at,
             created_by=penilaian.created_by,

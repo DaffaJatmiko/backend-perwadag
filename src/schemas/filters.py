@@ -6,7 +6,7 @@ from datetime import date
 
 from src.models.enums import UserRole
 from src.models.evaluasi_enums import MeetingType
-from src.models.penilaian_enums import StatusPeriode, ProfilRisiko
+from src.models.penilaian_enums import ProfilRisiko
 
 
 
@@ -622,7 +622,6 @@ class PeriodeEvaluasiFilterParams(BaseModel):
     search: Optional[str] = Field(None, description="Search by tahun")
     
     # Basic filters only
-    status: Optional[StatusPeriode] = Field(None, description="Filter by status")
     is_locked: Optional[bool] = Field(None, description="Filter by lock status")
     
     @field_validator('search')

@@ -81,7 +81,6 @@ async def get_all_periode_evaluasi(
     **Query Parameters**:
     - page, size: Pagination
     - search: Search by tahun
-    - status: Filter by status (aktif/tutup)
     - is_locked: Filter by lock status
     - tahun_from, tahun_to: Filter range tahun
     - include_statistics: Include statistics dalam response
@@ -123,7 +122,6 @@ async def update_periode_evaluasi(
     
     **Updatable fields**:
     - is_locked: Lock/unlock periode untuk editing
-    - status: aktif/tutup
     
     **Business Rules**:
     - Hanya admin yang bisa lock/unlock periode

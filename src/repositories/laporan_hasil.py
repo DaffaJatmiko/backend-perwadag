@@ -95,7 +95,7 @@ class LaporanHasilRepository:
             laporan_query = laporan_query.where(SuratTugas.user_perwadag_id == filters.user_perwadag_id)
         
         if filters.tahun_evaluasi:
-            laporan_query = laporan_query.where(SuratTugas.tahun_evaluasi == filters.tahun_evaluasi)
+            laporan_query = laporan_query.where(func.extract('year', SuratTugas.tanggal_evaluasi_mulai) == filters.tahun_evaluasi)
         
         # Add surat_tugas_id filter if available
         if hasattr(filters, 'surat_tugas_id') and filters.surat_tugas_id:

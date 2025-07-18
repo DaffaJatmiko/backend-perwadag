@@ -119,7 +119,7 @@ class MeetingRepository:
             meetings_query = meetings_query.where(SuratTugas.user_perwadag_id == filters.user_perwadag_id)
         
         if filters.tahun_evaluasi:
-            meetings_query = meetings_query.where(SuratTugas.tahun_evaluasi == filters.tahun_evaluasi)
+            meetings_query = meetings_query.where(func.extract('year', SuratTugas.tanggal_evaluasi_mulai) == filters.tahun_evaluasi)
         
         # 🔥 STEP 2: Count total (SAFE - menggunakan subquery)
         count_query = select(func.count()).select_from(meetings_query.subquery())
