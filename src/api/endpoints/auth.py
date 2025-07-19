@@ -9,7 +9,7 @@ from src.services.user import UserService
 from src.services.auth import AuthService
 from src.schemas.user import (
     UserLogin, Token, TokenRefresh, PasswordReset, PasswordResetConfirm,
-    MessageResponse, UserResponse
+    MessageResponse, UserResponse, UserChangePassword
 )
 from src.auth.permissions import get_current_active_user
 
@@ -92,6 +92,32 @@ async def logout(
 #     """
 #     return await auth_service.get_current_user_info(current_user["id"])
 
+@router.post("/change-password", response_model=MessageResponse, summary="Change user password")
+async def change_password(
+    password_data: UserChangePassword,
+    current_user: dict = Depends(get_current_active_user),
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """
+    Change current user's password.
+    
+    *Requires*: Valid JWT token
+    
+    - *current_password*: Current password
+    - *new_password*: New password (minimum 6 characters)
+    
+    *Process*:
+    1. Verify current password is correct
+    2. Ensure new password is different from current
+    3. Update password in database
+    
+    *Security*:
+    - User must be authenticated with valid token
+    - Current password must be verified before change
+    - New password must meet minimum requirements
+    """
+    user_service = UserService(UserRepository(auth_service.user_repo.session))
+    return await user_service.change_password(current_user["id"], password_data)
 
 @router.get("/password-reset-eligibility", summary="Check password reset eligibility")
 async def check_password_reset_eligibility(
