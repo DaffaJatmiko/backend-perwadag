@@ -367,12 +367,6 @@ async def delete_user(
     
     **Note**: This is a soft delete - user data is preserved but marked as deleted.
     """
-    # Prevent admin from deleting themselves
-    if current_user["id"] == user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete your own account"
-        )
     
-    return await user_service.delete_user(user_id)
-
+    # ✅ PASS current_user_id sebagai parameter
+    return await user_service.delete_user(user_id, current_user["id"])

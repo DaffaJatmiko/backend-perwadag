@@ -156,9 +156,17 @@ class UserService:
         
         return MessageResponse(message=f"Password direset ke default untuk user {user.nama}")
     
-    async def delete_user(self, user_id: str) -> MessageResponse:
-        """Soft delete user."""
-        # 1. Get user
+    async def delete_user(self, user_id: str, current_user_id: str) -> MessageResponse:
+        """Delete user dengan dependency checking."""
+        
+        # Prevent admin from deleting themselves
+        if current_user_id == user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete your own account"
+            )
+        
+        # Get user
         user = await self.user_repo.get_by_id(user_id)
         if not user:
             raise HTTPException(
@@ -166,7 +174,18 @@ class UserService:
                 detail="User tidak ditemukan"
             )
         
-        # 2. Check if user is admin (prevent deleting last admin)
+        # ✅ CHECK DEPENDENCIES untuk PERWADAG
+        if user.role == UserRole.PERWADAG:
+            surat_tugas_count = await self._count_user_surat_tugas(user_id)
+            
+            if surat_tugas_count > 0:
+                # ❌ BLOCK DELETE
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Tidak dapat menghapus user. Masih ada {surat_tugas_count} surat tugas yang terkait dengan user ini. Gunakan fitur deactivate sebagai alternatif."
+                )
+        
+        # Check if user is admin (prevent deleting last admin)
         if user.role == UserRole.ADMIN:
             admin_users = await self.user_repo.get_users_by_role(UserRole.ADMIN)
             if len(admin_users) <= 1:
@@ -175,9 +194,8 @@ class UserService:
                     detail="Tidak dapat menghapus user admin terakhir"
                 )
         
-        # 3. Soft delete
+        # ✅ SAFE TO DELETE
         await self.user_repo.soft_delete(user_id)
-        
         return MessageResponse(message=f"User {user.nama} berhasil dihapus")
     
     async def get_all_users_with_filters(self, filters: UserFilterParams) -> UserListResponse:
@@ -411,3 +429,21 @@ class UserService:
         for i in range(1, count + 1):
             alternatives.append(f"{base_username}{i}")
         return alternatives
+
+    async def _count_user_surat_tugas(self, user_id: str) -> int:
+        """Count surat tugas yang terkait dengan user."""
+        from sqlalchemy import select, func, and_
+        from src.models.surat_tugas import SuratTugas
+        
+        # Gunakan session dari user_repo
+        session = self.user_repo.session
+        
+        query = select(func.count(SuratTugas.id)).where(
+            and_(
+                SuratTugas.user_perwadag_id == user_id,
+                SuratTugas.deleted_at.is_(None)
+            )
+        )
+        
+        result = await session.execute(query)
+        return result.scalar() or 0
