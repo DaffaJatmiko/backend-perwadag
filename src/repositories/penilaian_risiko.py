@@ -260,18 +260,22 @@ class PenilaianRisikoRepository:
         total_result = await self.session.execute(count_query)
         total = total_result.scalar() or 0
         
-        # 🎯 FIXED SORTING LOGIC - Sort by total_nilai_risiko, null values always last
+        # 🎯 FIXED SORTING LOGIC - Sort by total_nilai_risiko with secondary sort by nama
         if filters.sort_by == "skor_tertinggi":
             # ✅ Total nilai risiko tertinggi: 100, 50, null (desc dengan null di belakang)
+            # ✅ Jika nilai sama, urutkan berdasarkan nama ASC
             query = query.order_by(
                 PenilaianRisiko.total_nilai_risiko.is_(None).asc(),  # NULL values last
-                PenilaianRisiko.total_nilai_risiko.desc()            # Then by total_nilai_risiko DESC
+                PenilaianRisiko.total_nilai_risiko.desc(),           # Primary: total_nilai_risiko DESC
+                User.nama.asc()                                      # Secondary: nama ASC (jika nilai sama)
             )
         elif filters.sort_by == "skor_terendah":
             # ✅ Total nilai risiko terendah: 50, 100, null (asc dengan null di belakang)
+            # ✅ Jika nilai sama, urutkan berdasarkan nama ASC
             query = query.order_by(
                 PenilaianRisiko.total_nilai_risiko.is_(None).asc(),  # NULL values last
-                PenilaianRisiko.total_nilai_risiko.asc()             # Then by total_nilai_risiko ASC
+                PenilaianRisiko.total_nilai_risiko.asc(),            # Primary: total_nilai_risiko ASC
+                User.nama.asc()                                      # Secondary: nama ASC (jika nilai sama)
             )
         elif filters.sort_by == "nama":
             # ✅ Default ascending untuk nama
