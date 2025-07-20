@@ -1,10 +1,10 @@
 # ===== src/repositories/penilaian_risiko.py =====
-"""Repository untuk penilaian risiko."""
+"""Repository untuk penilaian risiko - FIXED SORTING LOGIC."""
 
 from typing import List, Optional, Tuple, Dict, Any
 from datetime import datetime
 from decimal import Decimal
-from sqlalchemy import select, and_, or_, func, update
+from sqlalchemy import select, and_, or_, func, update, desc, asc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.penilaian_risiko import PenilaianRisiko
@@ -260,22 +260,24 @@ class PenilaianRisikoRepository:
         total_result = await self.session.execute(count_query)
         total = total_result.scalar() or 0
         
-        # ✅ FIXED: Proper SQLAlchemy sorting syntax
+        # 🎯 FIXED SORTING LOGIC - Sort by total_nilai_risiko, null values always last
         if filters.sort_by == "skor_tertinggi":
-            # Order by skor desc, nulls last
+            # ✅ Total nilai risiko tertinggi: 100, 50, null (desc dengan null di belakang)
             query = query.order_by(
-                PenilaianRisiko.skor_rata_rata.desc(),
-                PenilaianRisiko.skor_rata_rata.is_(None).asc()
+                PenilaianRisiko.total_nilai_risiko.is_(None).asc(),  # NULL values last
+                PenilaianRisiko.total_nilai_risiko.desc()            # Then by total_nilai_risiko DESC
             )
         elif filters.sort_by == "skor_terendah":
-            # Order by skor asc, nulls last  
+            # ✅ Total nilai risiko terendah: 50, 100, null (asc dengan null di belakang)
             query = query.order_by(
-                PenilaianRisiko.skor_rata_rata.is_(None).asc(),
-                PenilaianRisiko.skor_rata_rata.asc()
+                PenilaianRisiko.total_nilai_risiko.is_(None).asc(),  # NULL values last
+                PenilaianRisiko.total_nilai_risiko.asc()             # Then by total_nilai_risiko ASC
             )
         elif filters.sort_by == "nama":
+            # ✅ Default ascending untuk nama
             query = query.order_by(User.nama.asc())
         else:  # default: created_at
+            # ✅ Default descending untuk created_at (newest first)
             query = query.order_by(PenilaianRisiko.created_at.desc())
         
         # Apply pagination
@@ -297,7 +299,7 @@ class PenilaianRisikoRepository:
                 'penilaian': penilaian,
                 'perwadag_nama': perwadag_nama,
                 'periode_locked': periode_locked or False,
-                'periode_editable': not (periode_locked or False)  # ✅ SIMPLIFIED
+                'periode_editable': not (periode_locked or False)
             })
         
         return enriched_data, total
