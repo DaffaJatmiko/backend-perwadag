@@ -21,7 +21,8 @@ class SuratTugasRepository:
     
     async def create(self, surat_tugas_data: SuratTugasCreate, file_path: str) -> SuratTugas:
         """Create surat tugas baru dengan data perwadag."""
-        # Get perwadag info untuk copy nama dan inspektorat
+        
+        # Get perwadag info
         perwadag = await self.get_perwadag_by_id(surat_tugas_data.user_perwadag_id)
         if not perwadag:
             raise ValueError("Perwadag not found")
@@ -34,9 +35,12 @@ class SuratTugasRepository:
             tanggal_evaluasi_mulai=surat_tugas_data.tanggal_evaluasi_mulai,
             tanggal_evaluasi_selesai=surat_tugas_data.tanggal_evaluasi_selesai,
             no_surat=surat_tugas_data.no_surat,
-            nama_pengedali_mutu=surat_tugas_data.nama_pengedali_mutu,
-            nama_pengendali_teknis=surat_tugas_data.nama_pengendali_teknis,
-            nama_ketua_tim=surat_tugas_data.nama_ketua_tim,
+            
+            # UBAH: Handle None values dengan default
+            nama_pengedali_mutu=surat_tugas_data.nama_pengedali_mutu or "TBD",
+            nama_pengendali_teknis=surat_tugas_data.nama_pengendali_teknis or "TBD", 
+            nama_ketua_tim=surat_tugas_data.nama_ketua_tim or "TBD",
+            
             file_surat_tugas=file_path
         )
         

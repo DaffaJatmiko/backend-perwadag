@@ -25,6 +25,7 @@ from src.auth.evaluasi_permissions import (
     require_evaluasi_write_access, require_surat_tugas_delete_access,
     require_statistics_access, get_evaluasi_filter_scope
 )
+from datetime import datetime, date
 
 router = APIRouter()
 
@@ -56,36 +57,17 @@ async def create_surat_tugas(
     tanggal_evaluasi_mulai: str = Form(..., description="Tanggal mulai (YYYY-MM-DD)"),
     tanggal_evaluasi_selesai: str = Form(..., description="Tanggal selesai (YYYY-MM-DD)"),
     no_surat: str = Form(..., description="Nomor surat tugas"),
-    nama_pengedali_mutu: str = Form(..., description="Nama pengedali mutu"),
-    nama_pengendali_teknis: str = Form(..., description="Nama pengendali teknis"),
-    nama_ketua_tim: str = Form(..., description="Nama ketua tim"),
+    
+    # UBAH: Jadikan optional
+    nama_pengedali_mutu: Optional[str] = Form(None, description="Nama pengedali mutu (optional)"),
+    nama_pengendali_teknis: Optional[str] = Form(None, description="Nama pengendali teknis (optional)"),
+    nama_ketua_tim: Optional[str] = Form(None, description="Nama ketua tim (optional)"),
+    
     file: UploadFile = File(..., description="File surat tugas"),
     current_user: dict = Depends(require_surat_tugas_create_access()),
     surat_tugas_service: SuratTugasService = Depends(get_surat_tugas_service)
 ):
-    """
-    Create surat tugas baru dengan AUTO-GENERATE semua related records.
-    
-    **Accessible by**: Admin dan Inspektorat
-    
-    **Auto-Generate Process**:
-    1. Upload file surat tugas
-    2. Create surat tugas record
-    3. AUTO-GENERATE 6 related records:
-       - 1x surat_pemberitahuan (empty)
-       - 3x meetings (entry, konfirmasi, exit - all empty)
-       - 1x matriks (empty)
-       - 1x laporan_hasil (empty)
-       - 1x kuisioner (empty)
-    
-    **Requirements**:
-    - user_perwadag_id harus valid dan active
-    - no_surat harus unique
-    - file harus format yang didukung (PDF, DOC, DOCX)
-    
-    **Returns**: Complete surat tugas data dengan IDs semua generated records
-    """
-    from datetime import datetime
+    """Create surat tugas dengan field tim evaluasi optional."""
     
     # Parse dates
     try:
@@ -97,22 +79,20 @@ async def create_surat_tugas(
             detail="Invalid date format. Use YYYY-MM-DD"
         )
     
-    # Build create data
+    # Build create data - None values akan dihandle otomatis
     surat_tugas_data = SuratTugasCreate(
         user_perwadag_id=user_perwadag_id,
         tanggal_evaluasi_mulai=tanggal_mulai,
         tanggal_evaluasi_selesai=tanggal_selesai,
         no_surat=no_surat,
-        nama_pengedali_mutu=nama_pengedali_mutu,
-        nama_pengendali_teknis=nama_pengendali_teknis,
-        nama_ketua_tim=nama_ketua_tim
+        nama_pengedali_mutu=nama_pengedali_mutu,  # Bisa None
+        nama_pengendali_teknis=nama_pengendali_teknis,  # Bisa None
+        nama_ketua_tim=nama_ketua_tim  # Bisa None
     )
     
     return await surat_tugas_service.create_surat_tugas(
         surat_tugas_data, file, current_user["id"]
     )
-
-
 # ===== READ OPERATIONS =====
 
 @router.get("/", response_model=SuratTugasListResponse)

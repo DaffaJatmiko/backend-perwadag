@@ -31,23 +31,20 @@ class SuratTugasCreate(BaseModel):
         max_length=100, 
         description="Nomor surat tugas"
     )
-    nama_pengedali_mutu: str = Field(
-        ..., 
-        min_length=1, 
+    nama_pengedali_mutu: Optional[str] = Field(
+        None,  # Default None
         max_length=200,
-        description="Nama pengedali mutu"
+        description="Nama pengedali mutu (optional)"
     )
-    nama_pengendali_teknis: str = Field(
-        ..., 
-        min_length=1, 
+    nama_pengendali_teknis: Optional[str] = Field(
+        None,  # Default None
         max_length=200,
-        description="Nama pengendali teknis"
+        description="Nama pengendali teknis (optional)"
     )
-    nama_ketua_tim: str = Field(
-        ..., 
-        min_length=1, 
+    nama_ketua_tim: Optional[str] = Field(
+        None,  # Default None
         max_length=200,
-        description="Nama ketua tim evaluasi"
+        description="Nama ketua tim evaluasi (optional)"
     )
     
     @field_validator('tanggal_evaluasi_selesai')
@@ -76,9 +73,9 @@ class SuratTugasUpdate(BaseModel):
     tanggal_evaluasi_mulai: Optional[date] = None
     tanggal_evaluasi_selesai: Optional[date] = None
     no_surat: Optional[str] = Field(None, min_length=1, max_length=100)
-    nama_pengedali_mutu: Optional[str] = Field(None, min_length=1, max_length=200)
-    nama_pengendali_teknis: Optional[str] = Field(None, min_length=1, max_length=200)
-    nama_ketua_tim: Optional[str] = Field(None, min_length=1, max_length=200)
+    nama_pengedali_mutu: Optional[str] = Field(None, max_length=200)
+    nama_pengendali_teknis: Optional[str] = Field(None, max_length=200)
+    nama_ketua_tim: Optional[str] = Field(None, max_length=200)
     
     @field_validator('no_surat')
     @classmethod
