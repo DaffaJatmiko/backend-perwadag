@@ -75,7 +75,7 @@ class KuisionerService:
         if not kuisioner:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Kuisioner not found"
+                detail="Kuisioner tidak ditemukan"
             )
         
         # Get surat tugas data
@@ -83,7 +83,7 @@ class KuisionerService:
         if not surat_tugas_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Related surat tugas not found"
+                detail="Surat tugas terkait tidak ditemukan"
             )
         
         return await self._build_enriched_response(kuisioner, surat_tugas_data)
@@ -111,7 +111,7 @@ class KuisionerService:
         if not kuisioner:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Kuisioner not found"
+                detail="Kuisioner tidak ditemukan"
             )
 
         surat_tugas_data = await self._get_surat_tugas_basic_info(kuisioner.surat_tugas_id)
@@ -141,7 +141,7 @@ class KuisionerService:
         if not kuisioner:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Kuisioner not found"
+                detail="Kuisioner tidak ditemukan"
             )
 
         surat_tugas_data = await self._get_surat_tugas_basic_info(kuisioner.surat_tugas_id)
@@ -159,7 +159,7 @@ class KuisionerService:
             if not surat_tugas_data:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Related surat tugas not found"
+                    detail="Surat tugas terkait tidak ditemukan"
                 )
             
             user_nama = current_user.get("nama")
@@ -168,8 +168,8 @@ class KuisionerService:
             if user_nama != surat_tugas_nama_perwadag:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Access denied: You can only upload kuisioner files for your own evaluations. "
-                          f"Expected: {surat_tugas_nama_perwadag}, Got: {user_nama}"
+                    detail=f"Akses ditolak: Anda hanya dapat mengunggah file kuisioner untuk evaluasi Anda sendiri. "
+                          f"Yang diharapkan: {surat_tugas_nama_perwadag}, Yang diterima: {user_nama}"
                 )
         try:
             # 🔥 FIX: Correct parameter order - file first, then surat_tugas_id
@@ -184,7 +184,7 @@ class KuisionerService:
                 evaluasi_file_manager.delete_file(file_path)
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to update file path in database"
+                    detail="Gagal memperbarui path file di database"
                 )
             
             # Set uploaded_by
@@ -196,7 +196,7 @@ class KuisionerService:
             
             return KuisionerFileUploadResponse(
                 success=True,
-                message="File uploaded successfully",
+                message="File berhasil diunggah",
                 kuisioner_id=kuisioner_id,
                 file_path=file_path,
                 file_url=file_url
@@ -208,7 +208,7 @@ class KuisionerService:
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to upload file: {str(e)}"
+                detail=f"Gagal mengunggah file: {str(e)}"
             )
     
     async def download_file(
@@ -222,13 +222,13 @@ class KuisionerService:
         if not kuisioner:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Kuisioner not found"
+                detail="Kuisioner tidak ditemukan"
             )
         
         if not kuisioner.file_kuisioner:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="File not found"
+                detail="File tidak ditemukan"
             )
         
         # 🔥 FIX: Use get_file_download_response instead of download_file

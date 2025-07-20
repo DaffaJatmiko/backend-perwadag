@@ -27,14 +27,14 @@ class EmailService:
         self.sender_name = settings.EMAIL_SENDER_NAME
         
         if not all([self.smtp_username, self.smtp_password]):
-            logger.warning("Gmail SMTP credentials not configured. Email functionality will be disabled.")
+            logger.warning("Kredensial Gmail SMTP tidak dikonfigurasi. Fungsionalitas email akan dinonaktifkan.")
     
     def _send_email_sync(self, to_email: str, to_name: str, subject: str, html_content: str, text_content: str) -> bool:
         """
         Send email using Gmail SMTP synchronously.
         """
         if not all([self.smtp_username, self.smtp_password]):
-            logger.error("Cannot send email: Gmail SMTP credentials not configured")
+            logger.error("Tidak dapat mengirim email: Kredensial Gmail SMTP tidak dikonfigurasi")
             return False
         
         try:
@@ -58,14 +58,14 @@ class EmailService:
                 server.login(self.smtp_username, self.smtp_password)
                 server.send_message(message)
             
-            logger.info(f"Email sent successfully to {mask_email(to_email)}")
+            logger.info(f"Email berhasil dikirim ke {mask_email(to_email)}")
             return True
             
         except smtplib.SMTPException as e:
-            logger.error(f"SMTP error sending email to {mask_email(to_email)}: {str(e)}")
+            logger.error(f"Error SMTP mengirim email ke {mask_email(to_email)}: {str(e)}")
             return False
         except Exception as e:
-            logger.error(f"Unexpected error sending email to {mask_email(to_email)}: {str(e)}")
+            logger.error(f"Error tidak terduga mengirim email ke {mask_email(to_email)}: {str(e)}")
             return False
     
     async def _send_email(self, to_email: str, to_name: str, subject: str, html_content: str, text_content: str) -> bool:
@@ -92,7 +92,7 @@ class EmailService:
             True if email sent successfully, False otherwise
         """
         if not user_email or not user_nama or not reset_token:
-            logger.error("Invalid parameters for password reset email")
+            logger.error("Parameter tidak valid untuk email reset password")
             return False
         
         # Generate reset link
@@ -103,7 +103,7 @@ class EmailService:
         template = EmailTemplates.password_reset_template(user_nama, reset_link)
         
         # Send email
-        logger.info(f"Sending password reset email to {mask_email(user_email)}")
+        logger.info(f"Mengirim email reset password ke {mask_email(user_email)}")
         
         success = await self._send_email(
             to_email=user_email,
@@ -114,9 +114,9 @@ class EmailService:
         )
         
         if success:
-            logger.info(f"Password reset email sent successfully to {mask_email(user_email)}")
+            logger.info(f"Email reset password berhasil dikirim ke {mask_email(user_email)}")
         else:
-            logger.error(f"Failed to send password reset email to {mask_email(user_email)}")
+            logger.error(f"Gagal mengirim email reset password ke {mask_email(user_email)}")
         
         return success
     
@@ -132,14 +132,14 @@ class EmailService:
             True if email sent successfully, False otherwise
         """
         if not user_email or not user_nama:
-            logger.error("Invalid parameters for password reset success email")
+            logger.error("Parameter tidak valid untuk email konfirmasi reset password")
             return False
         
         # Get email template
         template = EmailTemplates.password_reset_success_template(user_nama)
         
         # Send email
-        logger.info(f"Sending password reset success email to {mask_email(user_email)}")
+        logger.info(f"Mengirim email konfirmasi reset password ke {mask_email(user_email)}")
         
         success = await self._send_email(
             to_email=user_email,
@@ -150,9 +150,9 @@ class EmailService:
         )
         
         if success:
-            logger.info(f"Password reset success email sent successfully to {mask_email(user_email)}")
+            logger.info(f"Email konfirmasi reset password berhasil dikirim ke {mask_email(user_email)}")
         else:
-            logger.error(f"Failed to send password reset success email to {mask_email(user_email)}")
+            logger.error(f"Gagal mengirim email konfirmasi reset password ke {mask_email(user_email)}")
         
         return success
     
@@ -166,7 +166,7 @@ class EmailService:
         if not all([self.smtp_username, self.smtp_password]):
             return {
                 "success": False,
-                "message": "Gmail SMTP credentials not configured",
+                "message": "Kredensial Gmail SMTP tidak dikonfigurasi",
                 "smtp_host": self.smtp_host,
                 "smtp_port": self.smtp_port,
                 "sender_email": self.sender_email,
@@ -177,14 +177,14 @@ class EmailService:
         test_success = await self._send_email(
             to_email=self.smtp_username,  # Send to self
             to_name="Test User",
-            subject="Test Email - Government Auth System",
-            html_content="<h1>Test Email</h1><p>This is a test email to verify Gmail SMTP configuration.</p>",
-            text_content="Test Email\n\nThis is a test email to verify Gmail SMTP configuration."
+            subject="Test Email - Sistem Auth Pemerintah",
+            html_content="<h1>Test Email</h1><p>Ini adalah email test untuk verifikasi konfigurasi Gmail SMTP.</p>",
+            text_content="Test Email\n\nIni adalah email test untuk verifikasi konfigurasi Gmail SMTP."
         )
         
         return {
             "success": test_success,
-            "message": "Test email sent successfully" if test_success else "Failed to send test email",
+            "message": "Email test berhasil dikirim" if test_success else "Gagal mengirim email test",
             "smtp_host": self.smtp_host,
             "smtp_port": self.smtp_port,
             "sender_email": self.sender_email,

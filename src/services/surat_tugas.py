@@ -75,14 +75,14 @@ class SuratTugasService:
         if not perwadag:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Perwadag not found or not active"
+                detail="Perwadag tidak ditemukan atau tidak aktif"
             )
         
         # 2. Validate nomor surat unique
         if await self.surat_tugas_repo.no_surat_exists(surat_tugas_data.no_surat):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Nomor surat already exists"
+                detail="Nomor surat sudah ada"
             )
         
         # 3. Upload file surat tugas
@@ -103,7 +103,7 @@ class SuratTugasService:
             
             return SuratTugasCreateResponse(
                 success=True,
-                message="Surat tugas created successfully with auto-generated records",
+                message="Surat tugas berhasil dibuat dengan auto-generate records",
                 surat_tugas=surat_tugas_response,
                 auto_generated_records=auto_generated_records,
                 data={
@@ -118,7 +118,7 @@ class SuratTugasService:
             evaluasi_file_manager.delete_file(file_path)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to create surat tugas: {str(e)}"
+                detail=f"Gagal membuat surat tugas: {str(e)}"
             )
     
     async def _auto_generate_related_records(self, surat_tugas_id: str) -> Dict[str, str]:
@@ -173,7 +173,7 @@ class SuratTugasService:
         except Exception as e:
             # If any auto-generate fails, we should cleanup
             # But let the main transaction handle the rollback
-            raise Exception(f"Auto-generate failed: {str(e)}")
+            raise Exception(f"Auto-generate gagal: {str(e)}")
     
     # ===== CRUD OPERATIONS =====
     
@@ -183,7 +183,7 @@ class SuratTugasService:
         if not surat_tugas:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Surat tugas not found"
+                detail="Surat tugas tidak ditemukan"
             )
         
         return await self._build_surat_tugas_response(surat_tugas)
@@ -231,7 +231,7 @@ class SuratTugasService:
         if not surat_tugas:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Surat tugas not found"
+                detail="Surat tugas tidak ditemukan"
             )
         
         # Validate nomor surat unique if being updated
@@ -242,14 +242,14 @@ class SuratTugasService:
             ):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Nomor surat already exists"
+                    detail="Nomor surat sudah ada"
                 )
         
         # Update surat tugas
         updated_surat_tugas = await self.surat_tugas_repo.update(surat_tugas_id, surat_tugas_data)
         
         return await self._build_surat_tugas_response(updated_surat_tugas)
-    
+
     async def delete_surat_tugas(
         self,
         surat_tugas_id: str,
@@ -287,7 +287,7 @@ class SuratTugasService:
                     file_deletion_result = evaluasi_file_manager.delete_multiple_files(file_paths_to_delete)
                 except Exception as file_error:
                     # Log file deletion errors but don't fail the entire operation
-                    print(f"Warning: Some files could not be deleted: {str(file_error)}")
+                    print(f"Peringatan: Beberapa file tidak dapat dihapus: {str(file_error)}")
                     file_deletion_result = {"deleted": 0, "failed": len(file_paths_to_delete), "total": len(file_paths_to_delete)}
             
             # 4. Cascade soft delete all related records
@@ -297,7 +297,7 @@ class SuratTugasService:
             surat_tugas_deleted = await self.surat_tugas_repo.soft_delete(surat_tugas_id)
             
             if not surat_tugas_deleted:
-                raise Exception("Failed to delete surat tugas record")
+                raise Exception("Gagal menghapus record surat tugas")
             
             # Calculate total cascade deletions
             total_cascade_deletions = sum(cascade_result.values())
@@ -375,7 +375,7 @@ class SuratTugasService:
             
         except Exception as e:
             # Log error but don't fail the delete process
-            print(f"Warning: Error getting file paths for surat tugas {surat_tugas_id}: {str(e)}")
+            print(f"Peringatan: Error mendapatkan file paths untuk surat tugas {surat_tugas_id}: {str(e)}")
             return file_paths
 
     async def _cascade_delete_related_records(self, surat_tugas_id: str) -> Dict[str, int]:
@@ -426,7 +426,7 @@ class SuratTugasService:
             return deleted_counts
             
         except Exception as e:
-            raise Exception(f"Failed to cascade delete related records: {str(e)}")
+            raise Exception(f"Gagal cascade delete related records: {str(e)}")
     
     # ===== FILE OPERATIONS =====
     
@@ -442,7 +442,7 @@ class SuratTugasService:
         if not surat_tugas:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Surat tugas not found"
+                detail="Surat tugas tidak ditemukan"
             )
         
         # Delete old file if exists
@@ -457,7 +457,7 @@ class SuratTugasService:
         
         return SuccessResponse(
             success=True,
-            message="File surat tugas uploaded successfully",
+            message="File surat tugas berhasil diunggah",
             data={
                 "surat_tugas_id": surat_tugas_id,
                 "file_path": file_path,
@@ -609,7 +609,7 @@ class SuratTugasService:
         if not surat_tugas or not surat_tugas.file_surat_tugas:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="File not found"
+                detail="File tidak ditemukan"
             )
         
         # Get original filename untuk download

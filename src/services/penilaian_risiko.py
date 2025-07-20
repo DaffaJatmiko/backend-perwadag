@@ -159,7 +159,7 @@ class PenilaianRisikoService:
                 # Log error tapi jangan fail update data
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.warning(f"Auto-calculation failed for penilaian {penilaian_id}: {str(e)}")
+                logger.warning(f"Auto-kalkulasi gagal untuk penilaian {penilaian_id}: {str(e)}")
         
         # 9. Build response
         response = await self._build_penilaian_response(updated_penilaian)
@@ -335,7 +335,7 @@ class PenilaianRisikoService:
         # Build summary objects
         perwadag_info = PerwardagSummary(
             id=penilaian.user_perwadag_id,
-            nama=perwadag_nama or "Unknown",
+            nama=perwadag_nama or "Tidak Diketahui",
             inspektorat=penilaian.inspektorat
         )
         
@@ -363,7 +363,7 @@ class PenilaianRisikoService:
             profil_risiko_color=penilaian.get_profil_risiko_color(),
             perwadag_info=perwadag_info,
             periode_info=periode_info,
-            nama_perwadag=perwadag_nama or "Unknown",
+            nama_perwadag=perwadag_nama or "Tidak Diketahui",
             periode_tahun=penilaian.tahun,
             created_at=penilaian.created_at,
             updated_at=penilaian.updated_at,

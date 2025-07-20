@@ -28,14 +28,14 @@ class UserService:
             if not user_data.inspektorat:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Inspektorat is required for admin and inspektorat roles"
+                    detail="Inspektorat diperlukan untuk role admin dan inspektorat"
                 )
         
         # 2. Validate email uniqueness
         if user_data.email and await self.user_repo.email_exists(user_data.email):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
+                detail="Email sudah terdaftar"
             )
         
         # 3. Generate username based on role
@@ -59,7 +59,7 @@ class UserService:
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
+                detail="User tidak ditemukan"
             )
         return UserResponse.from_user_model(user)
     
@@ -70,14 +70,14 @@ class UserService:
         if not existing_user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
+                detail="User tidak ditemukan"
             )
         
         # 2. Validate email uniqueness if being updated
         if user_data.email and await self.user_repo.email_exists(user_data.email, exclude_user_id=user_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
+                detail="Email sudah terdaftar"
             )
         
         # 3. If role changed to/from perwadag, validate inspektorat
@@ -85,7 +85,7 @@ class UserService:
             if user_data.role == UserRole.PERWADAG and not user_data.inspektorat:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Inspektorat is required for role 'perwadag'"
+                    detail="Inspektorat diperlukan untuk role 'perwadag'"
                 )
             elif user_data.role != UserRole.PERWADAG and user_data.inspektorat:
                 # Auto-clear inspektorat for non-perwadag roles
@@ -104,21 +104,21 @@ class UserService:
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
+                detail="User tidak ditemukan"
             )
         
         # 2. Verify current password
         if not verify_password(password_data.current_password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Current password is incorrect"
+                detail="Password saat ini salah"
             )
         
         # 3. Check if new password is different
         if verify_password(password_data.new_password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="New password must be different from current password"
+                detail="Password baru harus berbeda dari password saat ini"
             )
         
         # 4. Update password
@@ -128,10 +128,10 @@ class UserService:
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to update password"
+                detail="Gagal memperbarui password"
             )
         
-        return MessageResponse(message="Password changed successfully")
+        return MessageResponse(message="Password berhasil diubah")
     
     async def reset_user_password(self, user_id: str) -> MessageResponse:
         """Reset user password to default (admin only)."""
@@ -140,7 +140,7 @@ class UserService:
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
+                detail="User tidak ditemukan"
             )
         
         # 2. Reset to default password
@@ -151,10 +151,10 @@ class UserService:
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to reset password"
+                detail="Gagal mereset password"
             )
         
-        return MessageResponse(message=f"Password reset to default for user {user.nama}")
+        return MessageResponse(message=f"Password direset ke default untuk user {user.nama}")
     
     async def delete_user(self, user_id: str) -> MessageResponse:
         """Soft delete user."""
@@ -163,7 +163,7 @@ class UserService:
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
+                detail="User tidak ditemukan"
             )
         
         # 2. Check if user is admin (prevent deleting last admin)
@@ -172,13 +172,13 @@ class UserService:
             if len(admin_users) <= 1:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot delete the last admin user"
+                    detail="Tidak dapat menghapus user admin terakhir"
                 )
         
         # 3. Soft delete
         await self.user_repo.soft_delete(user_id)
         
-        return MessageResponse(message=f"User {user.nama} deleted successfully")
+        return MessageResponse(message=f"User {user.nama} berhasil dihapus")
     
     async def get_all_users_with_filters(self, filters: UserFilterParams) -> UserListResponse:
         """Get users dengan simplified filters."""
@@ -214,7 +214,7 @@ class UserService:
         if not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="User account is deactivated"
+                detail="Akun user dinonaktifkan"
             )
         
         # 3. Verify password
@@ -241,7 +241,7 @@ class UserService:
             if not preview_data.inspektorat:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Inspektorat is required for admin and inspektorat roles"
+                    detail="Inspektorat diperlukan untuk role admin dan inspektorat"
                 )
             username = generate_username_from_name_and_inspektorat(
                 preview_data.nama, preview_data.inspektorat
@@ -289,7 +289,7 @@ class UserService:
             if len(active_admins) == 0:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot deactivate the last active admin user"
+                    detail="Tidak dapat menonaktifkan user admin aktif terakhir"
                 )
         
         user_data = UserUpdate(is_active=False)
@@ -303,7 +303,7 @@ class UserService:
             return self._generate_perwadag_username(nama)
         else:  # ADMIN or INSPEKTORAT
             if not inspektorat:
-                raise ValueError("Inspektorat required for admin/inspektorat roles")
+                raise ValueError("Inspektorat diperlukan untuk role admin/inspektorat")
             return generate_username_from_name_and_inspektorat(nama, inspektorat)
     
     def _generate_perwadag_username(self, nama: str) -> str:
@@ -344,7 +344,7 @@ class UserService:
         else:
             # Use new inspektorat logic
             if not inspektorat:
-                raise ValueError("Inspektorat required for admin/inspektorat roles")
+                raise ValueError("Inspektorat diperlukan untuk role admin/inspektorat")
             
             result = await generate_available_username(
                 nama, inspektorat, role, self.user_repo.username_exists

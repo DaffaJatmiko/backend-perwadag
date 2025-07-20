@@ -91,7 +91,7 @@ class MatriksService:
         if not matriks:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Matriks not found"
+                detail="Matriks tidak ditemukan"
             )
         
         # Get surat tugas data untuk enrichment
@@ -99,7 +99,7 @@ class MatriksService:
         if not surat_tugas_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Related surat tugas not found"
+                detail="Surat tugas terkait tidak ditemukan"
             )
         
         return await self._build_enriched_response(matriks, surat_tugas_data)
@@ -129,7 +129,7 @@ class MatriksService:
         if not matriks:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Matriks not found"
+                detail="Matriks tidak ditemukan"
             )
         
         surat_tugas_data = await self._get_surat_tugas_basic_info(matriks.surat_tugas_id)
@@ -169,7 +169,7 @@ class MatriksService:
         if not matriks:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Matriks not found"
+                detail="Matriks tidak ditemukan"
             )
 
         surat_tugas_data = await self._get_surat_tugas_basic_info(matriks.surat_tugas_id)
@@ -193,7 +193,7 @@ class MatriksService:
                 evaluasi_file_manager.delete_file(file_path)
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to update file path in database"
+                    detail="Gagal memperbarui path file di database"
                 )
             
             # Set uploaded_by
@@ -205,7 +205,7 @@ class MatriksService:
             
             return MatriksFileUploadResponse(
                 success=True,
-                message="File uploaded successfully",
+                message="File berhasil diunggah",
                 matriks_id=matriks_id,
                 file_path=file_path,
                 file_url=file_url
@@ -217,7 +217,7 @@ class MatriksService:
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to upload file: {str(e)}"
+                detail=f"Gagal mengunggah file: {str(e)}"
             )
     
     async def download_file(
@@ -231,13 +231,13 @@ class MatriksService:
         if not matriks:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Matriks not found"
+                detail="Matriks tidak ditemukan"
             )
         
         if not matriks.file_dokumen_matriks:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="File not found"
+                detail="File tidak ditemukan"
             )
         
         # 🔥 FIX: Use get_file_download_response instead of download_file

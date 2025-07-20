@@ -87,7 +87,7 @@ class MeetingService:
         if not meeting:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Meeting not found"
+                detail="Meeting tidak ditemukan"
             )
         
         # Get surat tugas data
@@ -95,7 +95,7 @@ class MeetingService:
         if not surat_tugas_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Related surat tugas not found"
+                detail="Surat tugas terkait tidak ditemukan"
             )
         
         # Convert meeting object to dict for consistency
@@ -189,7 +189,7 @@ class MeetingService:
         if not meeting:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Meeting not found"
+                detail="Meeting tidak ditemukan"
             )
         
         # 2. Get tanggal evaluasi dari surat tugas
@@ -197,7 +197,7 @@ class MeetingService:
         if not surat_tugas_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Related surat tugas not found"
+                detail="Surat tugas terkait tidak ditemukan"
             )
         
         # 3. 🔥 VALIDASI AKSES TANGGAL - CEK APAKAH MASIH BISA EDIT
@@ -228,14 +228,14 @@ class MeetingService:
         if not meeting:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Meeting not found"
+                detail="Meeting tidak ditemukan"
             )
         
         surat_tugas_data = await self._get_surat_tugas_basic_info(meeting.surat_tugas_id)
         if not surat_tugas_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Related surat tugas not found"
+                detail="Surat tugas terkait tidak ditemukan"
             )
         
         # 2. 🔥 VALIDASI AKSES TANGGAL - CEK APAKAH MASIH BISA UPLOAD
@@ -319,7 +319,7 @@ class MeetingService:
             
             return MeetingFileUploadResponse(
                 success=True,
-                message=f"Successfully uploaded {len(processed_files)} files",
+                message=f"Berhasil mengunggah {len(processed_files)} file",
                 meeting_id=meeting_id,
                 uploaded_files=uploaded_files_response,  # Use UploadedFileInfo objects
                 total_files=len(all_files),
@@ -332,7 +332,7 @@ class MeetingService:
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to upload files: {str(e)}"
+                detail=f"Gagal mengunggah file: {str(e)}"
             )
 
     def _get_content_type_from_filename(self, filename: str) -> str:
@@ -353,13 +353,13 @@ class MeetingService:
         if not meeting:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Meeting not found"
+                detail="Meeting tidak ditemukan"
             )
         
         if not meeting.file_bukti_hadir:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No files found"
+                detail="File tidak ditemukan"
             )
         
         try:
@@ -376,7 +376,7 @@ class MeetingService:
             if not file_to_delete:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="File not found"
+                    detail="File tidak ditemukan"
                 )
             
             # Delete file from storage using file manager
@@ -394,7 +394,7 @@ class MeetingService:
             
             return MeetingFileDeleteResponse(
                 success=True,
-                message=f"File {filename} deleted successfully",
+                message=f"File {filename} berhasil dihapus",
                 meeting_id=meeting_id,
                 deleted_file=filename,
                 remaining_files=len(updated_files)
@@ -406,7 +406,7 @@ class MeetingService:
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to delete file: {str(e)}"
+                detail=f"Gagal menghapus file: {str(e)}"
             )
     
     async def download_file(
@@ -421,13 +421,13 @@ class MeetingService:
         if not meeting:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Meeting not found"
+                detail="Meeting tidak ditemukan"
             )
         
         if not meeting.file_bukti_hadir:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No files found"
+                detail="File tidak ditemukan"
             )
         
         # Find file
@@ -440,7 +440,7 @@ class MeetingService:
         if not file_info:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="File not found"
+                detail="File tidak ditemukan"
             )
         
         # Use file manager's download method
@@ -460,13 +460,13 @@ class MeetingService:
         if not meeting:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Meeting not found"
+                detail="Meeting tidak ditemukan"
             )
         
         if not meeting.file_bukti_hadir:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No files found"
+                detail="File tidak ditemukan"
             )
         
         # Get all file paths
@@ -479,7 +479,7 @@ class MeetingService:
         if not file_paths:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No valid file paths found"
+                detail="Path file yang valid tidak ditemukan"
             )
         
         # Create ZIP using file manager

@@ -37,7 +37,7 @@ class FormatKuisionerService:
         ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Template '{format_kuisioner_data.nama_template}' already exists for year {format_kuisioner_data.tahun}"
+                detail=f"Template '{format_kuisioner_data.nama_template}' sudah ada untuk tahun {format_kuisioner_data.tahun}"
             )
         
         # Upload file
@@ -53,7 +53,7 @@ class FormatKuisionerService:
             evaluasi_file_manager.delete_file(file_path)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to create format kuisioner: {str(e)}"
+                detail=f"Gagal membuat format kuisioner: {str(e)}"
             )
     
     async def get_format_kuisioner_or_404(self, format_kuisioner_id: str) -> FormatKuisionerResponse:
@@ -62,7 +62,7 @@ class FormatKuisionerService:
         if not format_kuisioner:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Format kuisioner not found"
+                detail="Format kuisioner tidak ditemukan"
             )
         return self._build_response(format_kuisioner)
     
@@ -132,7 +132,7 @@ class FormatKuisionerService:
         if not format_kuisioner:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Format kuisioner not found"
+                detail="Format kuisioner tidak ditemukan"
             )
         
         # Check nama template uniqueness untuk tahun tersebut jika diupdate
@@ -145,7 +145,7 @@ class FormatKuisionerService:
             ):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Template '{new_nama}' already exists for year {new_tahun}"
+                    detail=f"Template '{new_nama}' sudah ada untuk tahun {new_tahun}"
                 )
         
         updated = await self.format_kuisioner_repo.update(format_kuisioner_id, update_data)
@@ -162,7 +162,7 @@ class FormatKuisionerService:
         if not format_kuisioner:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Format kuisioner not found"
+                detail="Format kuisioner tidak ditemukan"
             )
         
         # Delete old file if exists
@@ -177,7 +177,7 @@ class FormatKuisionerService:
         
         return FormatKuisionerFileUploadResponse(
             success=True,
-            message="Template file uploaded successfully",
+            message="File template berhasil diunggah",
             format_kuisioner_id=format_kuisioner_id,
             file_path=file_path,
             file_url=evaluasi_file_manager.get_file_url(file_path),
@@ -190,7 +190,7 @@ class FormatKuisionerService:
         if not format_kuisioner:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Format kuisioner not found"
+                detail="Format kuisioner tidak ditemukan"
             )
         
         # Delete file from storage
@@ -202,7 +202,7 @@ class FormatKuisionerService:
         
         return SuccessResponse(
             success=True,
-            message=f"Format kuisioner '{format_kuisioner.nama_template}' deleted successfully",
+            message=f"Format kuisioner '{format_kuisioner.nama_template}' berhasil dihapus",
             data={"deleted_id": format_kuisioner_id}
         )
     

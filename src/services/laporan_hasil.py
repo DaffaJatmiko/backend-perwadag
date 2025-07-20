@@ -87,7 +87,7 @@ class LaporanHasilService:
         if not laporan_hasil:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Laporan hasil not found"
+                detail="Laporan hasil tidak ditemukan"
             )
         
         # Get surat tugas data
@@ -95,7 +95,7 @@ class LaporanHasilService:
         if not surat_tugas_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Related surat tugas not found"
+                detail="Surat tugas terkait tidak ditemukan"
             )
         
         return await self._build_enriched_response(laporan_hasil, surat_tugas_data)
@@ -123,7 +123,7 @@ class LaporanHasilService:
         if not laporan_hasil:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Laporan hasil not found"
+                detail="Laporan hasil tidak ditemukan"
             )
 
         surat_tugas_data = await self._get_surat_tugas_basic_info(laporan_hasil.surat_tugas_id)
@@ -153,7 +153,7 @@ class LaporanHasilService:
         if not laporan_hasil:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Laporan hasil not found"
+                detail="Laporan hasil tidak ditemukan"
             )
 
         surat_tugas_data = await self._get_surat_tugas_basic_info(laporan_hasil.surat_tugas_id)
@@ -171,7 +171,7 @@ class LaporanHasilService:
             if not surat_tugas_data:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Related surat tugas not found"
+                    detail="Surat tugas terkait tidak ditemukan"
                 )
             
             user_nama = current_user.get("nama")
@@ -180,8 +180,8 @@ class LaporanHasilService:
             if user_nama != surat_tugas_nama_perwadag:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Access denied: You can only upload files for your own laporan hasil. "
-                          f"Expected: {surat_tugas_nama_perwadag}, Got: {user_nama}"
+                    detail=f"Akses ditolak: Anda hanya dapat mengunggah file untuk laporan hasil Anda sendiri. "
+                          f"Yang diharapkan: {surat_tugas_nama_perwadag}, Yang diterima: {user_nama}"
                 )
         try:
             # 🔥 FIX: Correct parameter order - file first, then surat_tugas_id
@@ -196,7 +196,7 @@ class LaporanHasilService:
                 evaluasi_file_manager.delete_file(file_path)
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to update file path in database"
+                    detail="Gagal memperbarui path file di database"
                 )
             
             # Set uploaded_by
@@ -208,7 +208,7 @@ class LaporanHasilService:
             
             return LaporanHasilFileUploadResponse(
                 success=True,
-                message="File uploaded successfully",
+                message="File berhasil diunggah",
                 laporan_hasil_id=laporan_hasil_id,
                 file_path=file_path,
                 file_url=file_url
@@ -220,7 +220,7 @@ class LaporanHasilService:
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to upload file: {str(e)}"
+                detail=f"Gagal mengunggah file: {str(e)}"
             )
     
     async def download_file(
@@ -234,13 +234,13 @@ class LaporanHasilService:
         if not laporan_hasil:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Laporan hasil not found"
+                detail="Laporan hasil tidak ditemukan"
             )
         
         if not laporan_hasil.file_laporan_hasil:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="File not found"
+                detail="File tidak ditemukan"
             )
         
         # 🔥 FIX: Use get_file_download_response instead of download_file
@@ -261,13 +261,13 @@ class LaporanHasilService:
         if not laporan_hasil:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Laporan hasil not found"
+                detail="Laporan hasil tidak ditemukan"
             )
         
         if not laporan_hasil.file_laporan_hasil:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No file to delete"
+                detail="Tidak ada file untuk dihapus"
             )
         
         try:
@@ -279,7 +279,7 @@ class LaporanHasilService:
             if not updated_laporan_hasil:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to update database"
+                    detail="Gagal memperbarui database"
                 )
             
             # Delete file from storage
@@ -291,7 +291,7 @@ class LaporanHasilService:
             
             return {
                 "success": True,
-                "message": "File deleted successfully",
+                "message": "File berhasil dihapus",
                 "laporan_hasil_id": laporan_hasil_id,
                 "deleted_file": file_to_delete,
                 "storage_deleted": success
@@ -302,7 +302,7 @@ class LaporanHasilService:
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to delete file: {str(e)}"
+                detail=f"Gagal menghapus file: {str(e)}"
             )
     
     async def _get_surat_tugas_basic_info(self, surat_tugas_id: str) -> Optional[Dict[str, Any]]:

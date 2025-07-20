@@ -36,7 +36,7 @@ class AuthService:
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
+                detail="Username atau password salah",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
@@ -91,14 +91,14 @@ class AuthService:
             if payload.get("type") != "refresh":
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid token type"
+                    detail="Jenis token tidak valid"
                 )
             
             user_id = payload.get("sub")
             if not user_id:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid token payload"
+                    detail="Payload token tidak valid"
                 )
             
             # Get user
@@ -106,7 +106,7 @@ class AuthService:
             if not user or not user.is_active:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="User not found or inactive"
+                    detail="User tidak ditemukan atau tidak aktif"
                 )
             
             # ✅ FIXED: Use single role system
@@ -143,7 +143,7 @@ class AuthService:
                 raise e
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid refresh token"
+                detail="Refresh token tidak valid"
             )
     
     async def request_password_reset(self, reset_data: PasswordReset) -> MessageResponse:
@@ -154,28 +154,28 @@ class AuthService:
         user = await self.user_repo.get_by_email(reset_data.email)
         
         # Always return success message to prevent email enumeration
-        success_message = "If the email exists and is associated with an account, a password reset link has been sent"
+        success_message = "Jika email tersebut terdaftar dan terkait dengan akun, link reset password telah dikirim"
         
         # Case 1: Email tidak ditemukan di database
         if not user:
-            logger.warning(f"Password reset requested for non-existent email: {mask_email(reset_data.email)}")
+            logger.warning(f"Reset password diminta untuk email yang tidak terdaftar: {mask_email(reset_data.email)}")
             return MessageResponse(message=success_message)
         
         # Case 2: User tidak aktif
         if not user.is_active:
-            logger.warning(f"Password reset requested for inactive user: {user.nama} ({mask_email(reset_data.email)})")
+            logger.warning(f"Reset password diminta untuk user tidak aktif: {user.nama} ({mask_email(reset_data.email)})")
             return MessageResponse(message=success_message)
         
         # Case 3: User aktif tapi tidak punya email (edge case - seharusnya tidak terjadi)
         if not user.has_email():
-            logger.warning(f"Password reset requested for user without email: {user.nama}")
+            logger.warning(f"Reset password diminta untuk user tanpa email: {user.nama}")
             # Return specific error karena ini edge case
             return MessageResponse(
-                message="User account does not have email configured. Please contact administrator."
+                message="Akun user tidak memiliki email yang dikonfigurasi. Silakan hubungi administrator."
             )
         
         # Case 4: Semua validasi passed - process reset
-        logger.info(f"Processing password reset for user: {user.nama} ({mask_email(user.email)})")
+        logger.info(f"Memproses reset password untuk user: {user.nama} ({mask_email(user.email)})")
         
         # Generate reset token
         token = generate_password_reset_token()
@@ -188,11 +188,11 @@ class AuthService:
                 token,
                 expires_at
             )
-            logger.info(f"Password reset token created for user: {user.nama}")
+            logger.info(f"Token reset password dibuat untuk user: {user.nama}")
         except Exception as e:
-            logger.error(f"Failed to create password reset token for {mask_email(user.email)}: {str(e)}")
+            logger.error(f"Gagal membuat token reset password untuk {mask_email(user.email)}: {str(e)}")
             return MessageResponse(
-                message="Failed to process password reset request. Please try again later.",
+                message="Gagal memproses permintaan reset password. Silakan coba lagi nanti.",
                 success=False
             )
         
@@ -205,13 +205,13 @@ class AuthService:
             )
             
             if email_sent:
-                logger.info(f"Password reset email sent successfully to {mask_email(user.email)}")
+                logger.info(f"Email reset password berhasil dikirim ke {mask_email(user.email)}")
             else:
-                logger.error(f"Failed to send password reset email to {mask_email(user.email)}")
+                logger.error(f"Gagal mengirim email reset password ke {mask_email(user.email)}")
                 # Still return success message for security
                 
         except Exception as e:
-            logger.error(f"Exception while sending password reset email to {mask_email(user.email)}: {str(e)}")
+            logger.error(f"Exception saat mengirim email reset password ke {mask_email(user.email)}: {str(e)}")
             # Still return success message for security
         
         return MessageResponse(message=success_message)
@@ -225,28 +225,28 @@ class AuthService:
         reset_token = await self.user_repo.get_password_reset_token(reset_data.token)
         
         if not reset_token or not reset_token.is_valid():
-            logger.warning(f"Invalid or expired reset token used: {reset_data.token[:8]}...")
+            logger.warning(f"Token reset tidak valid atau kedaluwarsa digunakan: {reset_data.token[:8]}...")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired reset token"
+                detail="Token reset tidak valid atau kedaluwarsa"
             )
         
         # Get user
         user = await self.user_repo.get_by_id(reset_token.user_id)
         if not user:
-            logger.error(f"User not found for reset token: {reset_token.user_id}")
+            logger.error(f"User tidak ditemukan untuk token reset: {reset_token.user_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
+                detail="User tidak ditemukan"
             )
         
         # Check if new password is different from current
         from src.auth.jwt import verify_password, get_password_hash
         if verify_password(reset_data.new_password, user.hashed_password):
-            logger.warning(f"User {user.nama} tried to reset password with same password")
+            logger.warning(f"User {user.nama} mencoba reset password dengan password yang sama")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="New password must be different from current password"
+                detail="Password baru harus berbeda dari password saat ini"
             )
         
         # Update password
@@ -254,20 +254,20 @@ class AuthService:
         
         try:
             await self.user_repo.update_password(user.id, new_hashed_password)
-            logger.info(f"Password updated successfully for user: {user.nama} ({mask_email(user.email)})")
+            logger.info(f"Password berhasil diperbarui untuk user: {user.nama} ({mask_email(user.email)})")
         except Exception as e:
-            logger.error(f"Failed to update password for user {user.nama}: {str(e)}")
+            logger.error(f"Gagal memperbarui password untuk user {user.nama}: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to update password. Please try again."
+                detail="Gagal memperbarui password. Silakan coba lagi."
             )
         
         # Mark token as used
         try:
             await self.user_repo.use_password_reset_token(reset_data.token)
-            logger.info(f"Reset token marked as used: {reset_data.token[:8]}...")
+            logger.info(f"Token reset ditandai sebagai sudah digunakan: {reset_data.token[:8]}...")
         except Exception as e:
-            logger.error(f"Failed to mark reset token as used: {str(e)}")
+            logger.error(f"Gagal menandai token reset sebagai sudah digunakan: {str(e)}")
             # Continue anyway, password is already updated
         
         # Send success confirmation email
@@ -279,23 +279,23 @@ class AuthService:
                 )
                 
                 if email_sent:
-                    logger.info(f"Password reset success email sent to {mask_email(user.email)}")
+                    logger.info(f"Email konfirmasi reset password dikirim ke {mask_email(user.email)}")
                 else:
-                    logger.error(f"Failed to send success email to {mask_email(user.email)}")
+                    logger.error(f"Gagal mengirim email konfirmasi ke {mask_email(user.email)}")
                     # Don't fail the whole operation if email fails
                     
             except Exception as e:
-                logger.error(f"Exception while sending success email to {mask_email(user.email)}: {str(e)}")
+                logger.error(f"Exception saat mengirim email konfirmasi ke {mask_email(user.email)}: {str(e)}")
                 # Don't fail the whole operation if email fails
         
-        return MessageResponse(message="Password reset successful")
+        return MessageResponse(message="Reset password berhasil")
     
     async def logout(self) -> MessageResponse:
         """Logout user (simple version without session management)."""
         # In a simple JWT implementation, logout is handled client-side
         # by discarding the token. In more advanced implementations,
         # you might want to blacklist the token.
-        return MessageResponse(message="Logged out successfully")
+        return MessageResponse(message="Logout berhasil")
     
     async def get_current_user_info(self, user_id: str) -> UserResponse:
         """Get current user information."""
@@ -303,7 +303,7 @@ class AuthService:
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
+                detail="User tidak ditemukan"
             )
         return user
     
@@ -327,7 +327,7 @@ class AuthService:
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
+                detail="User tidak ditemukan"
             )
         
         has_email = user.has_email()
@@ -336,14 +336,14 @@ class AuthService:
             "eligible": has_email,
             "has_email": has_email,
             "email": user.email if has_email else None,
-            "message": "User can request password reset" if has_email else "User must set email first before requesting password reset"
+            "message": "User dapat meminta reset password" if has_email else "User harus mengatur email terlebih dahulu sebelum meminta reset password"
         }
     
     async def get_default_password_info(self) -> dict:
         """Get information about default password (for admin reference)."""
         return {
             "default_password": "@Kemendag123",
-            "description": "Default password for all new users",
-            "recommendation": "Users should change this password after first login",
-            "policy": "Password must be changed if user wants to use password reset feature"
+            "description": "Password default untuk semua user baru",
+            "recommendation": "User harus mengubah password ini setelah login pertama",
+            "policy": "Password harus diubah jika user ingin menggunakan fitur reset password"
         }

@@ -92,15 +92,15 @@ class SuratPemberitahuanService:
         if not surat_pemberitahuan:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Surat pemberitahuan not found"
+                detail="Surat pemberitahuan tidak ditemukan"
             )
         
         # Get surat tugas basic info
-        surat_tugas_data = await get_surat_tugas_basic_info(session, surat_pemberitahuan.surat_tugas_id)
+        surat_tugas_data = await self._get_surat_tugas_basic_info(surat_pemberitahuan.surat_tugas_id)
         if not surat_tugas_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Related surat tugas not found"
+                detail="Surat tugas terkait tidak ditemukan"
             )
         
         return await self._build_enriched_response(surat_pemberitahuan, surat_tugas_data)
@@ -138,7 +138,6 @@ class SuratPemberitahuanService:
             )
         
         # 3. 🔥 VALIDASI AKSES TANGGAL
-        from src.utils.evaluation_date_validator import validate_surat_pemberitahuan_date_access
         validate_surat_pemberitahuan_date_access(
             tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
             operation="update"
@@ -170,7 +169,7 @@ class SuratPemberitahuanService:
         if not surat_pemberitahuan:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Surat pemberitahuan not found"
+                detail="Surat pemberitahuan tidak ditemukan"
             )
         surat_tugas_data = await self._get_surat_tugas_basic_info(surat_pemberitahuan.surat_tugas_id)
         
@@ -192,7 +191,7 @@ class SuratPemberitahuanService:
         
         return SuratPemberitahuanFileUploadResponse(
             success=True,
-            message="File uploaded successfully",
+            message="File berhasil diunggah",
             surat_pemberitahuan_id=surat_pemberitahuan_id,
             file_path=file_path,
             file_url=evaluasi_file_manager.get_file_url(file_path),
@@ -226,7 +225,7 @@ class SuratPemberitahuanService:
         if not surat_pemberitahuan or not surat_pemberitahuan.file_dokumen:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="File not found"
+                detail="File tidak ditemukan"
             )
         
         # Get original filename untuk download
