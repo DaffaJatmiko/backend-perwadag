@@ -37,13 +37,21 @@ class Kuisioner(BaseModel, SQLModel, table=True):
         max_length=500,
         description="Path file kuisioner yang diisi"
     )
+
+    link_dokumen_data_dukung: Optional[str] = Field(
+        default=None,
+        max_length=1000,
+        description="Link Google Drive untuk dokumen data dukung"
+    )
     
     def is_completed(self) -> bool:
-        """Check apakah kuisioner sudah completed - UPDATED logic."""
+        """Check apakah kuisioner sudah completed - UPDATED logic dengan dokumen data dukung."""
         return (
             self.tanggal_kuisioner is not None and
             self.file_kuisioner is not None and
-            self.file_kuisioner.strip() != ""
+            self.file_kuisioner.strip() != "" and
+            self.link_dokumen_data_dukung is not None and
+            self.link_dokumen_data_dukung.strip() != ""
         )
     
     def has_file(self) -> bool:
@@ -53,15 +61,21 @@ class Kuisioner(BaseModel, SQLModel, table=True):
     def has_tanggal(self) -> bool:
         """Check apakah sudah ada tanggal kuisioner."""
         return self.tanggal_kuisioner is not None
-    
+
+    def has_link_dokumen(self) -> bool:
+        """Check apakah sudah ada link dokumen data dukung."""
+        return self.link_dokumen_data_dukung is not None and self.link_dokumen_data_dukung.strip() != ""
+
     def get_completion_percentage(self) -> int:
-        """Get completion percentage (0-100) - UPDATED logic."""
+        """Get completion percentage (0-100) - UPDATED logic dengan dokumen data dukung."""
         completed_items = 0
-        total_items = 2  # tanggal + file
+        total_items = 3  # tanggal + file + link dokumen
         
         if self.has_tanggal():
             completed_items += 1
         if self.has_file():
+            completed_items += 1
+        if self.has_link_dokumen():
             completed_items += 1
         
         return int((completed_items / total_items) * 100)

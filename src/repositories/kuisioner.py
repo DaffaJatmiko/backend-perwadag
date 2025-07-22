@@ -106,25 +106,47 @@ class KuisionerRepository:
                 kuisioner_query = kuisioner_query.where(Kuisioner.file_kuisioner.is_not(None))
             else:
                 kuisioner_query = kuisioner_query.where(Kuisioner.file_kuisioner.is_(None))
+
+        if filters.has_link_dokumen is not None:
+            if filters.has_link_dokumen:
+                kuisioner_query = kuisioner_query.where(
+                    and_(
+                        Kuisioner.link_dokumen_data_dukung.is_not(None),
+                        Kuisioner.link_dokumen_data_dukung != ""
+                    )
+                )
+            else:
+                kuisioner_query = kuisioner_query.where(
+                    or_(
+                        Kuisioner.link_dokumen_data_dukung.is_(None),
+                        Kuisioner.link_dokumen_data_dukung == ""
+                    )
+                )
         
         # Note: Model Kuisioner tidak punya nomor_kuisioner field, hanya file_kuisioner
         # Jadi has_nomor filter tidak applicable
         
         if filters.is_completed is not None:
             if filters.is_completed:
-                # Completed: has file only (since no nomor field)
+                # Completed: has tanggal + file + link dokumen
                 kuisioner_query = kuisioner_query.where(
                     and_(
+                        Kuisioner.tanggal_kuisioner.is_not(None),
                         Kuisioner.file_kuisioner.is_not(None),
-                        Kuisioner.file_kuisioner != ""
+                        Kuisioner.file_kuisioner != "",
+                        Kuisioner.link_dokumen_data_dukung.is_not(None),
+                        Kuisioner.link_dokumen_data_dukung != ""
                     )
                 )
             else:
-                # Not completed: no file or empty file
+                # Not completed: missing any of the required fields
                 kuisioner_query = kuisioner_query.where(
                     or_(
+                        Kuisioner.tanggal_kuisioner.is_(None),
                         Kuisioner.file_kuisioner.is_(None),
-                        Kuisioner.file_kuisioner == ""
+                        Kuisioner.file_kuisioner == "",
+                        Kuisioner.link_dokumen_data_dukung.is_(None),
+                        Kuisioner.link_dokumen_data_dukung == ""
                     )
                 )
         
@@ -179,6 +201,7 @@ class KuisionerRepository:
                 'surat_tugas_id': kuisioner.surat_tugas_id,
                 'tanggal_kuisioner': kuisioner.tanggal_kuisioner,
                 'file_kuisioner': kuisioner.file_kuisioner,
+                'link_dokumen_data_dukung': kuisioner.link_dokumen_data_dukung,  
                 'created_at': kuisioner.created_at,
                 'updated_at': kuisioner.updated_at,
                 'created_by': kuisioner.created_by,

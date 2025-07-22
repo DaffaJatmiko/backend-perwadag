@@ -294,8 +294,9 @@ class KuisionerService:
             # Repository return dict
             kuisioner_id = kuisioner.get('id')
             surat_tugas_id = kuisioner.get('surat_tugas_id')
-            tanggal_kuisioner = kuisioner.get('tanggal_kuisioner')  # 🔥 NEW field
+            tanggal_kuisioner = kuisioner.get('tanggal_kuisioner')
             file_kuisioner = kuisioner.get('file_kuisioner')
+            link_dokumen_data_dukung = kuisioner.get('link_dokumen_data_dukung')  # 🔥 FIELD BARU
             created_at = kuisioner.get('created_at')
             updated_at = kuisioner.get('updated_at')
             created_by = kuisioner.get('created_by')
@@ -304,8 +305,9 @@ class KuisionerService:
             # Repository return object
             kuisioner_id = kuisioner.id
             surat_tugas_id = kuisioner.surat_tugas_id
-            tanggal_kuisioner = kuisioner.tanggal_kuisioner  # 🔥 NEW field
+            tanggal_kuisioner = kuisioner.tanggal_kuisioner
             file_kuisioner = kuisioner.file_kuisioner
+            link_dokumen_data_dukung = kuisioner.link_dokumen_data_dukung  # 🔥 FIELD BARU
             created_at = kuisioner.created_at
             updated_at = kuisioner.updated_at
             created_by = kuisioner.created_by
@@ -353,16 +355,19 @@ class KuisionerService:
         
         # 🔥 UPDATED: Calculate completion dengan tanggal_kuisioner
         has_file = bool(file_kuisioner)
-        has_tanggal = bool(tanggal_kuisioner)  # 🔥 NEW field
-        is_completed = has_file and has_tanggal  # 🔥 UPDATED: Requires both fields
+        has_tanggal = bool(tanggal_kuisioner)
+        has_link_dokumen = bool(link_dokumen_data_dukung)  # 🔥 STATUS BARU
+        is_completed = has_file and has_tanggal and has_link_dokumen  # 🔥 UPDATED: Requires 3 fields
         
-        # Calculate completion percentage (2 fields: tanggal + file)
+        # Calculate completion percentage (3 fields: tanggal + file + link)
         completed_items = 0
         if has_tanggal:
             completed_items += 1
         if has_file:
             completed_items += 1
-        completion_percentage = int((completed_items / 2) * 100)  # 🔥 UPDATED: Divide by 2 instead of 1
+        if has_link_dokumen:  # 🔥 CHECK BARU
+            completed_items += 1
+        completion_percentage = int((completed_items / 3) * 100)  # 🔥 DIBAGI 3
         
         return KuisionerResponse(
             # Basic fields - UPDATED
@@ -370,6 +375,7 @@ class KuisionerService:
             surat_tugas_id=str(surat_tugas_id),
             tanggal_kuisioner=tanggal_kuisioner,  # 🔥 NEW field
             file_dokumen=file_kuisioner,  # Map to response field name
+            link_dokumen_data_dukung=link_dokumen_data_dukung, 
             
             # Enhanced file information
             file_urls=file_urls,
@@ -379,6 +385,7 @@ class KuisionerService:
             is_completed=is_completed,
             has_file=has_file,
             has_tanggal=has_tanggal,  # 🔥 NEW field
+            has_link_dokumen=has_link_dokumen, 
             completion_percentage=completion_percentage,
             
             # Enriched surat tugas data

@@ -421,6 +421,7 @@ class KuisionerFilterParams(BaseModel):
     # Specific filters
     surat_tugas_id: Optional[str] = Field(None, description="Filter by surat tugas")
     has_file: Optional[bool] = Field(None, description="Filter by file upload status")
+    has_link_dokumen: Optional[bool] = Field(None, description="Filter by dokumen data dukung link status")
     is_completed: Optional[bool] = Field(None, description="Filter by completion status")
     
     # Date filters

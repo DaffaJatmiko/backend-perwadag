@@ -83,7 +83,7 @@ async def get_kuisioner_by_surat_tugas(
 async def update_kuisioner(
     kuisioner_id: str,
     update_data: KuisionerUpdate,
-    current_user: dict = Depends(require_auto_generated_edit_access()),
+    current_user: dict = Depends(require_evaluasi_read_access()),
     service: KuisionerService = Depends(get_kuisioner_service)
 ):
     """Update kuisioner (nomor kuisioner)."""
