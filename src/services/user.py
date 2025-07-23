@@ -23,13 +23,20 @@ class UserService:
     
     async def create_user(self, user_data: UserCreate) -> UserResponse:
         """Create user dengan simplified validation."""
-        # 1. Validate inspektorat for admin/inspektorat roles
-        if user_data.role in [UserRole.ADMIN, UserRole.INSPEKTORAT]:
+        # 1. Validate inspektorat requirements based on role
+        if user_data.role == UserRole.INSPEKTORAT:
+            if not user_data.inspektorat:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,  
+                    detail="Inspektorat diperlukan untuk role inspektorat"
+                )
+        elif user_data.role == UserRole.PERWADAG:
             if not user_data.inspektorat:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Inspektorat diperlukan untuk role admin dan inspektorat"
+                    detail="Inspektorat diperlukan untuk role perwadag"
                 )
+        # ADMIN role does NOT require inspektorat
         
         # 2. Validate email uniqueness
         if user_data.email and await self.user_repo.email_exists(user_data.email):
@@ -319,10 +326,14 @@ class UserService:
         """Generate username based on role."""
         if role == UserRole.PERWADAG:
             return self._generate_perwadag_username(nama)
-        else:  # ADMIN or INSPEKTORAT
+        elif role == UserRole.INSPEKTORAT:
             if not inspektorat:
-                raise ValueError("Inspektorat diperlukan untuk role admin/inspektorat")
+                raise ValueError("Inspektorat diperlukan untuk role inspektorat")
             return generate_username_from_name_and_inspektorat(nama, inspektorat)
+        elif role == UserRole.ADMIN:
+            return self._generate_admin_username(nama)  # <- INI YANG BERUBAH
+        else:
+            raise ValueError(f"Unknown role: {role}")
     
     def _generate_perwadag_username(self, nama: str) -> str:
         """Generate username untuk perwadag dari nama."""
@@ -352,6 +363,32 @@ class UserService:
         # Clean username
         username = re.sub(r'[^a-z0-9_]', '', username)
         return username[:50]  # Limit length
+
+    def _generate_admin_username(self, nama: str) -> str:
+        """Generate simple username untuk admin dari nama."""
+        import re
+        import unicodedata
+        
+        # Normalize dan lowercase
+        nama = unicodedata.normalize('NFD', nama)
+        nama = ''.join(c for c in nama if unicodedata.category(c) != 'Mn')
+        nama = nama.lower()
+        
+        # Split kata dan bersihkan
+        words = nama.split()
+        clean_words = []
+        
+        for word in words:
+            clean_word = re.sub(r'[^a-z0-9]', '', word)
+            if clean_word:
+                clean_words.append(clean_word)
+        
+        if not clean_words:
+            return "admin"
+        elif len(clean_words) == 1:
+            return clean_words[0]  # "administrator" -> "administrator"
+        else:
+            return f"{clean_words[0]}_{clean_words[1]}"  # "admin sistem" -> "admin_sistem"
     
     async def _generate_available_username(self, nama: str, role: UserRole, inspektorat: str = None) -> str:
         """Generate available username dengan fallback."""

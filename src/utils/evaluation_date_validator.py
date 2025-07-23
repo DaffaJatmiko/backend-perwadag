@@ -49,16 +49,10 @@ class EvaluationDateValidator:
             operation_id = operation_mapping.get(operation, operation)
             module_id = module_mapping.get(module_name, module_name)
             
+            # UBAH BAGIAN INI - jadi simple response
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail={
-                    "message": f"Tidak dapat {operation_id} {module_id} karena periode evaluasi telah berakhir",
-                    "reason": "evaluation_period_ended",
-                    "current_date": current_date.isoformat(),
-                    "evaluation_end_date": tanggal_evaluasi_selesai.isoformat(),
-                    "days_past_deadline": (current_date - tanggal_evaluasi_selesai).days,
-                    "additional_info": f"Periode evaluasi berakhir pada {tanggal_evaluasi_selesai.strftime('%d %B %Y')}, sudah lewat {(current_date - tanggal_evaluasi_selesai).days} hari"
-                }
+                detail=f"Tidak dapat {operation_id} {module_id} karena periode evaluasi telah berakhir pada {tanggal_evaluasi_selesai.strftime('%d %B %Y')}"
             )
     
     @staticmethod

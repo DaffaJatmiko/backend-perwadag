@@ -97,7 +97,7 @@ class SuratTugasFilterParams(BaseModel):
     
     # Pagination
     page: int = Field(1, ge=1, description="Page number")
-    size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
+    size: int = Field(20, ge=1, description="Page size (unlimited)")
     
     # Search
     search: Optional[str] = Field(
@@ -181,7 +181,7 @@ class MeetingFilterParams(BaseModel):
     
     # Pagination
     page: int = Field(1, ge=1, description="Page number")
-    size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
+    size: int = Field(20, ge=1, description="Page size (unlimited)")
     
     # Search
     search: Optional[str] = Field(
@@ -254,7 +254,7 @@ class SuratPemberitahuanFilterParams(BaseModel):
     
     # Pagination
     page: int = Field(1, ge=1, description="Page number")
-    size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
+    size: int = Field(20, ge=1, description="Page size (unlimited)")
     
     # Search
     search: Optional[str] = Field(None, description="Search by nama perwadag, no surat, inspektorat")
@@ -294,7 +294,7 @@ class MeetingFilterParams(BaseModel):
     
     # Pagination
     page: int = Field(1, ge=1, description="Page number")
-    size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
+    size: int = Field(20, ge=1, description="Page size (unlimited)")
     
     # Search
     search: Optional[str] = Field(None, description="Search by meeting info")
@@ -327,7 +327,7 @@ class MatriksFilterParams(BaseModel):
     
     # Pagination
     page: int = Field(1, ge=1, description="Page number")
-    size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
+    size: int = Field(20, ge=1, description="Page size (unlimited - bisa set 1000+ untuk fetch semua)")
     
     # Search
     search: Optional[str] = Field(None, description="Search by nama perwadag, inspektorat")
@@ -366,7 +366,7 @@ class LaporanHasilFilterParams(BaseModel):
     
     # Pagination
     page: int = Field(1, ge=1, description="Page number")
-    size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
+    size: int = Field(20, ge=1, description="Page size (unlimited)")
     
     # Search
     search: Optional[str] = Field(None, description="Search by nomor laporan, nama perwadag")
@@ -408,7 +408,7 @@ class KuisionerFilterParams(BaseModel):
     
     # Pagination
     page: int = Field(1, ge=1, description="Page number")
-    size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
+    size: int = Field(20, ge=1, description="Page size (unlimited)")
     
     # Search
     search: Optional[str] = Field(None, description="Search by nama perwadag, inspektorat")
@@ -445,7 +445,7 @@ class FormatKuisionerFilterParams(BaseModel):
     
     # Pagination
     page: int = Field(1, ge=1, description="Page number")
-    size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
+    size: int = Field(20, ge=1, description="Page size (unlimited)")
     
     # Search
     search: Optional[str] = Field(

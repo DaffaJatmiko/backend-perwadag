@@ -39,18 +39,18 @@ class UserBase(BaseModel):
     
     @field_validator('inspektorat')
     @classmethod
-    def validate_inspektorat(cls, inspektorat: Optional[str], values) -> Optional[str]:
+    def validate_inspektorat(cls, inspektorat: Optional[str], info) -> Optional[str]:
         """Validate inspektorat field based on role."""
-        role = values.data.get('role') if hasattr(values, 'data') else None
+        role = info.data.get('role') if info.data else None
         
-        # For perwadag, inspektorat is required
+        # Hanya INSPEKTORAT dan PERWADAG yang wajib inspektorat
+        if role == UserRole.INSPEKTORAT and not inspektorat:
+            raise ValueError("Inspektorat is required for role 'inspektorat'")
+        
         if role == UserRole.PERWADAG and not inspektorat:
             raise ValueError("Inspektorat is required for role 'perwadag'")
         
-        # # For non-perwadag, inspektorat should be None
-        # if role != UserRole.PERWADAG and inspektorat:
-        #     raise ValueError("Inspektorat should only be set for role 'perwadag'")
-        
+        # ADMIN tidak wajib inspektorat
         return inspektorat.strip() if inspektorat else None
     
     # @field_validator('tanggal_lahir')
