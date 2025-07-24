@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 from src.repositories.email_template import EmailTemplateRepository
 from src.services.laporan_hasil import LaporanHasilService
 from src.schemas.email_template import EmailComposedResponse
+from src.core.config import settings
 
 
 class EmailCompositionService:
@@ -118,7 +119,7 @@ class EmailCompositionService:
         
         # Status information
         variables["evaluation_status"] = getattr(laporan_data, "evaluation_status", "")
-        variables["status_kelengkapan"] = "✅ Lengkap" if getattr(laporan_data, "is_completed", False) else "⚠️ Belum Lengkap"
+        variables["status_kelengkapan"] = "Lengkap" if getattr(laporan_data, "is_completed", False) else "Belum Lengkap"
         variables["persentase"] = str(getattr(laporan_data, "completion_percentage", 0))
         
         # File information
@@ -127,13 +128,21 @@ class EmailCompositionService:
             file_urls = getattr(laporan_data, "file_urls", None)
             if file_urls:
                 file_url = getattr(file_urls, "file_url", "")
-                variables["file_status"] = "✅ File dokumen tersedia"
-                variables["file_url"] = f"🔗 Link Download: {file_url}" if file_url else ""
+                variables["file_status"] = "File dokumen tersedia"
+                if file_url:
+                    # Add API base URL prefix if file_url is relative
+                    if file_url.startswith('/'):
+                        full_file_url = f"{settings.API_BASE_URL}{file_url}"
+                    else:
+                        full_file_url = file_url
+                    variables["file_url"] = full_file_url
+                else:
+                    variables["file_url"] = ""
             else:
-                variables["file_status"] = "✅ File dokumen tersedia"
+                variables["file_status"] = "File dokumen tersedia"
                 variables["file_url"] = ""
         else:
-            variables["file_status"] = "❌ File dokumen belum tersedia"
+            variables["file_status"] = "File dokumen belum tersedia"
             variables["file_url"] = ""
         
         # User information

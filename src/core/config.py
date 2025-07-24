@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     DEBUG: bool = False
     API_V1_STR: str = "/api/v1"
+    API_BASE_URL: str = "http://localhost:8000"
 
     # CORS
     CORS_ORIGINS: str = "*"
