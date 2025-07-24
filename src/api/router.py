@@ -8,7 +8,8 @@ from src.api.endpoints import auth, users
 # New evaluasi imports
 from src.api.endpoints import (
     surat_tugas, meeting, surat_pemberitahuan,
-    matriks, laporan_hasil, kuisioner, format_kuisioner, periode_evaluasi, penilaian_risiko
+    matriks, laporan_hasil, kuisioner, format_kuisioner, periode_evaluasi, penilaian_risiko,
+    email_templates
 )
 
 # Create main API router
@@ -160,6 +161,19 @@ api_router.include_router(
     }
 )
 
+# Email Templates - Admin management with composition service
+api_router.include_router(
+    email_templates.router,
+    prefix="/email-templates",
+    tags=["Email Templates"],
+    responses={
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden - Admin only for management"},
+        404: {"description": "Email template not found"},
+        422: {"description": "Validation Error"},
+    }
+)
+
 # ===== DOCUMENTATION METADATA =====
 
 # Update tags metadata untuk better documentation
@@ -273,6 +287,19 @@ new_tags_metadata = [
         - Profil risiko determination (Rendah/Sedang/Tinggi)
         - Comprehensive filtering dan statistics
         - Bulk operations untuk efficiency
+        """,
+    },
+    {
+        "name": "Email Templates",
+        "description": """
+        **Email template management dengan variable replacement**
+        
+        - **Admin only**: Template management (CRUD operations)
+        - Variable-based email composition untuk laporan hasil
+        - Only one active template at a time
+        - Real-time variable replacement dengan laporan data
+        - Gmail integration untuk compose URLs
+        - Available variables: nama_perwadag, inspektorat, tahun_evaluasi, dll
         """,
     }
 ]
