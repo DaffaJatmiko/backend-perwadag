@@ -9,7 +9,7 @@ from src.api.endpoints import auth, users
 from src.api.endpoints import (
     surat_tugas, meeting, surat_pemberitahuan,
     matriks, laporan_hasil, kuisioner, format_kuisioner, periode_evaluasi, penilaian_risiko,
-    email_templates
+    email_templates, log_activity
 )
 
 # Create main API router
@@ -174,6 +174,18 @@ api_router.include_router(
     }
 )
 
+api_router.include_router(
+    log_activity.router,
+    prefix="/log-activity",
+    tags=["Log Activity"],
+    responses={
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden - Admin/Inspektorat only for most operations"},
+        404: {"description": "Log activity not found"},
+        422: {"description": "Validation Error"},
+    }
+)
+
 # ===== DOCUMENTATION METADATA =====
 
 # Update tags metadata untuk better documentation
@@ -301,7 +313,7 @@ new_tags_metadata = [
         - Gmail integration untuk compose URLs
         - Available variables: nama_perwadag, inspektorat, tahun_evaluasi, dll
         """,
-    }
+    },
 ]
 
 # Extend existing tags_metadata

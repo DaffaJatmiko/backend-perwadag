@@ -13,6 +13,7 @@ from src.api.router import api_router
 from src.middleware.error_handler import add_error_handlers
 from src.middleware.rate_limiting import add_rate_limiting
 from src.utils.logging import setup_logging
+from src.middleware.activity_logger import ActivityLoggingMiddleware
 
 # Setup logging first
 setup_logging()
@@ -71,10 +72,7 @@ def create_application() -> FastAPI:
         * `admin` - System Administrator
         * `inspektorat_1` to `inspektorat_4` - Inspektorat regional offices
         * `perwadag` - Perdagangan department
-        * `bappeda` - Regional Planning Agency
-        * `dinas_kesehatan` - Health Department
-        * `dinas_pendidikan` - Education Department
-        * `dinas_sosial` - Social Affairs Department
+
         
         ## Authentication
         
@@ -108,6 +106,8 @@ def create_application() -> FastAPI:
 
     # # Add rate limiting middleware
     # add_rate_limiting(app)
+
+    app.add_middleware(ActivityLoggingMiddleware)
 
     # Di dalam create_application()
     uploads_path = Path(settings.UPLOADS_PATH)  # "static/uploads"

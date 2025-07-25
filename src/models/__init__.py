@@ -34,6 +34,9 @@ from .penilaian_enums import (
 from .periode_evaluasi import PeriodeEvaluasi
 from .penilaian_risiko import PenilaianRisiko
 
+# ===== LOG ACTIVITY MODEL =====
+from .log_activity import LogActivity
+
 # ===== EXPORTS =====
 
 __all__ = [
@@ -71,6 +74,8 @@ __all__ = [
     # New penilaian risiko models
     "PeriodeEvaluasi",
     "PenilaianRisiko",
+
+    "LogActivity",  # Assuming LogActivity is also a model in this context
 ]
 
 # ===== MODEL REGISTRATION FOR SQLModel =====
