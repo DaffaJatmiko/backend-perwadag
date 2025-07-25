@@ -1,17 +1,24 @@
 """Authentication endpoints (simplified - nama as username)."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.repositories.user import UserRepository
+from src.repositories.log_activity import LogActivityRepository
+from src.schemas.log_activity import LogActivityCreate
+from datetime import datetime
 from src.services.user import UserService
 from src.services.auth import AuthService
 from src.schemas.user import (
     UserLogin, Token, TokenRefresh, PasswordReset, PasswordResetConfirm,
     MessageResponse, UserResponse, UserChangePassword
 )
-from src.auth.permissions import get_current_active_user
+from src.auth.permissions import get_current_active_user, admin_required, get_token_string
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -26,6 +33,8 @@ async def get_auth_service(session: AsyncSession = Depends(get_db)) -> AuthServi
 @router.post("/login", response_model=Token, summary="Login user")
 async def login(
     login_data: UserLogin,
+    request: Request,  # 🔥 TAMBAH INI
+    session: AsyncSession = Depends(get_db),  # 🔥 TAMBAH INI
     auth_service: AuthService = Depends(get_auth_service)
 ):
     """
@@ -35,21 +44,74 @@ async def login(
     - **password**: User password (default: @Kemendag123)
     
     Returns JWT access token and refresh token along with user information.
-    
-    **Login Info**:
-    - Username = Nama lengkap user (contoh: "Budi Santoso")
-    - All users start with password: @Kemendag123
-    - Case sensitive untuk nama
-    
-    **Example**:
-    ```json
-    {
-      "nama": "Administrator Sistem",
-      "password": "@Kemendag123"
-    }
-    ```
     """
-    return await auth_service.login(login_data)
+    
+    # 🔥 TAMBAH: Get IP address
+    def get_client_ip(request: Request) -> str:
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip()
+        real_ip = request.headers.get("X-Real-IP")
+        if real_ip:
+            return real_ip.strip()
+        return request.client.host if request.client else "unknown"
+    
+    ip_address = get_client_ip(request)
+    
+    try:
+        # Execute login
+        result = await auth_service.login(login_data)
+        
+        # 🔥 TAMBAH: Log successful login
+        try:
+            from src.core.config import settings
+            base_url = settings.API_BASE_URL.rstrip('/')
+            full_url = f"{base_url}{request.url.path}"
+            
+            log_repo = LogActivityRepository(session)
+            log_data = LogActivityCreate(
+                user_id=result.user.id,  # From login result
+                method="POST",
+                url=full_url,
+                activity="User login",
+                date=datetime.utcnow(),
+                user_name=result.user.nama,
+                ip_address=ip_address,
+                response_status=200
+            )
+            await log_repo.create(log_data)
+            await session.commit()
+        except Exception as e:
+            # Don't break login if logging fails
+            logger.error(f"Failed to log login activity: {e}")
+        
+        return result
+        
+    except HTTPException as e:
+        # 🔥 TAMBAH: Log failed login attempt
+        try:
+            from src.core.config import settings
+            base_url = settings.API_BASE_URL.rstrip('/')
+            full_url = f"{base_url}{request.url.path}"
+            
+            log_repo = LogActivityRepository(session)
+            log_data = LogActivityCreate(
+                user_id=None,  # No user for failed login
+                method="POST", 
+                url=full_url,
+                activity="Failed login attempt",
+                date=datetime.utcnow(),
+                user_name=f"Failed login: {login_data.nama}",
+                ip_address=ip_address,
+                response_status=e.status_code
+            )
+            await log_repo.create(log_data)
+            await session.commit()
+        except Exception as log_error:
+            logger.error(f"Failed to log failed login: {log_error}")
+        
+        # Re-raise original exception
+        raise e
 
 
 @router.post("/refresh", response_model=Token, summary="Refresh access token")
@@ -69,15 +131,22 @@ async def refresh_access_token(
 
 @router.post("/logout", response_model=MessageResponse, summary="Logout user")
 async def logout(
-    current_user: dict = Depends(get_current_active_user),
+    token: str = Depends(get_token_string),  # Tambahkan ini
     auth_service: AuthService = Depends(get_auth_service)
 ):
     """
-    Logout current user.
+    Logout current user dengan token blacklist.
     
-    In JWT implementation, this is mainly handled client-side.
+    **Process**:
+    1. Extract token dari Authorization header
+    2. Add token ke Redis blacklist dengan TTL = remaining token life
+    3. Token menjadi invalid untuk semua request selanjutnya
+    
+    **Security**:
+    - Token benar-benar invalid setelah logout (tidak seperti client-side logout)
+    - Stolen token tidak bisa digunakan setelah legitimate user logout
     """
-    return await auth_service.logout()
+    return await auth_service.logout(token)
 
 
 # @router.get("/me", response_model=UserResponse, summary="Get current user info")

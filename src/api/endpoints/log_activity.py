@@ -149,93 +149,93 @@ async def cleanup_old_log_activities(
 
 # ===== UTILITY ENDPOINTS =====
 
-@router.get("/dashboard/summary")
-async def get_log_activity_dashboard_summary(
-    current_user: dict = Depends(admin_required),  # ADMIN ONLY
-    service: LogActivityService = Depends(get_log_activity_service)
-):
-    """
-    Get dashboard summary untuk log activities.
+# @router.get("/dashboard/summary")
+# async def get_log_activity_dashboard_summary(
+#     current_user: dict = Depends(admin_required),  # ADMIN ONLY
+#     service: LogActivityService = Depends(get_log_activity_service)
+# ):
+#     """
+#     Get dashboard summary untuk log activities.
     
-    **⚠️ ADMIN ONLY ACCESS**
+#     **⚠️ ADMIN ONLY ACCESS**
     
-    **Returns**: 
-    - Quick statistics
-    - Recent activities (last 10)
-    - Activity trends
+#     **Returns**: 
+#     - Quick statistics
+#     - Recent activities (last 10)
+#     - Activity trends
     
-    **Use Case**: Admin dashboard widgets dan overview
-    """
+#     **Use Case**: Admin dashboard widgets dan overview
+#     """
     
-    # Get basic statistics
-    stats = await service.get_statistics(
-        user_role="ADMIN",
-        user_inspektorat=None,
-        user_id=None
-    )
+#     # Get basic statistics
+#     stats = await service.get_statistics(
+#         user_role="ADMIN",
+#         user_inspektorat=None,
+#         user_id=None
+#     )
     
-    # Get recent activities
-    from src.schemas.log_activity import LogActivityFilterParams
-    recent_filters = LogActivityFilterParams(page=1, size=10)
+#     # Get recent activities
+#     from src.schemas.log_activity import LogActivityFilterParams
+#     recent_filters = LogActivityFilterParams(page=1, size=10)
     
-    recent_activities = await service.get_all_log_activities(
-        recent_filters,
-        user_role="ADMIN",
-        user_inspektorat=None,
-        user_id=None
-    )
+#     recent_activities = await service.get_all_log_activities(
+#         recent_filters,
+#         user_role="ADMIN",
+#         user_inspektorat=None,
+#         user_id=None
+#     )
     
-    return {
-        "user_info": {
-            "nama": current_user["nama"],
-            "role": current_user["role"]
-        },
-        "statistics": stats,
-        "recent_activities": recent_activities.items,
-        "quick_insights": {
-            "total_activities_today": 0,  # TODO: Calculate today's activities
-            "most_active_module": "surat tugas",  # TODO: Calculate from stats
-            "success_rate_trend": "stable"  # TODO: Calculate trend
-        }
-    }
+#     return {
+#         "user_info": {
+#             "nama": current_user["nama"],
+#             "role": current_user["role"]
+#         },
+#         "statistics": stats,
+#         "recent_activities": recent_activities.items,
+#         "quick_insights": {
+#             "total_activities_today": 0,  # TODO: Calculate today's activities
+#             "most_active_module": "surat tugas",  # TODO: Calculate from stats
+#             "success_rate_trend": "stable"  # TODO: Calculate trend
+#         }
+#     }
 
 
-@router.get("/export/csv")
-async def export_log_activities_csv(
-    filters: LogActivityFilterParams = Depends(),
-    current_user: dict = Depends(admin_required),  # ADMIN ONLY
-    service: LogActivityService = Depends(get_log_activity_service)
-):
-    """
-    Export log activities to CSV (Admin only).
+# @router.get("/export/csv")
+# async def export_log_activities_csv(
+#     filters: LogActivityFilterParams = Depends(),
+#     current_user: dict = Depends(admin_required),  # ADMIN ONLY
+#     service: LogActivityService = Depends(get_log_activity_service)
+# ):
+#     """
+#     Export log activities to CSV (Admin only).
     
-    **⚠️ ADMIN ONLY ACCESS**
+#     **⚠️ ADMIN ONLY ACCESS**
     
-    **Parameters**: Same as GET / endpoint filters
+#     **Parameters**: Same as GET / endpoint filters
     
-    **Returns**: CSV file download
+#     **Returns**: CSV file download
     
-    **Use Cases:**
-    - Audit reporting
-    - Compliance documentation
-    - External analysis
+#     **Use Cases:**
+#     - Audit reporting
+#     - Compliance documentation
+#     - External analysis
     
-    **Note**: Large exports may take time, consider pagination
-    """
-    # TODO: Implement CSV export functionality
-    # This would require additional CSV generation logic
+#     **Note**: Large exports may take time, consider pagination
+#     """
+#     # TODO: Implement CSV export functionality
+#     # This would require additional CSV generation logic
     
-    # For now, return structured data
-    # In production, this should generate and return actual CSV file
-    log_activities = await service.get_all_log_activities(
-        filters,
-        user_role="ADMIN",
-        user_inspektorat=None,
-        user_id=None
-    )
+#     # For now, return structured data
+#     # In production, this should generate and return actual CSV file
+#     log_activities = await service.get_all_log_activities(
+#         filters,
+#         user_role="ADMIN",
+#         user_inspektorat=None,
+#         user_id=None
+#     )
     
-    return {
-        "message": "CSV export functionality - implement with pandas/csv writer",
-        "total_records": log_activities.total,
-        "note": "This endpoint should return actual CSV file in production"
-    }
+#     return {
+#         "message": "CSV export functionality - implement with pandas/csv writer",
+#         "total_records": log_activities.total,
+#         "note": "This endpoint should return actual CSV file in production"
+#     }

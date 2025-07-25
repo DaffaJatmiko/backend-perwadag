@@ -109,6 +109,12 @@ class Settings(BaseSettings):
     PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 1
     PASSWORD_RESET_TOKEN_LENGTH: int = 32
 
+    # Token Blacklist Settings
+    TOKEN_BLACKLIST_ENABLED: bool = True
+    ROLE_CHANGE_FORCE_RELOGIN: bool = True
+    ROLE_CHANGE_TTL_HOURS: int = 24
+    TOKEN_BLACKLIST_CLEANUP_INTERVAL_HOURS: int = 6
+
     @field_validator("DATABASE_URI", mode="before")
     def assemble_db_connection(cls, v: Optional[str], info: Dict[str, Any]) -> Any:
         """Build PostgreSQL connection string from components."""

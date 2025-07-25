@@ -186,3 +186,72 @@ async def redis_flush_pattern(pattern: str) -> int:
     except Exception as e:
         logger.error(f"Redis FLUSH error for pattern {pattern}: {e}")
         return 0
+
+async def redis_blacklist_token(token: str, remaining_seconds: int) -> bool:
+    """Add token to blacklist with TTL."""
+    if not redis_client:
+        logger.warning("Redis not available for token blacklist")
+        return False
+    
+    try:
+        await redis_client.setex(f"blacklist:{token}", remaining_seconds, "logged_out")
+        logger.info(f"Token blacklisted for {remaining_seconds} seconds")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to blacklist token: {e}")
+        return False
+
+
+async def redis_is_token_blacklisted(token: str) -> bool:
+    """Check if token is blacklisted."""
+    if not redis_client:
+        logger.warning("Redis not available for blacklist check")
+        return False
+    
+    try:
+        result = await redis_client.exists(f"blacklist:{token}")
+        return result > 0
+    except Exception as e:
+        logger.error(f"Failed to check token blacklist: {e}")
+        return False
+
+
+async def redis_mark_role_changed(user_id: str, ttl_seconds: int = 86400) -> bool:
+    """Mark user role as changed, forcing re-login."""
+    if not redis_client:
+        logger.warning("Redis not available for role change marking")
+        return False
+    
+    try:
+        await redis_client.setex(f"user_role_changed:{user_id}", ttl_seconds, "changed")
+        logger.info(f"User {user_id} marked for role change re-login")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to mark role change for user {user_id}: {e}")
+        return False
+
+
+async def redis_is_role_changed(user_id: str) -> bool:
+    """Check if user role has changed and needs re-login."""
+    if not redis_client:
+        return False
+    
+    try:
+        result = await redis_client.exists(f"user_role_changed:{user_id}")
+        return result > 0
+    except Exception as e:
+        logger.error(f"Failed to check role change for user {user_id}: {e}")
+        return False
+
+
+async def redis_clear_role_changed(user_id: str) -> bool:
+    """Clear role changed flag (called after successful re-login)."""
+    if not redis_client:
+        return False
+    
+    try:
+        result = await redis_client.delete(f"user_role_changed:{user_id}")
+        return result > 0
+    except Exception as e:
+        logger.error(f"Failed to clear role change flag for user {user_id}: {e}")
+        return False

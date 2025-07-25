@@ -17,7 +17,7 @@ class LogActivityCreate(BaseModel):
     
     user_id: str
     method: str = Field(..., pattern="^(POST|PUT|PATCH|DELETE)$")
-    url: str = Field(..., max_length=500)
+    url: str = Field(..., max_length=1000)
     activity: str
     date: datetime
     user_name: Optional[str] = None

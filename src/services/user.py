@@ -13,6 +13,7 @@ from src.auth.jwt import get_password_hash, verify_password
 from src.models.user import User
 from src.models.enums import UserRole
 from src.utils.username_generator import generate_username_from_name_and_inspektorat, generate_available_username
+from src.core.redis import redis_mark_role_changed
 
 class UserService:
     """Simplified user service dengan single table approach."""
@@ -71,7 +72,7 @@ class UserService:
         return UserResponse.from_user_model(user)
     
     async def update_user(self, user_id: str, user_data: UserUpdate) -> UserResponse:
-        """Update user information."""
+        """Update user information dengan role change detection."""
         # 1. Check if user exists
         existing_user = await self.user_repo.get_by_id(user_id)
         if not existing_user:
@@ -88,6 +89,7 @@ class UserService:
             )
         
         # 3. If role changed to/from perwadag, validate inspektorat
+        old_role = existing_user.role
         if user_data.role:
             if user_data.role == UserRole.PERWADAG and not user_data.inspektorat:
                 raise HTTPException(
@@ -101,7 +103,19 @@ class UserService:
         # 4. Update user in database
         updated_user = await self.user_repo.update(user_id, user_data)
         
-        # 5. Convert Model → Schema Response
+        # 5. NEW: Check if role changed, mark for re-login
+        if user_data.role and old_role != user_data.role:
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            try:
+                await redis_mark_role_changed(user_id, ttl_seconds=86400)
+                logger.info(f"Role changed: {user_id} from {old_role.value} to {user_data.role.value}")
+            except Exception as e:
+                logger.error(f"Failed to mark role change for user {user_id}: {str(e)}")
+                # Don't fail the update if Redis fails, just log
+        
+        # 6. Convert Model → Schema Response
         return UserResponse.from_user_model(updated_user)
     
     async def change_password(self, user_id: str, password_data: UserChangePassword) -> MessageResponse:

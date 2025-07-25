@@ -22,6 +22,7 @@ class LogActivity(BaseModel, SQLModel, table=True):
     
     # ===== CORE FIELDS (REQUIRED) =====
     user_id: str = Field(
+        default=None,
         foreign_key="users.id",
         index=True,
         max_length=36,
@@ -33,7 +34,7 @@ class LogActivity(BaseModel, SQLModel, table=True):
         description="HTTP method: POST, PUT, DELETE, PATCH"
     )
     url: str = Field(
-        max_length=500,
+        max_length=1000,
         description="Endpoint URL yang diakses"
     )
     activity: str = Field(

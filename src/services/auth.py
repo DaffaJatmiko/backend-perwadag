@@ -25,6 +25,7 @@ class AuthService:
         self.email_service = EmailService()  
         # No more role_repo needed!
     
+
     async def login(self, login_data: UserLogin) -> Token:
         """Login user with simplified role handling."""
         # Authenticate user
@@ -72,6 +73,18 @@ class AuthService:
             # Fallback to direct conversion
             user_response = UserResponse.from_user_model(user)
         
+        # 🔥 TAMBAHAN: Clear logout flag setelah login berhasil
+        from src.core.redis import redis_clear_role_changed
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            await redis_clear_role_changed(str(user.id))
+            logger.info(f"Logout flag cleared for user {user.id}")
+        except Exception as e:
+            logger.warning(f"Failed to clear logout flag: {e}")
+            # Jangan gagalkan login jika Redis error
+        
         # ✅ RETURN TOKEN RESPONSE
         return Token(
             access_token=access_token,
@@ -82,9 +95,19 @@ class AuthService:
         )
     
     async def refresh_token(self, refresh_token: str) -> Token:
-        """Refresh access token using refresh token."""
+        """Refresh access token dengan blacklist check."""
+        from src.core.redis import redis_is_token_blacklisted, redis_is_role_changed
+        
         try:
-            # Verify refresh token
+            # STEP 1: Check if refresh token is blacklisted
+            is_blacklisted = await redis_is_token_blacklisted(refresh_token)
+            if is_blacklisted:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Refresh token sudah tidak valid"
+                )
+            
+            # STEP 2: Verify refresh token
             payload = verify_token(refresh_token)
             
             # Check token type
@@ -101,7 +124,15 @@ class AuthService:
                     detail="Payload token tidak valid"
                 )
             
-            # Get user
+            # STEP 3: Check role changes
+            role_changed = await redis_is_role_changed(user_id)
+            if role_changed:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Sesi telah berakhir, silahkan login ulang"
+                )
+            
+            # STEP 4: Get user dan generate new tokens
             user = await self.user_repo.get_by_id(user_id)
             if not user or not user.is_active:
                 raise HTTPException(
@@ -109,15 +140,13 @@ class AuthService:
                     detail="User tidak ditemukan atau tidak aktif"
                 )
             
-            # ✅ FIXED: Use single role system
-            user_role = user.role.value  # Get from enum: "ADMIN", "INSPEKTORAT", "PERWADAG"
-            
-            # Create new access token
+            # Generate new access token dengan role terbaru dari database
+            user_role = user.role.value
             token_data = {
                 "sub": str(user.id),
                 "username": user.username,
                 "nama": user.nama,
-                "role": user_role,  # ✅ Single role instead of array
+                "role": user_role,  # Role terbaru dari DB
                 "type": "access"
             }
             
@@ -127,12 +156,11 @@ class AuthService:
                 expires_delta=access_token_expires
             )
             
-            # ✅ FIXED: Use correct method
             user_response = UserResponse.from_user_model(user)
             
             return Token(
                 access_token=access_token,
-                refresh_token=refresh_token,  # Keep the same refresh token
+                refresh_token=refresh_token,  # Keep same refresh token
                 token_type="bearer",
                 expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
                 user=user_response
@@ -290,12 +318,69 @@ class AuthService:
         
         return MessageResponse(message="Reset password berhasil")
     
-    async def logout(self) -> MessageResponse:
-        """Logout user (simple version without session management)."""
-        # In a simple JWT implementation, logout is handled client-side
-        # by discarding the token. In more advanced implementations,
-        # you might want to blacklist the token.
-        return MessageResponse(message="Logout berhasil")
+    async def logout(self, token: str) -> MessageResponse:
+        """Logout user - invalidate ALL tokens untuk user ini."""
+        import time
+        from src.core.redis import redis_blacklist_token, redis_mark_role_changed
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        try:
+            # Decode current token (bisa access atau refresh)
+            payload = verify_token(token)
+            user_id = payload.get('sub')
+            token_type = payload.get('type', 'access')
+            
+            # Calculate remaining time untuk current token
+            exp_time = payload.get('exp', 0)
+            current_time = time.time()
+            remaining_seconds = int(exp_time - current_time)
+            
+            # Blacklist current token jika masih valid
+            if remaining_seconds > 0:
+                success = await redis_blacklist_token(token, remaining_seconds)
+                if success:
+                    logger.info(f"Token ({token_type}) blacklisted for {remaining_seconds} seconds for user {user_id}")
+            
+            # 🔥 TAMBAHAN: Invalidate SEMUA tokens user (access + refresh)
+            await redis_mark_role_changed(user_id, ttl_seconds=86400)
+            logger.info(f"All tokens invalidated for user {user_id}")
+            
+            logger.info(f"User {user_id} logged out successfully")
+            return MessageResponse(message="Logout berhasil")
+            
+        except Exception as e:
+            logger.warning(f"Logout attempt: {str(e)}")
+            return MessageResponse(message="Logout berhasil")
+
+    async def force_logout_user(self, user_id: str) -> MessageResponse:
+        """Force logout user by marking role as changed (admin only)."""
+        from src.core.redis import redis_mark_role_changed
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        try:
+            # Mark user for forced re-login
+            success = await redis_mark_role_changed(user_id, ttl_seconds=86400)
+            
+            if success:
+                logger.info(f"User {user_id} forced to logout by admin")
+                return MessageResponse(message="User berhasil di-force logout")
+            else:
+                logger.error(f"Failed to force logout user {user_id}")
+                return MessageResponse(
+                    message="Gagal memproses force logout",
+                    success=False
+                )
+                
+        except Exception as e:
+            logger.error(f"Error forcing logout for user {user_id}: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Gagal memproses force logout"
+            )
     
     async def get_current_user_info(self, user_id: str) -> UserResponse:
         """Get current user information."""

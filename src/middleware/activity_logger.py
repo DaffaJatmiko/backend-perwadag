@@ -296,17 +296,40 @@ class ActivityLoggingMiddleware(BaseHTTPMiddleware):
                 str(request.url.path)
             )
             
-            # Create log data
-            log_data = LogActivityCreate(
-                user_id=current_user["id"],
-                method=request.method,
-                url=str(request.url.path),
-                activity=activity,
-                date=datetime.utcnow(),
-                user_name=current_user["nama"],
-                ip_address=ip_address,
-                response_status=response.status_code
-            )
+            # Handle login case (ketika current_user is None)
+            if not current_user and "login" in str(request.url.path):
+                logger.info(f"🔍 DEBUG: Processing login case")
+                login_info = await self._get_login_user_info(request, response)
+                logger.info(f"🔍 DEBUG: Login info result: {login_info}")
+                
+                # Hanya log jika berhasil extract user info
+                if login_info and login_info["user_id"] != 'unknown-user':
+                    logger.info(f"🔍 DEBUG: Creating log data for login")
+                    log_data = LogActivityCreate(
+                        user_id=login_info["user_id"],
+                        method=request.method,
+                        url=self._get_full_url(request),
+                        activity=activity,
+                        date=datetime.utcnow(),
+                        user_name=login_info["user_name"],
+                        ip_address=ip_address,
+                        response_status=response.status_code
+                    )
+                else:
+                    logger.warning(f"🔍 DEBUG: Skipping login log - no valid user info")
+                    return
+            else:
+                # Normal case dengan current_user yang ada
+                log_data = LogActivityCreate(
+                    user_id=current_user["id"],
+                    method=request.method,
+                    url=self._get_full_url(request),
+                    activity=activity,
+                    date=datetime.utcnow(),
+                    user_name=current_user["nama"],
+                    ip_address=ip_address,
+                    response_status=response.status_code
+                )
             
             # Save to database
             async with async_session() as session:
@@ -317,3 +340,49 @@ class ActivityLoggingMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             # NEVER break aplikasi karena logging error
             logger.error(f"Failed to log activity: {str(e)}")
+
+
+    def _get_full_url(self, request: Request) -> str:
+        """Get complete URL with domain."""
+        from src.core.config import settings
+        base_url = settings.API_BASE_URL.rstrip('/')
+        return f"{base_url}{request.url.path}"
+    
+    async def _get_login_user_info(self, request, response) -> dict:
+        """Extract user info dari login response."""
+        logger.info(f"🔍 DEBUG: Trying to extract login info from response")
+        logger.info(f"🔍 DEBUG: Response status: {response.status_code}")
+        logger.info(f"🔍 DEBUG: Request path: {request.url.path}")
+        
+        try:
+            if response.status_code == 200 and "login" in str(request.url.path):
+                # Debug response body
+                response_body = getattr(response, '_body', None)
+                logger.info(f"🔍 DEBUG: Response body exists: {response_body is not None}")
+                
+                if response_body:
+                    import json
+                    try:
+                        response_data = json.loads(response_body)
+                        logger.info(f"🔍 DEBUG: Response data keys: {list(response_data.keys())}")
+                        
+                        user_data = response_data.get('user', {})
+                        logger.info(f"🔍 DEBUG: User data: {user_data}")
+                        
+                        result = {
+                            "user_id": user_data.get('id', 'unknown-user'),
+                            "user_name": user_data.get('nama', 'Unknown User')
+                        }
+                        logger.info(f"🔍 DEBUG: Extracted user info: {result}")
+                        return result
+                    except Exception as e:
+                        logger.error(f"🔍 DEBUG: JSON parse error: {e}")
+                
+                logger.warning(f"🔍 DEBUG: No response body found")
+                return None
+            else:
+                logger.info(f"🔍 DEBUG: Login condition not met")
+                return None
+        except Exception as e:
+            logger.error(f"🔍 DEBUG: General error: {e}")
+            return None

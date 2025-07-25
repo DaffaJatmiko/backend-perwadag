@@ -8,6 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.jwt import verify_token
 from src.core.database import get_db
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class JWTBearer(HTTPBearer):
@@ -37,12 +41,19 @@ class JWTBearer(HTTPBearer):
 
 jwt_bearer = JWTBearer()
 
+async def get_token_string(token: str = Depends(jwt_bearer)) -> str:
+    """Extract token string from JWT bearer."""
+    return token
+
 
 async def get_current_user(
     token: str = Depends(jwt_bearer), 
     session: AsyncSession = Depends(get_db)
 ) -> Dict:
-    """Get the current authenticated user from JWT token - SINGLE ROLE SYSTEM."""
+    """Get the current authenticated user from JWT token with blacklist and role change detection."""
+    # Import Redis functions
+    from src.core.redis import redis_is_token_blacklisted, redis_is_role_changed
+    
     # Import here to avoid circular import
     from src.repositories.user import UserRepository
     
@@ -53,7 +64,17 @@ async def get_current_user(
     )
 
     try:
-        # Verify and decode JWT token
+        # STEP 1: Check if token is blacklisted
+        is_blacklisted = await redis_is_token_blacklisted(token)
+        if is_blacklisted:
+            logger.info("Blacklisted token used")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token sudah tidak valid",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # STEP 2: Verify and decode JWT token
         payload = verify_token(token)
         
         # Extract user ID from token
@@ -61,7 +82,17 @@ async def get_current_user(
         if not user_id:
             raise credentials_exception
 
-        # Get user from database to ensure they still exist and are active
+        # STEP 3: Check if user role has changed
+        role_changed = await redis_is_role_changed(user_id)
+        if role_changed:
+            logger.info(f"User {user_id} role changed, forcing re-login")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Role berubah, silakan login ulang",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # STEP 4: Get user from database to ensure they still exist and are active
         user_repo = UserRepository(session)
         user = await user_repo.get_by_id(user_id)
 
@@ -74,7 +105,7 @@ async def get_current_user(
                 detail="User account is deactivated"
             )
 
-        # ✅ SINGLE ROLE SYSTEM: Use current role from database
+        # STEP 5: Build user data response
         user_role = user.role.value  # Get from enum: "ADMIN", "INSPEKTORAT", "PERWADAG"
         
         user_data = {
@@ -85,8 +116,8 @@ async def get_current_user(
             "role": user_role,           # Single role string
             "roles": [user_role],        # Array with single role for compatibility
             "is_active": user.is_active,
-            # "pangkat": user.pangkat,
-            "jabatan": user.jabatan
+            "jabatan": user.jabatan,
+            "inspektorat": user.inspektorat
         }
 
         return user_data
@@ -95,10 +126,11 @@ async def get_current_user(
         raise credentials_exception
     except ValueError:
         raise credentials_exception
+    except HTTPException:
+        # Re-raise HTTP exceptions (blacklist, role change, etc.)
+        raise
     except Exception as e:
         # Add logging for debugging
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"Authentication error: {str(e)}")
         raise credentials_exception
 

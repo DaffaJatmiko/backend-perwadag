@@ -9,6 +9,7 @@ from pathlib import Path
 
 from src.core.config import settings
 from src.core.database import init_db
+from src.core.redis import init_redis
 from src.api.router import api_router
 from src.middleware.error_handler import add_error_handlers
 from src.middleware.rate_limiting import add_rate_limiting
@@ -34,10 +35,23 @@ async def lifespan(app: FastAPI):
         logger.error(f"❌ Database initialization failed: {e}")
         raise
     
+    # Initialize Redis (TAMBAHAN BARU)
+    try:
+        await init_redis()
+        if settings.REDIS_HOST:
+            logger.info("✅ Redis connected for token blacklist")
+        else:
+            logger.info("⚠️  Redis not configured - token blacklist disabled")
+    except Exception as e:
+        logger.warning(f"⚠️  Redis connection failed: {e} - token blacklist disabled")
+        # Don't fail startup if Redis unavailable
+    
     # Log configuration
     logger.info(f"📊 Configuration loaded:")
     logger.info(f"   - Environment: {'Development' if settings.DEBUG else 'Production'}")
     logger.info(f"   - Database: PostgreSQL")
+    logger.info(f"   - Redis: {'Enabled' if settings.REDIS_HOST else 'Disabled'}")  # TAMBAHAN
+    logger.info(f"   - Token Blacklist: {'Enabled' if settings.REDIS_HOST else 'Disabled'}")  # TAMBAHAN
     logger.info(f"   - Rate Limiting: {settings.RATE_LIMIT_CALLS} calls/{settings.RATE_LIMIT_PERIOD}s")
     logger.info(f"   - Auth Rate Limiting: {settings.AUTH_RATE_LIMIT_CALLS} calls/{settings.AUTH_RATE_LIMIT_PERIOD}s")
     
@@ -47,6 +61,15 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("🛑 Shutting down Government Auth API...")
+    
+    # Close Redis connection (TAMBAHAN BARU)
+    try:
+        from src.core.redis import close_redis
+        await close_redis()
+        logger.info("✅ Redis connection closed")
+    except Exception as e:
+        logger.warning(f"Warning during Redis shutdown: {e}")
+    
     logger.info("✅ Shutdown completed")
 
 
