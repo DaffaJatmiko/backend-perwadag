@@ -23,6 +23,8 @@ from src.models.surat_tugas import SuratTugas
 from src.models.user import User
 from src.models.evaluasi_enums import MeetingType
 from src.utils.evaluation_date_validator import validate_meeting_date_access
+from src.schemas.shared import FileDeleteResponse
+
 
 
 
@@ -345,10 +347,12 @@ class MeetingService:
         self, 
         meeting_id: str, 
         filename: str,
-        deleted_by: str
-    ) -> MeetingFileDeleteResponse:
-        """Delete specific file dari meeting."""
+        deleted_by: str,
+        current_user: dict = None
+    ) -> FileDeleteResponse:  # CHANGED: Use standardized response
+        """Delete specific file dari meeting - STANDARDIZED."""
         
+        # 1. Get meeting
         meeting = await self.meeting_repo.get_by_id(meeting_id)
         if not meeting:
             raise HTTPException(
@@ -356,14 +360,30 @@ class MeetingService:
                 detail="Meeting tidak ditemukan"
             )
         
+        # 2. Check files exist
         if not meeting.file_bukti_hadir:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="File tidak ditemukan"
+                detail="Tidak ada file untuk dihapus"
             )
         
+        # 3. Get surat tugas data untuk date validation
+        surat_tugas_data = await self._get_surat_tugas_basic_info(meeting.surat_tugas_id)
+        if not surat_tugas_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Surat tugas terkait tidak ditemukan"
+            )
+        
+        # 4. Date validation
+        from src.utils.evaluation_date_validator import validate_meeting_date_access
+        validate_meeting_date_access(
+            tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
+            operation="delete file"
+        )
+        
         try:
-            # Find and remove file
+            # 5. Find and remove file from array
             file_to_delete = None
             updated_files = []
             
@@ -376,32 +396,32 @@ class MeetingService:
             if not file_to_delete:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="File tidak ditemukan"
+                    detail=f"File '{filename}' tidak ditemukan"
                 )
             
-            # Delete file from storage using file manager
-            if file_to_delete.get('path'):
-                success = evaluasi_file_manager.delete_file(file_to_delete['path'])
-                if not success:
-                    # File might not exist in storage, but we'll continue to update database
-                    pass
-            
-            # Update meeting
+            # 6. Update meeting files array
             meeting.file_bukti_hadir = updated_files
             meeting.updated_by = deleted_by
             meeting.updated_at = datetime.utcnow()
             await self.meeting_repo.session.commit()
             
-            return MeetingFileDeleteResponse(
+            # 7. Delete file from storage
+            storage_deleted = False
+            if file_to_delete.get('path'):
+                storage_deleted = evaluasi_file_manager.delete_file(file_to_delete['path'])
+            
+            return FileDeleteResponse(
                 success=True,
-                message=f"File {filename} berhasil dihapus",
-                meeting_id=meeting_id,
-                deleted_file=filename,
-                remaining_files=len(updated_files)
+                message=f"File '{filename}' berhasil dihapus",
+                entity_id=meeting_id,
+                deleted_filename=filename,
+                file_type="multiple",
+                remaining_files=len(updated_files),
+                storage_deleted=storage_deleted,
+                database_updated=True
             )
             
         except HTTPException:
-            # Re-raise HTTPException
             raise
         except Exception as e:
             raise HTTPException(

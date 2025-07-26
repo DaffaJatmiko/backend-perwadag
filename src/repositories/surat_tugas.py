@@ -318,3 +318,15 @@ class SuratTugasRepository:
         surat_tugas_list = result.scalars().all()
         
         return list(surat_tugas_list)
+
+    async def clear_file_path(self, surat_tugas_id: str) -> Optional[SuratTugas]:
+        """Clear file path (set to empty string)."""
+        surat_tugas = await self.get_by_id(surat_tugas_id)
+        if not surat_tugas:
+            return None
+        
+        surat_tugas.file_surat_tugas = ""
+        surat_tugas.updated_at = datetime.utcnow()
+        await self.session.commit()
+        await self.session.refresh(surat_tugas)
+        return surat_tugas

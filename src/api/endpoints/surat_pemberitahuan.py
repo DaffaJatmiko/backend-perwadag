@@ -16,6 +16,8 @@ from src.schemas.filters import SuratPemberitahuanFilterParams
 from src.auth.evaluasi_permissions import (
     require_evaluasi_read_access, require_auto_generated_edit_access, get_evaluasi_filter_scope
 )
+from src.schemas.shared import FileDeleteResponse
+
 
 router = APIRouter()
 
@@ -134,3 +136,25 @@ async def view_surat_pemberitahuan_file(
     **Use Case**: Preview file tanpa download untuk supported file types
     """
     return await service.download_file(surat_pemberitahuan_id, download_type="view")
+    
+@router.delete("/{surat_pemberitahuan_id}/files/{filename}", response_model=FileDeleteResponse)
+async def delete_surat_pemberitahuan_file(
+    surat_pemberitahuan_id: str,
+    filename: str = Path(..., description="Filename to delete"),
+    current_user: dict = Depends(require_auto_generated_edit_access()),
+    service: SuratPemberitahuanService = Depends(get_surat_pemberitahuan_service)
+):
+    """
+    Delete surat pemberitahuan file by filename.
+    
+    **Accessible by**: Admin dan Inspektorat
+    
+    **Date Validation**: Cannot delete after evaluation period ends
+    
+    **Parameters**:
+    - surat_pemberitahuan_id: ID surat pemberitahuan
+    - filename: Nama file yang akan dihapus (harus exact match)
+    """
+    return await service.delete_file(
+        surat_pemberitahuan_id, filename, current_user["id"], current_user
+    )

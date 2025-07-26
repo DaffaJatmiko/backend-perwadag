@@ -24,6 +24,8 @@ from src.schemas.filters import SuratTugasFilterParams
 from src.schemas.common import SuccessResponse
 from src.utils.evaluasi_files import evaluasi_file_manager
 from src.models.evaluasi_enums import MeetingType
+from src.schemas.shared import FileDeleteResponse
+from src.schemas.shared import FileUrls, FileMetadata
 
 
 class SuratTugasService:
@@ -319,7 +321,77 @@ class SuratTugasService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Gagal menghapus surat tugas: {str(e)}"
             )
-    
+
+    async def delete_file(
+        self,
+        surat_tugas_id: str,
+        filename: str,
+        deleted_by: str,
+        current_user: dict = None
+    ) -> FileDeleteResponse:
+        """Delete file surat tugas by filename."""
+        
+        # 1. Get surat tugas
+        surat_tugas = await self.surat_tugas_repo.get_by_id(surat_tugas_id)
+        if not surat_tugas:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Surat tugas tidak ditemukan"
+            )
+        
+        # 2. Check file exists
+        if not surat_tugas.file_surat_tugas:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tidak ada file untuk dihapus"
+            )
+        
+        # 3. Validate filename matches
+        current_filename = evaluasi_file_manager.extract_filename_from_path(surat_tugas.file_surat_tugas)
+        if current_filename != filename:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File '{filename}' tidak ditemukan"
+            )
+        
+        try:
+            # 4. Store file path for deletion
+            file_to_delete = surat_tugas.file_surat_tugas
+            
+            # 5. Clear database field FIRST
+            updated_surat_tugas = await self.surat_tugas_repo.update_file_path(surat_tugas_id, "")
+            if not updated_surat_tugas:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Gagal memperbarui database"
+                )
+            
+            # 6. Set deleted_by
+            updated_surat_tugas.updated_by = deleted_by
+            await self.surat_tugas_repo.session.commit()
+            
+            # 7. Delete file from storage
+            storage_deleted = evaluasi_file_manager.delete_file(file_to_delete)
+            
+            return FileDeleteResponse(
+                success=True,
+                message=f"File '{filename}' berhasil dihapus",
+                entity_id=surat_tugas_id,
+                deleted_filename=filename,
+                file_type="single",
+                remaining_files=0,
+                storage_deleted=storage_deleted,
+                database_updated=True
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Gagal menghapus file: {str(e)}"
+            )
+            
     async def _get_all_file_paths_for_surat_tugas(self, surat_tugas_id: str) -> List[str]:
         """Get semua file paths terkait surat tugas untuk deletion."""
         file_paths = []
@@ -678,7 +750,7 @@ class SuratTugasService:
     # ===== HELPER METHODS =====
     
     async def _build_surat_tugas_response(self, surat_tugas) -> SuratTugasResponse:
-        """Build complete SuratTugasResponse dengan progress tracking."""
+        """Build complete SuratTugasResponse dengan progress tracking dan file metadata."""
         
         # Get progress
         progress = await self._calculate_progress(surat_tugas.id)
@@ -690,6 +762,32 @@ class SuratTugasService:
             nama=perwadag.nama,
             inspektorat=perwadag.inspektorat
         ) if perwadag else None
+        
+        # Build file information
+        file_urls = None
+        file_metadata = None
+        
+        if surat_tugas.file_surat_tugas:
+            file_urls = FileUrls(
+                file_url=evaluasi_file_manager.get_file_url(surat_tugas.file_surat_tugas),
+                download_url=f"/api/v1/surat-tugas/{surat_tugas.id}/download",
+                view_url=f"/api/v1/surat-tugas/{surat_tugas.id}/view"
+            )
+            
+            # Get file info
+            file_info = evaluasi_file_manager.get_file_info(surat_tugas.file_surat_tugas)
+            if file_info:
+                file_metadata = FileMetadata(
+                    filename=file_info['filename'],
+                    original_filename=file_info.get('original_filename'),
+                    size=file_info['size'],
+                    size_mb=round(file_info['size'] / 1024 / 1024, 2),
+                    content_type=file_info.get('content_type', 'application/octet-stream'),
+                    extension=file_info.get('extension', ''),
+                    uploaded_at=surat_tugas.updated_at or surat_tugas.created_at,
+                    uploaded_by=surat_tugas.updated_by,
+                    is_viewable=file_info.get('content_type', '').startswith(('image/', 'application/pdf'))
+                )
         
         return SuratTugasResponse(
             id=surat_tugas.id,
@@ -703,6 +801,11 @@ class SuratTugasService:
             nama_pengendali_teknis=surat_tugas.nama_pengendali_teknis,
             nama_ketua_tim=surat_tugas.nama_ketua_tim,
             file_surat_tugas=surat_tugas.file_surat_tugas,
+            
+            # TAMBAHAN BARU:
+            file_urls=file_urls,
+            file_metadata=file_metadata,
+            
             tahun_evaluasi=surat_tugas.tahun_evaluasi,
             durasi_evaluasi=surat_tugas.durasi_evaluasi,
             is_evaluation_active=surat_tugas.is_evaluation_active(),

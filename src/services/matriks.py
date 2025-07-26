@@ -22,7 +22,8 @@ from src.models.surat_tugas import SuratTugas
 from src.models.user import User
 from src.utils.evaluation_date_validator import validate_matriks_date_access
 from src.schemas.matriks import TemuanRekomendasiSummary
-
+from src.schemas.shared import FileDeleteResponse
+from src.schemas.shared import FileDeleteResponse
 
 
 class MatriksService:
@@ -246,6 +247,91 @@ class MatriksService:
             original_filename=None,  # Will use filename from path
             download_type=download_type
         )
+
+    async def delete_file(
+        self,
+        matriks_id: str,
+        filename: str,
+        deleted_by: str,
+        current_user: dict = None
+    ) -> FileDeleteResponse:
+        """Delete file matriks by filename."""
+        
+        # 1. Get matriks
+        matriks = await self.matriks_repo.get_by_id(matriks_id)
+        if not matriks:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Matriks tidak ditemukan"
+            )
+        
+        # 2. Check file exists
+        if not matriks.file_dokumen_matriks:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tidak ada file untuk dihapus"
+            )
+        
+        # 3. Get surat tugas data untuk date validation
+        surat_tugas_data = await self._get_surat_tugas_basic_info(matriks.surat_tugas_id)
+        if not surat_tugas_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Surat tugas terkait tidak ditemukan"
+            )
+        
+        # 4. Date validation
+        from src.utils.evaluation_date_validator import validate_matriks_date_access
+        validate_matriks_date_access(
+            tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
+            operation="delete file"
+        )
+        
+        # 5. Validate filename matches
+        current_filename = evaluasi_file_manager.extract_filename_from_path(matriks.file_dokumen_matriks)
+        if current_filename != filename:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File '{filename}' tidak ditemukan"
+            )
+        
+        try:
+            # 6. Store file path for deletion
+            file_to_delete = matriks.file_dokumen_matriks
+            
+            # 7. Clear database field FIRST
+            updated_matriks = await self.matriks_repo.update_file_path(matriks_id, None)
+            if not updated_matriks:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Gagal memperbarui database"
+                )
+            
+            # 8. Set deleted_by
+            updated_matriks.updated_by = deleted_by
+            await self.matriks_repo.session.commit()
+            
+            # 9. Delete file from storage
+            storage_deleted = evaluasi_file_manager.delete_file(file_to_delete)
+            
+            return FileDeleteResponse(
+                success=True,
+                message=f"File '{filename}' berhasil dihapus",
+                entity_id=matriks_id,
+                deleted_filename=filename,
+                file_type="single",
+                remaining_files=0,
+                storage_deleted=storage_deleted,
+                database_updated=True
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Gagal menghapus file: {str(e)}"
+            )
     
     async def _build_enriched_response(
         self, 

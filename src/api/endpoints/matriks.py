@@ -16,6 +16,7 @@ from src.schemas.filters import MatriksFilterParams
 from src.auth.evaluasi_permissions import (
     require_evaluasi_read_access, require_auto_generated_edit_access, get_evaluasi_filter_scope
 )
+from src.schemas.shared import FileDeleteResponse
 
 router = APIRouter()
 
@@ -156,6 +157,28 @@ async def download_matriks_file(
     **Access Control**: Role-based access dengan ownership validation
     """
     return await service.download_file(matriks_id, download_type="download")
+
+@router.delete("/{matriks_id}/files/{filename}", response_model=FileDeleteResponse)
+async def delete_matriks_file(
+    matriks_id: str,
+    filename: str = Path(..., description="Filename to delete"),
+    current_user: dict = Depends(require_auto_generated_edit_access()),
+    service: MatriksService = Depends(get_matriks_service)
+):
+    """
+    Delete matriks file by filename.
+    
+    **Accessible by**: Admin dan Inspektorat
+    
+    **Date Validation**: Cannot delete after evaluation period ends
+    
+    **Parameters**:
+    - matriks_id: ID matriks
+    - filename: Nama file yang akan dihapus (harus exact match)
+    """
+    return await service.delete_file(
+        matriks_id, filename, current_user["id"], current_user
+    )
 
 
 @router.get("/{matriks_id}/view", response_class=FileResponse)

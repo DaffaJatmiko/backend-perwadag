@@ -1,7 +1,7 @@
 # ===== src/api/endpoints/format_kuisioner.py =====
 """API endpoints untuk format kuisioner master templates."""
 
-from fastapi import APIRouter, Depends, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, UploadFile, File, Form, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
@@ -16,6 +16,7 @@ from src.schemas.common import SuccessResponse
 from src.auth.evaluasi_permissions import (
     require_evaluasi_read_access, require_format_kuisioner_access
 )
+from src.schemas.shared import FileDeleteResponse
 
 
 router = APIRouter()
@@ -184,3 +185,23 @@ async def get_format_kuisioner_statistics(
         "templates_without_files": total_templates - templates_with_files,
         "completion_rate": round((templates_with_files / max(total_templates, 1)) * 100, 2)
     }
+
+@router.delete("/{format_kuisioner_id}/files/{filename}", response_model=FileDeleteResponse)
+async def delete_format_kuisioner_file(
+    format_kuisioner_id: str,
+    filename: str = Path(..., description="Filename to delete"),
+    current_user: dict = Depends(require_format_kuisioner_access()),
+    service: FormatKuisionerService = Depends(get_format_kuisioner_service)
+):
+    """
+    Delete format kuisioner file by filename.
+    
+    **Accessible by**: Admin only
+    
+    **Parameters**:
+    - format_kuisioner_id: ID format kuisioner
+    - filename: Nama file yang akan dihapus (harus exact match)
+    """
+    return await service.delete_file_by_filename(
+        format_kuisioner_id, filename, current_user["id"], current_user
+    )

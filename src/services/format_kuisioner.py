@@ -14,6 +14,8 @@ from src.schemas.filters import FormatKuisionerFilterParams
 from src.schemas.common import SuccessResponse
 from src.schemas.shared import PaginationInfo, ModuleStatistics, FileUrls, FileMetadata
 from src.utils.evaluasi_files import evaluasi_file_manager
+from src.schemas.shared import FileDeleteResponse
+
 
 
 class FormatKuisionerService:
@@ -205,6 +207,76 @@ class FormatKuisionerService:
             message=f"Format kuisioner '{format_kuisioner.nama_template}' berhasil dihapus",
             data={"deleted_id": format_kuisioner_id}
         )
+
+    async def delete_file_by_filename(
+        self,
+        format_kuisioner_id: str,
+        filename: str,
+        deleted_by: str,
+        current_user: dict = None
+    ) -> FileDeleteResponse:
+        """Delete file format kuisioner by filename."""
+        
+        # 1. Get format kuisioner
+        format_kuisioner = await self.format_kuisioner_repo.get_by_id(format_kuisioner_id)
+        if not format_kuisioner:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Format kuisioner tidak ditemukan"
+            )
+        
+        # 2. Check file exists
+        if not format_kuisioner.link_template:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tidak ada file untuk dihapus"
+            )
+        
+        # 3. Validate filename matches
+        current_filename = evaluasi_file_manager.extract_filename_from_path(format_kuisioner.link_template)
+        if current_filename != filename:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File '{filename}' tidak ditemukan"
+            )
+        
+        try:
+            # 4. Store file path for deletion
+            file_to_delete = format_kuisioner.link_template
+            
+            # 5. Clear database field FIRST
+            updated_format_kuisioner = await self.format_kuisioner_repo.update_file_path(format_kuisioner_id, "")
+            if not updated_format_kuisioner:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Gagal memperbarui database"
+                )
+            
+            # 6. Set deleted_by
+            updated_format_kuisioner.updated_by = deleted_by
+            await self.format_kuisioner_repo.session.commit()
+            
+            # 7. Delete file from storage
+            storage_deleted = evaluasi_file_manager.delete_file(file_to_delete)
+            
+            return FileDeleteResponse(
+                success=True,
+                message=f"File '{filename}' berhasil dihapus",
+                entity_id=format_kuisioner_id,
+                deleted_filename=filename,
+                file_type="single",
+                remaining_files=0,
+                storage_deleted=storage_deleted,
+                database_updated=True
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Gagal menghapus file: {str(e)}"
+            )
     
     def _build_response(self, format_kuisioner) -> FormatKuisionerResponse:
         """Build response from model - ENHANCED."""

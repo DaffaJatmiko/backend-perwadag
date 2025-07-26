@@ -314,3 +314,15 @@ class MatriksRepository:
         result = await self.session.execute(query)
         await self.session.commit()
         return result.rowcount
+
+    async def clear_file_path(self, matriks_id: str) -> Optional[Matriks]:
+        """Clear file path (set to None)."""
+        matriks = await self.get_by_id(matriks_id)
+        if not matriks:
+            return None
+        
+        matriks.file_dokumen_matriks = None
+        matriks.updated_at = datetime.utcnow()
+        await self.session.commit()
+        await self.session.refresh(matriks)
+        return matriks

@@ -305,3 +305,15 @@ class LaporanHasilRepository:
         laporan_hasil.updated_at = datetime.utcnow()
         # JANGAN COMMIT - biarkan transaction context yang handle
         return True
+
+    async def clear_file_path(self, laporan_hasil_id: str) -> Optional[LaporanHasil]:
+        """Clear file path (set to None)."""
+        laporan_hasil = await self.get_by_id(laporan_hasil_id)
+        if not laporan_hasil:
+            return None
+        
+        laporan_hasil.file_laporan_hasil = None
+        laporan_hasil.updated_at = datetime.utcnow()
+        await self.session.commit()
+        await self.session.refresh(laporan_hasil)
+        return laporan_hasil

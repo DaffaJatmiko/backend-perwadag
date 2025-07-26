@@ -21,6 +21,8 @@ from src.schemas.shared import (
 )
 from src.schemas.filters import SuratPemberitahuanFilterParams
 from src.utils.evaluation_date_validator import validate_surat_pemberitahuan_date_access
+from src.schemas.shared import FileDeleteResponse
+
 
 
 class SuratPemberitahuanService:
@@ -197,7 +199,92 @@ class SuratPemberitahuanService:
             file_url=evaluasi_file_manager.get_file_url(file_path),
             data={"file_path": file_path}
         )
-    
+
+    async def delete_file(
+        self,
+        surat_pemberitahuan_id: str,
+        filename: str,
+        deleted_by: str,
+        current_user: dict = None
+    ) -> FileDeleteResponse:
+        """Delete file surat pemberitahuan by filename."""
+        
+        # 1. Get surat pemberitahuan
+        surat_pemberitahuan = await self.surat_pemberitahuan_repo.get_by_id(surat_pemberitahuan_id)
+        if not surat_pemberitahuan:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Surat pemberitahuan tidak ditemukan"
+            )
+        
+        # 2. Check file exists
+        if not surat_pemberitahuan.file_dokumen:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tidak ada file untuk dihapus"
+            )
+        
+        # 3. Get surat tugas data untuk date validation
+        surat_tugas_data = await self._get_surat_tugas_basic_info(surat_pemberitahuan.surat_tugas_id)
+        if not surat_tugas_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Surat tugas terkait tidak ditemukan"
+            )
+        
+        # 4. Date validation
+        from src.utils.evaluation_date_validator import validate_surat_pemberitahuan_date_access
+        validate_surat_pemberitahuan_date_access(
+            tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
+            operation="delete file"
+        )
+        
+        # 5. Validate filename matches
+        current_filename = evaluasi_file_manager.extract_filename_from_path(surat_pemberitahuan.file_dokumen)
+        if current_filename != filename:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File '{filename}' tidak ditemukan"
+            )
+        
+        try:
+            # 6. Store file path for deletion
+            file_to_delete = surat_pemberitahuan.file_dokumen
+            
+            # 7. Clear database field FIRST
+            updated_surat_pemberitahuan = await self.surat_pemberitahuan_repo.update_file_path(surat_pemberitahuan_id, None)
+            if not updated_surat_pemberitahuan:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Gagal memperbarui database"
+                )
+            
+            # 8. Set deleted_by
+            updated_surat_pemberitahuan.updated_by = deleted_by
+            await self.surat_pemberitahuan_repo.session.commit()
+            
+            # 9. Delete file from storage
+            storage_deleted = evaluasi_file_manager.delete_file(file_to_delete)
+            
+            return FileDeleteResponse(
+                success=True,
+                message=f"File '{filename}' berhasil dihapus",
+                entity_id=surat_pemberitahuan_id,
+                deleted_filename=filename,
+                file_type="single",
+                remaining_files=0,
+                storage_deleted=storage_deleted,
+                database_updated=True
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Gagal menghapus file: {str(e)}"
+            )
+        
     def _build_response(self, surat_pemberitahuan) -> SuratPemberitahuanResponse:
         """Build response from model."""
         return SuratPemberitahuanResponse(

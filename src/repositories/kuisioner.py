@@ -304,3 +304,15 @@ class KuisionerRepository:
         kuisioner.updated_at = datetime.utcnow()
         # JANGAN COMMIT - biarkan transaction context yang handle
         return True
+
+    async def clear_file_path(self, kuisioner_id: str) -> Optional[Kuisioner]:
+        """Clear file path (set to None)."""
+        kuisioner = await self.get_by_id(kuisioner_id)
+        if not kuisioner:
+            return None
+        
+        kuisioner.file_kuisioner = None
+        kuisioner.updated_at = datetime.utcnow()
+        await self.session.commit()
+        await self.session.refresh(kuisioner)
+        return kuisioner

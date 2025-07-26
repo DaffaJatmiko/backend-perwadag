@@ -20,6 +20,7 @@ from src.schemas.filters import KuisionerFilterParams
 from src.models.surat_tugas import SuratTugas
 from src.models.user import User
 from src.utils.evaluation_date_validator import validate_kuisioner_date_access
+from src.schemas.shared import FileDeleteResponse
 
 
 class KuisionerService:
@@ -237,6 +238,102 @@ class KuisionerService:
             original_filename=None,  # Will use filename from path
             download_type=download_type
         )
+
+    async def delete_file_by_filename(
+        self,
+        kuisioner_id: str,
+        filename: str,
+        deleted_by: str,
+        current_user: dict = None
+    ) -> FileDeleteResponse:
+        """Delete file kuisioner by filename."""
+        
+        # 1. Get kuisioner
+        kuisioner = await self.kuisioner_repo.get_by_id(kuisioner_id)
+        if not kuisioner:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Kuisioner tidak ditemukan"
+            )
+        
+        # 2. Check file exists
+        if not kuisioner.file_kuisioner:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tidak ada file untuk dihapus"
+            )
+        
+        # 3. Get surat tugas data untuk date validation
+        surat_tugas_data = await self._get_surat_tugas_basic_info(kuisioner.surat_tugas_id)
+        if not surat_tugas_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Surat tugas terkait tidak ditemukan"
+            )
+        
+        # 4. Date validation
+        from src.utils.evaluation_date_validator import validate_kuisioner_date_access
+        validate_kuisioner_date_access(
+            tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
+            operation="delete file"
+        )
+        
+        # 5. Permission check untuk PERWADAG
+        if current_user and current_user.get("role") == "PERWADAG":
+            user_nama = current_user.get("nama")
+            surat_tugas_nama_perwadag = surat_tugas_data.get("nama_perwadag")
+            
+            if user_nama != surat_tugas_nama_perwadag:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Akses ditolak: Anda hanya dapat menghapus file kuisioner milik sendiri"
+                )
+        
+        # 6. Validate filename matches
+        current_filename = evaluasi_file_manager.extract_filename_from_path(kuisioner.file_kuisioner)
+        if current_filename != filename:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File '{filename}' tidak ditemukan"
+            )
+        
+        try:
+            # 7. Store file path for deletion
+            file_to_delete = kuisioner.file_kuisioner
+            
+            # 8. Clear database field FIRST
+            updated_kuisioner = await self.kuisioner_repo.update_file_path(kuisioner_id, None)
+            if not updated_kuisioner:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Gagal memperbarui database"
+                )
+            
+            # 9. Set deleted_by
+            updated_kuisioner.updated_by = deleted_by
+            await self.kuisioner_repo.session.commit()
+            
+            # 10. Delete file from storage
+            storage_deleted = evaluasi_file_manager.delete_file(file_to_delete)
+            
+            return FileDeleteResponse(
+                success=True,
+                message=f"File '{filename}' berhasil dihapus",
+                entity_id=kuisioner_id,
+                deleted_filename=filename,
+                file_type="single",
+                remaining_files=0,
+                storage_deleted=storage_deleted,
+                database_updated=True
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Gagal menghapus file: {str(e)}"
+            )
     
 
     async def _get_surat_tugas_basic_info(self, surat_tugas_id: str) -> Optional[Dict[str, Any]]:

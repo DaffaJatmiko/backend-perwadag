@@ -166,3 +166,15 @@ class FormatKuisionerRepository:
         
         result = await self.session.execute(query)
         return result.scalar_one_or_none() is not None
+
+    async def clear_file_path(self, format_kuisioner_id: str) -> Optional[FormatKuisioner]:
+        """Clear file path (set to empty string)."""
+        format_kuisioner = await self.get_by_id(format_kuisioner_id)
+        if not format_kuisioner:
+            return None
+        
+        format_kuisioner.link_template = ""
+        format_kuisioner.updated_at = datetime.utcnow()
+        await self.session.commit()
+        await self.session.refresh(format_kuisioner)
+        return format_kuisioner

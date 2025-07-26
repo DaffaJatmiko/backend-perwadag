@@ -6,6 +6,7 @@ from datetime import datetime, date
 
 from src.schemas.common import SuccessResponse
 from src.schemas.shared import BaseListResponse
+from src.schemas.shared import FileUrls, FileMetadata
 
 
 # ===== REQUEST SCHEMAS =====
@@ -162,6 +163,9 @@ class SuratTugasResponse(BaseModel):
     nama_pengendali_teknis: str
     nama_ketua_tim: str
     file_surat_tugas: str
+
+    file_urls: Optional[FileUrls] = None
+    file_metadata: Optional[FileMetadata] = None
     
     # Computed fields
     tahun_evaluasi: Optional[int] = None

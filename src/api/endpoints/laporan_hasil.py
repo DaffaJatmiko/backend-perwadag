@@ -16,6 +16,8 @@ from src.schemas.filters import LaporanHasilFilterParams
 from src.auth.evaluasi_permissions import (
     require_evaluasi_read_access, require_auto_generated_edit_access, get_evaluasi_filter_scope
 )
+from src.schemas.shared import FileDeleteResponse
+
 
 router = APIRouter()
 
@@ -110,6 +112,27 @@ async def download_laporan_hasil_file(
     """Download laporan hasil file."""
     return await service.download_file(laporan_hasil_id, download_type="download")
 
+@router.delete("/{laporan_hasil_id}/files/{filename}", response_model=FileDeleteResponse)
+async def delete_laporan_hasil_file(
+    laporan_hasil_id: str,
+    filename: str = Path(..., description="Filename to delete"),
+    current_user: dict = Depends(require_evaluasi_read_access()),
+    service: LaporanHasilService = Depends(get_laporan_hasil_service)
+):
+    """
+    Delete laporan hasil file by filename.
+    
+    **Accessible by**: Admin, Inspektorat, dan Perwadag (own data only)
+    
+    **Date Validation**: Cannot delete after evaluation period ends
+    
+    **Parameters**:
+    - laporan_hasil_id: ID laporan hasil
+    - filename: Nama file yang akan dihapus (harus exact match)
+    """
+    return await service.delete_file_by_filename(
+        laporan_hasil_id, filename, current_user["id"], current_user
+    )
 
 @router.get("/{laporan_hasil_id}/view", response_class=FileResponse)
 async def view_laporan_hasil_file(

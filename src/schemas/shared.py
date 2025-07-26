@@ -298,3 +298,16 @@ class CrossModuleSearchResponse(BaseModel):
     search_time_ms: float
     
     model_config = ConfigDict(from_attributes=True)
+
+class FileDeleteResponse(BaseModel):
+    """Standard response untuk delete file - SEMUA entity."""
+    success: bool
+    message: str
+    entity_id: str
+    deleted_filename: str
+    file_type: str = Field(description="single atau multiple")
+    remaining_files: int = Field(default=0, description="0 untuk single file, N untuk multiple files")
+    storage_deleted: bool = Field(default=False, description="Whether file was deleted from storage")
+    database_updated: bool = Field(default=False, description="Whether database was updated")
+    
+    model_config = ConfigDict(from_attributes=True)

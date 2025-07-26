@@ -26,6 +26,7 @@ from src.auth.evaluasi_permissions import (
     require_statistics_access, get_evaluasi_filter_scope
 )
 from datetime import datetime, date
+from src.schemas.shared import FileDeleteResponse
 
 router = APIRouter()
 
@@ -249,6 +250,8 @@ async def delete_surat_tugas(
     )
 
 
+
+
 # ===== STATISTICS & REPORTS =====
 
 # @router.get("/statistics/overview", response_model=SuratTugasStats)
@@ -465,3 +468,25 @@ async def download_surat_tugas_file(
     **Access Control**: Role-based access dengan ownership validation
     """
     return await surat_tugas_service.download_file(surat_tugas_id, download_type="download")
+
+@router.delete("/{surat_tugas_id}/files/{filename}", response_model=FileDeleteResponse)
+async def delete_surat_tugas_file(
+    surat_tugas_id: str,
+    filename: str = Path(..., description="Filename to delete"),
+    current_user: dict = Depends(require_evaluasi_write_access()),
+    surat_tugas_service: SuratTugasService = Depends(get_surat_tugas_service)
+):
+    """
+    Delete surat tugas file by filename.
+    
+    **Accessible by**: Admin dan Inspektorat
+    
+    **Parameters**:
+    - surat_tugas_id: ID surat tugas
+    - filename: Nama file yang akan dihapus (harus exact match)
+    
+    **Returns**: Confirmation dengan file deletion status
+    """
+    return await surat_tugas_service.delete_file(
+        surat_tugas_id, filename, current_user["id"], current_user
+    )

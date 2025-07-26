@@ -18,6 +18,7 @@ from src.models.evaluasi_enums import MeetingType
 from src.auth.evaluasi_permissions import (
     require_evaluasi_read_access, require_auto_generated_edit_access, get_evaluasi_filter_scope
 )
+from src.schemas.shared import FileDeleteResponse
 
 router = APIRouter()
 
@@ -111,7 +112,7 @@ async def upload_meeting_files(
     return await service.upload_files(meeting_id, files, current_user["id"], replace_existing)
 
 
-@router.delete("/{meeting_id}/files/{filename}", response_model=MeetingFileDeleteResponse)
+@router.delete("/{meeting_id}/files/{filename}", response_model=FileDeleteResponse)
 async def delete_meeting_file(
     meeting_id: str,
     filename: str = Path(..., description="Filename to delete"),
@@ -119,7 +120,7 @@ async def delete_meeting_file(
     service: MeetingService = Depends(get_meeting_service)
 ):
     """Delete specific file dari meeting."""
-    return await service.delete_file(meeting_id, filename, current_user["id"])
+    return await service.delete_file(meeting_id, filename, current_user["id"], current_user)
 
 
 @router.get("/{meeting_id}/files/{filename}/download", response_class=FileResponse)

@@ -125,6 +125,15 @@ class PenilaianRisikoService:
                 penilaian_data.kriteria_data
             )
             penilaian_data.kriteria_data = processed_kriteria
+
+        # ✅ TAMBAHAN: Check if calculation complete dan reset total score jika tidak
+        is_complete, missing_criteria = self.calculator.is_calculation_complete(
+            penilaian_data.kriteria_data or updated_penilaian.kriteria_data
+        )
+        
+        if not is_complete:
+            # ✅ RESET total score jika ada kriteria yang null
+            await self.penilaian_repo.reset_calculation_result(penilaian_id)
         
         # ✅ 6. Create clean data tanpa auto_calculate untuk repository
         clean_data = PenilaianRisikoUpdate(

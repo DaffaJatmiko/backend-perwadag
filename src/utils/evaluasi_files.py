@@ -127,6 +127,18 @@ class EvaluasiFileManager:
         safe_name = os.path.basename(original_filename)
         safe_name = "".join(c for c in safe_name if c.isalnum() or c in '._-')
         return safe_name or "download"
+
+    def extract_filename_from_path(self, file_path: str) -> str:
+        """Extract filename dari full path."""
+        if not file_path:
+            return ""
+        return os.path.basename(file_path)
+
+    def get_filename_for_single_file_entity(self, file_path: str) -> Optional[str]:
+        """Get filename untuk single file entity."""
+        if not file_path:
+            return None
+        return self.extract_filename_from_path(file_path)
     
     def get_file_download_response(
         self, 

@@ -1,19 +1,19 @@
 # ===== src/utils/penilaian_calculator.py =====
-"""Calculator untuk business logic penilaian risiko."""
+"""Calculator untuk business logic penilaian risiko - FIXED VERSION."""
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional, Tuple
 from decimal import Decimal
 
 
 class PenilaianRisikoCalculator:
-    """Calculator untuk kalkulasi penilaian risiko."""
+    """Calculator untuk kalkulasi penilaian risiko dengan proper null handling."""
     
     def process_criteria_input(self, kriteria_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process dan kalkulasi otomatis untuk setiap kriteria."""
+        """Process dan kalkulasi otomatis untuk setiap kriteria dengan EXPLICIT RESET."""
         
         processed_data = kriteria_data.copy()
         
-        # Process setiap kriteria
+        # Process setiap kriteria dengan explicit reset
         if "tren_capaian" in processed_data:
             processed_data["tren_capaian"] = self._process_tren_capaian(
                 processed_data["tren_capaian"]
@@ -56,22 +56,36 @@ class PenilaianRisikoCalculator:
         
         return processed_data
     
-    def calculate_total_score(self, kriteria_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Kalkulasi total nilai risiko dan profil risiko."""
+    def calculate_total_score(self, kriteria_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Kalkulasi total nilai risiko dan profil risiko.
+        
+        Returns:
+            Dict jika semua kriteria lengkap, None jika ada yang kosong
+        """
         
         # Extract nilai dari setiap kriteria
-        nilai_scores = []
-        for criteria_name in [
+        criteria_names = [
             "tren_capaian", "realisasi_anggaran", "tren_ekspor", "audit_itjen",
             "perjanjian_perdagangan", "peringkat_ekspor", "persentase_ik", "realisasi_tei"
-        ]:
+        ]
+        
+        nilai_scores = []
+        missing_criteria = []
+        
+        for criteria_name in criteria_names:
             if criteria_name in kriteria_data:
                 nilai = kriteria_data[criteria_name].get("nilai")
                 if nilai is not None:
                     nilai_scores.append(nilai)
+                else:
+                    missing_criteria.append(criteria_name)
+            else:
+                missing_criteria.append(criteria_name)
         
+        # ✅ PERBAIKAN: Return None jika ada kriteria yang kosong
         if len(nilai_scores) != 8:
-            raise ValueError("Semua 8 kriteria harus memiliki nilai untuk kalkulasi")
+            return None  # Tidak bisa kalkulasi, return None bukan raise error
         
         # Kalkulasi berdasarkan business rules
         weights = [15, 10, 15, 25, 5, 10, 10, 10]  # Bobot untuk masing-masing kriteria
@@ -101,11 +115,48 @@ class PenilaianRisikoCalculator:
             "weighted_scores": [nilai * weight for nilai, weight in zip(nilai_scores, weights)]
         }
     
-    # ===== INDIVIDUAL CRITERIA PROCESSORS =====
+    def is_calculation_complete(self, kriteria_data: Dict[str, Any]) -> Tuple[bool, list]:
+        """
+        Check apakah semua kriteria lengkap untuk kalkulasi.
+        
+        Returns:
+            Tuple(is_complete: bool, missing_criteria: list)
+        """
+        criteria_names = [
+            "tren_capaian", "realisasi_anggaran", "tren_ekspor", "audit_itjen",
+            "perjanjian_perdagangan", "peringkat_ekspor", "persentase_ik", "realisasi_tei"
+        ]
+        
+        missing_criteria = []
+        
+        for criteria_name in criteria_names:
+            if criteria_name not in kriteria_data:
+                missing_criteria.append(criteria_name)
+                continue
+                
+            criteria_data_item = kriteria_data[criteria_name]
+            nilai = criteria_data_item.get("nilai")
+            
+            if nilai is None:
+                missing_criteria.append(criteria_name)
+        
+        is_complete = len(missing_criteria) == 0
+        return is_complete, missing_criteria
+    
+    # ===== INDIVIDUAL CRITERIA PROCESSORS WITH EXPLICIT RESET =====
     
     def _process_tren_capaian(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process kriteria tren capaian."""
-        if data.get("capaian_tahun_1") is not None and data.get("capaian_tahun_2") is not None:
+        """Process kriteria tren capaian dengan EXPLICIT RESET."""
+        
+        # ✅ ALWAYS RESET calculated fields FIRST
+        data["tren"] = None
+        data["pilihan"] = None
+        data["nilai"] = None
+        
+        # Then calculate IF conditions are met
+        if (data.get("capaian_tahun_1") is not None and 
+            data.get("capaian_tahun_2") is not None):
+            
             capaian_1 = float(data["capaian_tahun_1"])
             capaian_2 = float(data["capaian_tahun_2"])
             
@@ -133,8 +184,16 @@ class PenilaianRisikoCalculator:
         return data
     
     def _process_realisasi_anggaran(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process kriteria realisasi anggaran."""
-        if data.get("realisasi") is not None and data.get("pagu") is not None:
+        """Process kriteria realisasi anggaran dengan EXPLICIT RESET."""
+        
+        # ✅ ALWAYS RESET calculated fields FIRST
+        data["persentase"] = None
+        data["pilihan"] = None
+        data["nilai"] = None
+        
+        if (data.get("realisasi") is not None and 
+            data.get("pagu") is not None):
+            
             realisasi = float(data["realisasi"])
             pagu = float(data["pagu"])
             
@@ -162,7 +221,12 @@ class PenilaianRisikoCalculator:
         return data
     
     def _process_tren_ekspor(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process kriteria tren ekspor."""
+        """Process kriteria tren ekspor dengan EXPLICIT RESET."""
+        
+        # ✅ ALWAYS RESET calculated fields FIRST
+        data["pilihan"] = None
+        data["nilai"] = None
+        
         if data.get("deskripsi") is not None:
             deskripsi = float(data["deskripsi"])
             
@@ -186,7 +250,11 @@ class PenilaianRisikoCalculator:
         return data
     
     def _process_audit_itjen(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process kriteria audit itjen."""
+        """Process kriteria audit itjen dengan EXPLICIT RESET."""
+        
+        # ✅ ALWAYS RESET calculated fields FIRST
+        data["nilai"] = None
+        
         if data.get("pilihan") is not None:
             pilihan = data["pilihan"]
             
@@ -204,7 +272,11 @@ class PenilaianRisikoCalculator:
         return data
     
     def _process_perjanjian_perdagangan(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process kriteria perjanjian perdagangan."""
+        """Process kriteria perjanjian perdagangan dengan EXPLICIT RESET."""
+        
+        # ✅ ALWAYS RESET calculated fields FIRST
+        data["nilai"] = None
+        
         if data.get("pilihan") is not None:
             pilihan = data["pilihan"]
             
@@ -222,7 +294,12 @@ class PenilaianRisikoCalculator:
         return data
     
     def _process_peringkat_ekspor(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process kriteria peringkat ekspor."""
+        """Process kriteria peringkat ekspor dengan EXPLICIT RESET."""
+        
+        # ✅ ALWAYS RESET calculated fields FIRST
+        data["pilihan"] = None
+        data["nilai"] = None
+        
         if data.get("deskripsi") is not None:
             deskripsi = int(data["deskripsi"])
             
@@ -246,8 +323,16 @@ class PenilaianRisikoCalculator:
         return data
     
     def _process_persentase_ik(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process kriteria persentase IK."""
-        if data.get("ik_tidak_tercapai") is not None and data.get("total_ik") is not None:
+        """Process kriteria persentase IK dengan EXPLICIT RESET."""
+        
+        # ✅ ALWAYS RESET calculated fields FIRST
+        data["persentase"] = None
+        data["pilihan"] = None
+        data["nilai"] = None
+        
+        if (data.get("ik_tidak_tercapai") is not None and 
+            data.get("total_ik") is not None):
+            
             ik_tidak_tercapai = int(data["ik_tidak_tercapai"])
             total_ik = int(data["total_ik"])
             
@@ -275,8 +360,16 @@ class PenilaianRisikoCalculator:
         return data
     
     def _process_realisasi_tei(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process kriteria realisasi TEI."""
-        if data.get("nilai_realisasi") is not None and data.get("nilai_potensi") is not None:
+        """Process kriteria realisasi TEI dengan EXPLICIT RESET."""
+        
+        # ✅ ALWAYS RESET calculated fields FIRST
+        data["deskripsi"] = None
+        data["pilihan"] = None
+        data["nilai"] = None
+        
+        if (data.get("nilai_realisasi") is not None and 
+            data.get("nilai_potensi") is not None):
+            
             nilai_realisasi = float(data["nilai_realisasi"])
             nilai_potensi = float(data["nilai_potensi"])
             

@@ -16,6 +16,8 @@ from src.schemas.filters import KuisionerFilterParams
 from src.auth.evaluasi_permissions import (
     require_evaluasi_read_access, require_auto_generated_edit_access, get_evaluasi_filter_scope
 )
+from src.schemas.shared import FileDeleteResponse
+
 
 router = APIRouter()
 
@@ -119,3 +121,25 @@ async def view_kuisioner_file(
 ):
     """View/preview kuisioner file in browser."""
     return await service.download_file(kuisioner_id, download_type="view")
+
+@router.delete("/{kuisioner_id}/files/{filename}", response_model=FileDeleteResponse)
+async def delete_kuisioner_file(
+    kuisioner_id: str,
+    filename: str = Path(..., description="Filename to delete"),
+    current_user: dict = Depends(require_evaluasi_read_access()),
+    service: KuisionerService = Depends(get_kuisioner_service)
+):
+    """
+    Delete kuisioner file by filename.
+    
+    **Accessible by**: Admin, Inspektorat, dan Perwadag (own data only)
+    
+    **Date Validation**: Cannot delete after evaluation period ends
+    
+    **Parameters**:
+    - kuisioner_id: ID kuisioner
+    - filename: Nama file yang akan dihapus (harus exact match)
+    """
+    return await service.delete_file_by_filename(
+        kuisioner_id, filename, current_user["id"], current_user
+    )

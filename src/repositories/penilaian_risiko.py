@@ -454,3 +454,19 @@ class PenilaianRisikoRepository:
             "avg_total_nilai_risiko": float(avg_row[0]) if avg_row[0] else None,
             "avg_skor_rata_rata": float(avg_row[1]) if avg_row[1] else None
         }
+
+    async def reset_calculation_result(self, penilaian_id: str) -> Optional[PenilaianRisiko]:
+        """Reset hasil kalkulasi ke null ketika ada kriteria yang incomplete."""
+        penilaian = await self.get_by_id(penilaian_id)
+        if not penilaian:
+            return None
+        
+        # ✅ RESET semua calculated fields ke null
+        penilaian.total_nilai_risiko = None
+        penilaian.skor_rata_rata = None
+        penilaian.profil_risiko_auditan = None
+        penilaian.updated_at = datetime.utcnow()
+        
+        await self.session.commit()
+        await self.session.refresh(penilaian)
+        return penilaian

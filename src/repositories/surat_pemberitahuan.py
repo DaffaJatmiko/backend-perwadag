@@ -365,3 +365,15 @@ class SuratPemberitahuanRepository:
             "completion_rate": round(completion_rate, 2),
             "last_updated": datetime.utcnow()
         }
+
+    async def clear_file_path(self, surat_pemberitahuan_id: str) -> Optional[SuratPemberitahuan]:
+        """Clear file path (set to None)."""
+        surat_pemberitahuan = await self.get_by_id(surat_pemberitahuan_id)
+        if not surat_pemberitahuan:
+            return None
+        
+        surat_pemberitahuan.file_dokumen = None
+        surat_pemberitahuan.updated_at = datetime.utcnow()
+        await self.session.commit()
+        await self.session.refresh(surat_pemberitahuan)
+        return surat_pemberitahuan
