@@ -503,6 +503,178 @@ class SuratTugasService:
         
         return SuratTugasStats(**stats_data)
     
+    async def get_dashboard_summary_with_completion_stats(
+        self,
+        user_role: str,
+        user_inspektorat: Optional[str] = None,
+        user_id: Optional[str] = None,
+        year: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Get dashboard summary dengan completion statistics per relationship.
+        
+        ROMBAK TOTAL: Menggunakan repository method baru dan menghitung
+        completion stats dari related records secara langsung.
+        """
+        
+        # Get surat tugas data dari repository dengan year filter
+        surat_tugas_list = await self.surat_tugas_repo.get_dashboard_completion_data(
+            user_role, user_inspektorat, user_id, year
+        )
+
+
+        # Initialize completion counters
+        completion_stats = {
+            "surat_pemberitahuan": {"completed": 0, "total": 0},
+            "entry_meeting": {"completed": 0, "total": 0},
+            "konfirmasi_meeting": {"completed": 0, "total": 0},
+            "exit_meeting": {"completed": 0, "total": 0},
+            "matriks": {"completed": 0, "total": 0},
+            "laporan_hasil": {"completed": 0, "total": 0},
+            "kuisioner": {"completed": 0, "total": 0}
+        }
+        
+        overall_progress_sum = 0
+        total_evaluasi = len(surat_tugas_list)
+        recent_surat_tugas_data = []
+      
+        # Process each surat tugas untuk completion statistics
+        for i, surat_tugas in enumerate(surat_tugas_list):
+            
+            # Get related records untuk setiap surat tugas
+            surat_pemberitahuan = await self.surat_pemberitahuan_repo.get_by_surat_tugas_id(surat_tugas.id)
+            meetings = await self.meeting_repo.get_all_by_surat_tugas_id(surat_tugas.id)
+            matriks = await self.matriks_repo.get_by_surat_tugas_id(surat_tugas.id)
+            laporan_hasil = await self.laporan_hasil_repo.get_by_surat_tugas_id(surat_tugas.id)
+            kuisioner = await self.kuisioner_repo.get_by_surat_tugas_id(surat_tugas.id)
+            
+            # Check completion status per relationship
+            surat_pemberitahuan_completed = surat_pemberitahuan.is_completed() if surat_pemberitahuan else False
+            
+            # Check meetings completion by type
+            entry_meeting_completed = False
+            konfirmasi_meeting_completed = False
+            exit_meeting_completed = False
+            
+            for meeting in meetings:
+                if meeting.meeting_type == MeetingType.ENTRY:
+                    entry_meeting_completed = meeting.is_completed()
+                elif meeting.meeting_type == MeetingType.KONFIRMASI:
+                    konfirmasi_meeting_completed = meeting.is_completed()
+                elif meeting.meeting_type == MeetingType.EXIT:
+                    exit_meeting_completed = meeting.is_completed()
+            
+            matriks_completed = matriks.is_completed() if matriks else False
+            laporan_completed = laporan_hasil.is_completed() if laporan_hasil else False
+            kuisioner_completed = kuisioner.is_completed() if kuisioner else False
+
+            
+            # Count completions per relationship
+            if surat_pemberitahuan_completed:
+                completion_stats["surat_pemberitahuan"]["completed"] += 1
+            completion_stats["surat_pemberitahuan"]["total"] += 1
+            
+            if entry_meeting_completed:
+                completion_stats["entry_meeting"]["completed"] += 1
+            completion_stats["entry_meeting"]["total"] += 1
+            
+            if konfirmasi_meeting_completed:
+                completion_stats["konfirmasi_meeting"]["completed"] += 1
+            completion_stats["konfirmasi_meeting"]["total"] += 1
+            
+            if exit_meeting_completed:
+                completion_stats["exit_meeting"]["completed"] += 1
+            completion_stats["exit_meeting"]["total"] += 1
+            
+            if matriks_completed:
+                completion_stats["matriks"]["completed"] += 1
+            completion_stats["matriks"]["total"] += 1
+            
+            if laporan_completed:
+                completion_stats["laporan_hasil"]["completed"] += 1
+            completion_stats["laporan_hasil"]["total"] += 1
+            
+            if kuisioner_completed:
+                completion_stats["kuisioner"]["completed"] += 1
+            completion_stats["kuisioner"]["total"] += 1
+            
+            # Calculate individual progress for this surat tugas
+            completed_stages = sum([
+                surat_pemberitahuan_completed,
+                entry_meeting_completed,
+                konfirmasi_meeting_completed,
+                exit_meeting_completed,
+                matriks_completed,
+                laporan_completed,
+                kuisioner_completed
+            ])
+            individual_progress = int((completed_stages / 7) * 100)
+            overall_progress_sum += individual_progress
+            
+            # Collect recent surat tugas data (first 5)
+            if i < 5:
+                # Build full response untuk recent data menggunakan existing method
+                full_response = await self._build_surat_tugas_response(surat_tugas)
+                recent_data = full_response.model_dump()
+                recent_data["progress_percentage"] = individual_progress
+                recent_surat_tugas_data.append(recent_data)
+        
+        # Calculate completion percentages
+        completion_percentages = {}
+        for relationship, stats in completion_stats.items():
+            if stats["total"] > 0:
+                percentage = int((stats["completed"] / stats["total"]) * 100)
+                completion_percentages[relationship] = {
+                    "completed": stats["completed"],
+                    "total": stats["total"],
+                    "percentage": percentage,
+                    "remaining": stats["total"] - stats["completed"]
+                }
+            else:
+                completion_percentages[relationship] = {
+                    "completed": 0,
+                    "total": 0,
+                    "percentage": 0,
+                    "remaining": 0
+                }
+        
+        # Calculate overall statistics
+        average_progress = int(overall_progress_sum / total_evaluasi) if total_evaluasi > 0 else 0
+        
+        # Convert completion_percentages to proper format untuk schema
+        from src.schemas.surat_tugas import (
+            DashboardStatistics, RelationshipCompletionStats, RelationshipSummary,
+            CompletionStats, RecentSuratTugasItem
+        )
+        
+        # Build completion stats objects
+        completion_stats_objects = {}
+        for relationship, stats in completion_percentages.items():
+            completion_stats_objects[relationship] = CompletionStats(**stats)
+        
+        # Build recent surat tugas objects
+        recent_items = [RecentSuratTugasItem(**item) for item in recent_surat_tugas_data]
+        
+        return {
+            "statistics": DashboardStatistics(
+                total_surat_tugas=total_evaluasi,
+                average_progress=average_progress,
+                year_filter_applied=year is not None,
+                filtered_year=year
+            ),
+            "completion_stats": RelationshipCompletionStats(**completion_stats_objects),
+            "recent_surat_tugas": recent_items,
+            "summary_by_relationship": RelationshipSummary(
+                most_completed=max(completion_percentages.items(), 
+                                 key=lambda x: x[1]["percentage"])[0] if completion_percentages else None,
+                least_completed=min(completion_percentages.items(), 
+                                  key=lambda x: x[1]["percentage"])[0] if completion_percentages else None,
+                total_relationships=len(completion_percentages),
+                fully_completed_relationships=sum(1 for stats in completion_percentages.values() 
+                                                if stats["percentage"] == 100)
+            )
+        }
+    
     # ===== HELPER METHODS =====
     
     async def _build_surat_tugas_response(self, surat_tugas) -> SuratTugasResponse:

@@ -70,7 +70,7 @@ async def create_periode_evaluasi(
 @router.get("/", response_model=PeriodeEvaluasiListResponse)
 async def get_all_periode_evaluasi(
     filters: PeriodeEvaluasiFilterParams = Depends(),
-    current_user: dict = Depends(admin_or_inspektorat),
+    current_user: dict = Depends(get_current_active_user),
     periode_service: PeriodeEvaluasiService = Depends(get_periode_evaluasi_service)
 ):
     """
@@ -93,7 +93,7 @@ async def get_all_periode_evaluasi(
 @router.get("/{periode_id}", response_model=PeriodeEvaluasiResponse)
 async def get_periode_evaluasi(
     periode_id: str,
-    current_user: dict = Depends(admin_or_inspektorat),
+    current_user: dict = Depends(get_current_active_user),
     periode_service: PeriodeEvaluasiService = Depends(get_periode_evaluasi_service)
 ):
     """

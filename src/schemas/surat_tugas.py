@@ -272,3 +272,84 @@ class SuratTugasProgressResponse(BaseModel):
     progress: EvaluasiProgress
     last_updated: datetime
     next_stage: Optional[str] = None
+
+
+# ===== DASHBOARD SCHEMAS =====
+
+class CompletionStats(BaseModel):
+    """Schema untuk completion statistics per relationship."""
+    
+    completed: int = Field(ge=0, description="Jumlah yang sudah completed")
+    total: int = Field(ge=0, description="Total records")
+    percentage: int = Field(ge=0, le=100, description="Persentase completion")
+    remaining: int = Field(ge=0, description="Jumlah yang belum completed")
+
+
+class DashboardStatistics(BaseModel):
+    """Schema untuk dashboard statistics."""
+    
+    total_surat_tugas: int = Field(ge=0, description="Total surat tugas (filtered by year)")
+    average_progress: int = Field(ge=0, le=100, description="Average progress percentage")
+    year_filter_applied: bool = Field(description="Whether year filter is applied")
+    filtered_year: Optional[int] = Field(None, description="Year filter value")
+
+
+class RelationshipCompletionStats(BaseModel):
+    """Schema untuk completion statistics semua relationships."""
+    
+    surat_pemberitahuan: CompletionStats
+    entry_meeting: CompletionStats
+    konfirmasi_meeting: CompletionStats
+    exit_meeting: CompletionStats
+    matriks: CompletionStats
+    laporan_hasil: CompletionStats
+    kuisioner: CompletionStats
+
+
+class RelationshipSummary(BaseModel):
+    """Schema untuk summary relationships."""
+    
+    most_completed: Optional[str] = Field(None, description="Relationship with highest completion rate")
+    least_completed: Optional[str] = Field(None, description="Relationship with lowest completion rate")
+    total_relationships: int = Field(ge=0, description="Total number of relationships")
+    fully_completed_relationships: int = Field(ge=0, description="Number of 100% completed relationships")
+
+
+class RecentSuratTugasItem(SuratTugasResponse):
+    """Schema untuk recent surat tugas items in dashboard."""
+    
+    progress_percentage: int = Field(ge=0, le=100)
+
+
+class DashboardSummaryData(BaseModel):
+    """Schema untuk dashboard summary data lengkap."""
+    
+    statistics: DashboardStatistics
+    completion_stats: RelationshipCompletionStats
+    recent_surat_tugas: List[RecentSuratTugasItem]
+    summary_by_relationship: RelationshipSummary
+
+
+class UserInfo(BaseModel):
+    """Schema untuk user info in dashboard."""
+    
+    nama: str
+    role: str
+    inspektorat: Optional[str] = None
+
+
+class QuickActions(BaseModel):
+    """Schema untuk quick actions in dashboard."""
+    
+    can_create_surat_tugas: bool
+    can_manage_templates: bool
+    total_evaluasi: int
+
+
+class DashboardSummaryResponse(BaseModel):
+    """Schema untuk complete dashboard summary response."""
+    
+    user_info: UserInfo
+    year_filter: Optional[int] = None
+    summary: DashboardSummaryData
+    quick_actions: QuickActions

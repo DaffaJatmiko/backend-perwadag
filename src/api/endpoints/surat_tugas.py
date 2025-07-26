@@ -16,7 +16,7 @@ from src.services.surat_tugas import SuratTugasService
 from src.schemas.surat_tugas import (
     SuratTugasCreate, SuratTugasUpdate, SuratTugasResponse,
     SuratTugasListResponse, SuratTugasCreateResponse, SuratTugasOverview,
-    SuratTugasStats
+    SuratTugasStats, DashboardSummaryResponse
 )
 from src.schemas.filters import SuratTugasFilterParams
 from src.schemas.common import SuccessResponse
@@ -400,59 +400,55 @@ async def get_available_perwadag(
 
 # ===== DASHBOARD ENDPOINTS =====
 
-@router.get("/dashboard/summary")
+@router.get("/dashboard/summary", response_model=DashboardSummaryResponse)
 async def get_dashboard_summary(
+    year: Optional[int] = Query(None, ge=2020, le=2050, description="Filter by tahun evaluasi"),
     current_user: dict = Depends(require_evaluasi_read_access()),
     surat_tugas_service: SuratTugasService = Depends(get_surat_tugas_service)
 ):
     """
-    Get dashboard summary untuk current user.
+    Get dashboard summary untuk current user dengan year filtering dan completion statistics.
     
     **Role-based Summary**:
     - **Admin**: Summary semua evaluasi
-    - **Inspektorat**: Summary wilayah kerja
+    - **Inspektorat**: Summary semua perwadag yang terafiliasi dengan inspektorat current user 
     - **Perwadag**: Summary evaluasi milik sendiri
     
     **Returns**:
-    - Quick stats
-    - Recent surat tugas
-    - Progress overview
-    - Pending actions
+    - Quick stats dengan completion details per relationship
+    - Recent surat tugas (filtered by year if provided)
+    - Completion statistics per related table
+    - Progress overview with detailed breakdown
     """
     filter_scope = get_evaluasi_filter_scope(current_user)
     
-    # Get statistics
-    stats = await surat_tugas_service.get_statistics(
+    # Get dashboard summary dengan completion statistics
+    summary = await surat_tugas_service.get_dashboard_summary_with_completion_stats(
         filter_scope["user_role"],
         filter_scope.get("user_inspektorat"),
-        filter_scope.get("user_id")
+        filter_scope.get("user_id"),
+        year
     )
     
-    # Get recent surat tugas (last 5)
-    from src.schemas.filters import SuratTugasFilterParams
-    recent_filters = SuratTugasFilterParams(page=1, size=5)
-    
-    recent_surat_tugas = await surat_tugas_service.get_all_surat_tugas(
-        recent_filters,
-        filter_scope["user_role"],
-        filter_scope.get("user_inspektorat"),
-        filter_scope.get("user_id")
+    # Build response menggunakan schema
+    from src.schemas.surat_tugas import (
+        DashboardSummaryResponse, DashboardSummaryData, UserInfo, QuickActions
     )
     
-    return {
-        "user_info": {
-            "nama": current_user["nama"],
-            "role": current_user["role"],
-            "inspektorat": current_user.get("inspektorat")
-        },
-        "statistics": stats,
-        "recent_surat_tugas": recent_surat_tugas.surat_tugas,
-        "quick_actions": {
-            "can_create_surat_tugas": current_user["role"] in ["ADMIN", "INSPEKTORAT"],
-            "can_manage_templates": current_user["role"] == "ADMIN",
-            "total_evaluasi": stats.total_surat_tugas
-        }
-    }
+    return DashboardSummaryResponse(
+        user_info=UserInfo(
+            nama=current_user["nama"],
+            role=current_user["role"],
+            inspektorat=current_user.get("inspektorat")
+        ),
+        year_filter=year,
+        summary=DashboardSummaryData(**summary),
+        quick_actions=QuickActions(
+            can_create_surat_tugas=current_user["role"] in ["ADMIN", "INSPEKTORAT"],
+            can_manage_templates=current_user["role"] == "ADMIN",
+            total_evaluasi=summary["statistics"].total_surat_tugas
+        )
+    )
 
 @router.get("/{surat_tugas_id}/download", response_class=FileResponse)
 async def download_surat_tugas_file(

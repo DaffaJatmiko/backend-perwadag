@@ -278,90 +278,43 @@ class SuratTugasRepository:
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
     
-    # ===== STATISTICS =====
-    
-    async def get_statistics(
-        self, 
+    # ===== STATISTICS =====   
+    async def get_dashboard_completion_data(
+        self,
         user_role: str,
         user_inspektorat: Optional[str] = None,
-        user_id: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Get statistik surat tugas berdasarkan role."""
+        user_id: Optional[str] = None,
+        year: Optional[int] = None
+    ) -> List[SuratTugas]:
+        """
+        Get surat tugas data untuk dashboard completion statistics.
         
-        # Base query berdasarkan role
-        base_query = select(SuratTugas).where(SuratTugas.deleted_at.is_(None))
+        Mengembalikan list surat tugas dengan filtering berdasarkan role dan year.
+        Method ini akan digunakan service untuk menghitung completion statistics
+        dari related records secara manual.
+        """
         
+        # Build base query berdasarkan role
+        query = select(SuratTugas).where(SuratTugas.deleted_at.is_(None))
+        
+        # Apply role-based filtering (sama seperti get_all_filtered)
         if user_role == "PERWADAG":
-            base_query = base_query.where(SuratTugas.user_perwadag_id == user_id)
+            query = query.where(SuratTugas.user_perwadag_id == user_id)
         elif user_role == "INSPEKTORAT" and user_inspektorat:
-            base_query = base_query.where(SuratTugas.inspektorat == user_inspektorat)
+            query = query.where(SuratTugas.inspektorat == user_inspektorat)
+        # Admin bisa lihat semua
         
-        # Total surat tugas
-        total_query = select(func.count()).select_from(base_query.subquery())
-        total_result = await self.session.execute(total_query)
-        total_surat_tugas = total_result.scalar() or 0
-        
-        # Count by tahun
-        tahun_query = (
-            select(
-                func.extract('year', SuratTugas.tanggal_evaluasi_mulai).label('tahun'),
-                func.count().label('count')
+        # Apply year filter jika ada (sama seperti get_all_filtered)
+        if year:
+            query = query.where(
+                func.extract('year', SuratTugas.tanggal_evaluasi_mulai) == year
             )
-            .select_from(base_query.subquery())
-            .group_by(func.extract('year', SuratTugas.tanggal_evaluasi_mulai))
-            .order_by('tahun')
-        )
-        tahun_result = await self.session.execute(tahun_query)
-        total_by_tahun = {int(row.tahun): row.count for row in tahun_result.all()}
         
-        # Count by inspektorat (hanya untuk admin)
-        total_by_inspektorat = {}
-        if user_role == "ADMIN":
-            inspektorat_query = (
-                select(SuratTugas.inspektorat, func.count().label('count'))
-                .where(SuratTugas.deleted_at.is_(None))
-                .group_by(SuratTugas.inspektorat)
-                .order_by('count')
-            )
-            inspektorat_result = await self.session.execute(inspektorat_query)
-            total_by_inspektorat = {row.inspektorat: row.count for row in inspektorat_result.all()}
+        # Order by created_at desc untuk recent data
+        query = query.order_by(SuratTugas.created_at.desc())
         
-        # Status evaluasi
-        today = date.today()
+        # Execute query
+        result = await self.session.execute(query)
+        surat_tugas_list = result.scalars().all()
         
-        # Evaluasi yang sedang berlangsung
-        active_query = select(func.count()).select_from(
-            base_query.where(
-                and_(
-                    SuratTugas.tanggal_evaluasi_mulai <= today,
-                    SuratTugas.tanggal_evaluasi_selesai >= today
-                )
-            ).subquery()
-        )
-        active_result = await self.session.execute(active_query)
-        in_progress_evaluations = active_result.scalar() or 0
-        
-        # Evaluasi yang akan datang
-        upcoming_query = select(func.count()).select_from(
-            base_query.where(SuratTugas.tanggal_evaluasi_mulai > today).subquery()
-        )
-        upcoming_result = await self.session.execute(upcoming_query)
-        upcoming_evaluations = upcoming_result.scalar() or 0
-        
-        # Evaluasi yang sudah selesai
-        completed_evaluations = total_surat_tugas - in_progress_evaluations - upcoming_evaluations
-        
-        # Completion rate (placeholder - akan dihitung dari related tables nanti)
-        completion_rate = 0.0
-        if total_surat_tugas > 0:
-            completion_rate = (completed_evaluations / total_surat_tugas) * 100
-        
-        return {
-            "total_surat_tugas": total_surat_tugas,
-            "total_by_tahun": total_by_tahun,
-            "total_by_inspektorat": total_by_inspektorat,
-            "completed_evaluations": completed_evaluations,
-            "in_progress_evaluations": in_progress_evaluations,
-            "upcoming_evaluations": upcoming_evaluations,
-            "completion_rate": round(completion_rate, 2)
-        }
+        return list(surat_tugas_list)
