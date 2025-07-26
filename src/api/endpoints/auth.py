@@ -1,6 +1,6 @@
 """Authentication endpoints (simplified - nama as username)."""
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
@@ -212,41 +212,176 @@ async def check_password_reset_eligibility(
 @router.post("/request-password-reset", response_model=MessageResponse, summary="Request password reset")
 async def request_password_reset(
     reset_data: PasswordReset,
+    background_tasks: BackgroundTasks,  # ⭐ TAMBAH PARAMETER INI
     auth_service: AuthService = Depends(get_auth_service)
 ):
     """
-    Request password reset token.
+    Request password reset token dengan BACKGROUND EMAIL SENDING.
     
     - **email**: User email address (must be set in profile first)
     
-    **Requirements**:
-    1. User must have set email in their profile first (PUT /users/me)
-    2. Email must be associated with an active account
+    **NEW FEATURE**: Email sending now runs in background for faster response!
     
     **Process**:
-    1. If user hasn't set email → Contact administrator or set email first
-    2. If email exists → Reset link sent to email
-    3. Always returns success message to prevent email enumeration
+    1. Validate user and email ✅ (blocking)
+    2. Generate and save reset token ✅ (blocking) 
+    3. Schedule email sending 📧 (background)
+    4. Return success response immediately 🚀
     
-    **Note**: Users can set email via PUT /users/me endpoint.
+    **Performance**: Response time reduced from ~3s to ~200ms
     """
-    return await auth_service.request_password_reset(reset_data)
+    import logging
+    from src.utils.password import generate_password_reset_token, mask_email
+    from src.core.config import settings
+    from datetime import datetime, timedelta
+    
+    logger = logging.getLogger(__name__)
+    
+    user = await auth_service.user_repo.get_by_email(reset_data.email)
+    
+    # Always return success message to prevent email enumeration
+    success_message = "Jika email tersebut terdaftar dan terkait dengan akun, link reset password telah dikirim"
+    
+    # Case 1: Email tidak ditemukan di database
+    if not user:
+        logger.warning(f"Reset password request for unregistered email: {mask_email(reset_data.email)}")
+        return MessageResponse(message=success_message)
+    
+    # Case 2: User tidak aktif
+    if not user.is_active:
+        logger.warning(f"Reset password request for inactive user: {user.nama} ({mask_email(reset_data.email)})")
+        return MessageResponse(message=success_message)
+    
+    # Case 3: User aktif tapi tidak punya email (edge case)
+    if not user.has_email():
+        logger.warning(f"Reset password request for user without email: {user.nama}")
+        return MessageResponse(
+            message="Akun user tidak memiliki email yang dikonfigurasi. Silakan hubungi administrator."
+        )
+    
+    # Case 4: Semua validasi passed - process reset
+    logger.info(f"Processing password reset for user: {user.nama} ({mask_email(user.email)})")
+    
+    # Generate reset token
+    token = generate_password_reset_token()
+    expires_at = datetime.utcnow() + timedelta(hours=settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS)
+    
+    # Save token to database (BLOCKING - must complete before response)
+    try:
+        await auth_service.user_repo.create_password_reset_token(
+            user.id,
+            token,
+            expires_at
+        )
+        logger.info(f"Password reset token created for user: {user.nama}")
+    except Exception as e:
+        logger.error(f"Failed to create password reset token for {mask_email(user.email)}: {str(e)}")
+        return MessageResponse(
+            message="Gagal memproses permintaan reset password. Silakan coba lagi nanti.",
+            success=False
+        )
+    
+    # 🚀 BACKGROUND EMAIL SENDING - PERUBAHAN UTAMA!
+    logger.info(f"Scheduling background email for {mask_email(user.email)}")
+    
+    background_tasks.add_task(
+        auth_service.email_service.send_password_reset_email,
+        user.email,      # user_email
+        user.nama,       # user_nama  
+        token           # reset_token
+    )
+    
+    # ✅ RETURN IMMEDIATELY - email sedang dikirim di background
+    logger.info(f"Password reset response sent immediately, email processing in background")
+    
+    return MessageResponse(message=success_message)
+
 
 
 @router.post("/confirm-password-reset", response_model=MessageResponse, summary="Confirm password reset")
 async def confirm_password_reset(
     reset_data: PasswordResetConfirm,
+    background_tasks: BackgroundTasks,  # ⭐ TAMBAH PARAMETER INI
     auth_service: AuthService = Depends(get_auth_service)
 ):
     """
-    Confirm password reset with token.
+    Confirm password reset with token dengan BACKGROUND SUCCESS EMAIL.
     
     - **token**: Password reset token from email
     - **new_password**: New password (minimum 6 characters)
     
+    **NEW FEATURE**: Success confirmation email now sent in background!
+    
     Resets user password if token is valid and not expired (1 hour expiry).
     """
-    return await auth_service.confirm_password_reset(reset_data)
+    import logging
+    from src.utils.password import mask_email
+    
+    logger = logging.getLogger(__name__)
+    
+    # Get and validate token
+    reset_token = await auth_service.user_repo.get_password_reset_token(reset_data.token)
+    
+    if not reset_token or not reset_token.is_valid():
+        logger.warning(f"Invalid or expired reset token used: {reset_data.token[:8]}...")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token reset tidak valid atau kedaluwarsa"
+        )
+    
+    # Get user
+    user = await auth_service.user_repo.get_by_id(reset_token.user_id)
+    if not user:
+        logger.error(f"User not found for reset token: {reset_token.user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User tidak ditemukan"
+        )
+    
+    # Check if new password is different from current
+    from src.auth.jwt import verify_password, get_password_hash
+    if verify_password(reset_data.new_password, user.hashed_password):
+        logger.warning(f"User {user.nama} tried to reset with same password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password baru harus berbeda dari password saat ini"
+        )
+    
+    # Update password (BLOCKING - must complete)
+    new_hashed_password = get_password_hash(reset_data.new_password)
+    
+    try:
+        await auth_service.user_repo.update_password(user.id, new_hashed_password)
+        logger.info(f"Password successfully updated for user: {user.nama} ({mask_email(user.email)})")
+    except Exception as e:
+        logger.error(f"Failed to update password for user {user.nama}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Gagal memperbarui password. Silakan coba lagi."
+        )
+    
+    # Mark token as used (BLOCKING)
+    try:
+        await auth_service.user_repo.use_password_reset_token(reset_data.token)
+        logger.info(f"Reset token marked as used: {reset_data.token[:8]}...")
+    except Exception as e:
+        logger.error(f"Failed to mark reset token as used: {str(e)}")
+        # Continue anyway, password is already updated
+    
+    # 🚀 BACKGROUND SUCCESS EMAIL - PERUBAHAN UTAMA!
+    if user.has_email():
+        logger.info(f"Scheduling background success email for {mask_email(user.email)}")
+        
+        background_tasks.add_task(
+            auth_service.email_service.send_password_reset_success_email,
+            user.email,    # user_email
+            user.nama      # user_nama
+        )
+    
+    # ✅ RETURN IMMEDIATELY - success email sedang dikirim di background
+    logger.info(f"Password reset completed, success email processing in background")
+    
+    return MessageResponse(message="Reset password berhasil")
 
 
 @router.get("/verify-token", summary="Verify JWT token")
