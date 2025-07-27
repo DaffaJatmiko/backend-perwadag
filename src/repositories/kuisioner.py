@@ -128,25 +128,23 @@ class KuisionerRepository:
         
         if filters.is_completed is not None:
             if filters.is_completed:
-                # Completed: has tanggal + file + link dokumen
+                # 🔥 UPDATED: Completed hanya membutuhkan tanggal + file (TANPA link dokumen)
                 kuisioner_query = kuisioner_query.where(
                     and_(
                         Kuisioner.tanggal_kuisioner.is_not(None),
                         Kuisioner.file_kuisioner.is_not(None),
-                        Kuisioner.file_kuisioner != "",
-                        Kuisioner.link_dokumen_data_dukung.is_not(None),
-                        Kuisioner.link_dokumen_data_dukung != ""
+                        Kuisioner.file_kuisioner != ""
+                        # REMOVED: link_dokumen_data_dukung conditions
                     )
                 )
             else:
-                # Not completed: missing any of the required fields
+                # 🔥 UPDATED: Not completed jika salah satu dari 2 field kosong
                 kuisioner_query = kuisioner_query.where(
                     or_(
                         Kuisioner.tanggal_kuisioner.is_(None),
                         Kuisioner.file_kuisioner.is_(None),
-                        Kuisioner.file_kuisioner == "",
-                        Kuisioner.link_dokumen_data_dukung.is_(None),
-                        Kuisioner.link_dokumen_data_dukung == ""
+                        Kuisioner.file_kuisioner == ""
+                        # REMOVED: link_dokumen_data_dukung conditions
                     )
                 )
         

@@ -384,7 +384,7 @@ class KuisionerService:
         kuisioner, 
         surat_tugas_data: Dict[str, Any]
     ) -> KuisionerResponse:
-        """Build enriched response - UPDATED dengan tanggal_kuisioner."""
+        """Build enriched response - UPDATED: link dokumen tidak mempengaruhi status complete."""
         
         # Handle dict vs object dan field name yang benar
         if isinstance(kuisioner, dict):
@@ -393,7 +393,7 @@ class KuisionerService:
             surat_tugas_id = kuisioner.get('surat_tugas_id')
             tanggal_kuisioner = kuisioner.get('tanggal_kuisioner')
             file_kuisioner = kuisioner.get('file_kuisioner')
-            link_dokumen_data_dukung = kuisioner.get('link_dokumen_data_dukung')  # 🔥 FIELD BARU
+            link_dokumen_data_dukung = kuisioner.get('link_dokumen_data_dukung')
             created_at = kuisioner.get('created_at')
             updated_at = kuisioner.get('updated_at')
             created_by = kuisioner.get('created_by')
@@ -404,13 +404,13 @@ class KuisionerService:
             surat_tugas_id = kuisioner.surat_tugas_id
             tanggal_kuisioner = kuisioner.tanggal_kuisioner
             file_kuisioner = kuisioner.file_kuisioner
-            link_dokumen_data_dukung = kuisioner.link_dokumen_data_dukung  # 🔥 FIELD BARU
+            link_dokumen_data_dukung = kuisioner.link_dokumen_data_dukung
             created_at = kuisioner.created_at
             updated_at = kuisioner.updated_at
             created_by = kuisioner.created_by
             updated_by = kuisioner.updated_by
         
-        # Build file information - FIXED: Remove await
+        # Build file information
         file_urls = None
         file_metadata = None
         
@@ -421,7 +421,6 @@ class KuisionerService:
                 view_url=f"/api/v1/kuisioner/{kuisioner_id}/view"
             )
             
-            # Remove await - get_file_info is NOT async
             file_info = evaluasi_file_manager.get_file_info(file_kuisioner)
             if file_info:
                 file_metadata = FileMetadata(
@@ -450,40 +449,39 @@ class KuisionerService:
             is_evaluation_active=True
         )
         
-        # 🔥 UPDATED: Calculate completion dengan tanggal_kuisioner
+        # 🔥 UPDATED: Calculate completion TANPA link dokumen
         has_file = bool(file_kuisioner)
         has_tanggal = bool(tanggal_kuisioner)
-        has_link_dokumen = bool(link_dokumen_data_dukung)  # 🔥 STATUS BARU
-        is_completed = has_file and has_tanggal and has_link_dokumen  # 🔥 UPDATED: Requires 3 fields
+        has_link_dokumen = bool(link_dokumen_data_dukung)  # Keep for display purposes
+        is_completed = has_file and has_tanggal  # 🔥 CHANGED: hanya 2 field untuk complete
         
-        # Calculate completion percentage (3 fields: tanggal + file + link)
+        # Calculate completion percentage (HANYA 2 fields: tanggal + file)
         completed_items = 0
         if has_tanggal:
             completed_items += 1
         if has_file:
             completed_items += 1
-        if has_link_dokumen:  # 🔥 CHECK BARU
-            completed_items += 1
-        completion_percentage = int((completed_items / 3) * 100)  # 🔥 DIBAGI 3
+        # REMOVED: link dokumen dari perhitungan completion
+        completion_percentage = int((completed_items / 2) * 100)  # 🔥 CHANGED: dibagi 2, bukan 3
         
         return KuisionerResponse(
-            # Basic fields - UPDATED
+            # Basic fields
             id=str(kuisioner_id),
             surat_tugas_id=str(surat_tugas_id),
-            tanggal_kuisioner=tanggal_kuisioner,  # 🔥 NEW field
-            file_dokumen=file_kuisioner,  # Map to response field name
-            link_dokumen_data_dukung=link_dokumen_data_dukung, 
+            tanggal_kuisioner=tanggal_kuisioner,
+            file_dokumen=file_kuisioner,
+            link_dokumen_data_dukung=link_dokumen_data_dukung,  # Keep field but not affect completion
             
             # Enhanced file information
             file_urls=file_urls,
             file_metadata=file_metadata,
             
             # Status information - UPDATED
-            is_completed=is_completed,
+            is_completed=is_completed,  # 🔥 CHANGED: hanya berdasarkan tanggal + file
             has_file=has_file,
-            has_tanggal=has_tanggal,  # 🔥 NEW field
-            has_link_dokumen=has_link_dokumen, 
-            completion_percentage=completion_percentage,
+            has_tanggal=has_tanggal,
+            has_link_dokumen=has_link_dokumen,  # Keep for display, tapi tidak mempengaruhi completion
+            completion_percentage=completion_percentage,  # 🔥 CHANGED: berdasarkan 2 field saja
             
             # Enriched surat tugas data
             surat_tugas_info=surat_tugas_info,

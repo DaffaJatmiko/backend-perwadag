@@ -1,4 +1,4 @@
-"""Model untuk kuisioner evaluasi - UPDATED dengan tanggal_kuisioner."""
+"""Model untuk kuisioner evaluasi - UPDATED tanpa link dokumen untuk status complete."""
 
 from typing import Optional
 from datetime import date
@@ -26,7 +26,6 @@ class Kuisioner(BaseModel, SQLModel, table=True):
         description="ID surat tugas terkait"
     )
     
-    # 🔥 NEW: Add tanggal_kuisioner field
     tanggal_kuisioner: Optional[date] = Field(
         default=None,
         description="Tanggal pengisian kuisioner"
@@ -41,17 +40,15 @@ class Kuisioner(BaseModel, SQLModel, table=True):
     link_dokumen_data_dukung: Optional[str] = Field(
         default=None,
         max_length=1000,
-        description="Link Google Drive untuk dokumen data dukung"
+        description="Link Google Drive untuk dokumen data dukung (optional)"
     )
     
     def is_completed(self) -> bool:
-        """Check apakah kuisioner sudah completed - UPDATED logic dengan dokumen data dukung."""
+        """Check apakah kuisioner sudah completed - UPDATED: hanya tanggal + file."""
         return (
             self.tanggal_kuisioner is not None and
             self.file_kuisioner is not None and
-            self.file_kuisioner.strip() != "" and
-            self.link_dokumen_data_dukung is not None and
-            self.link_dokumen_data_dukung.strip() != ""
+            self.file_kuisioner.strip() != ""
         )
     
     def has_file(self) -> bool:
@@ -67,16 +64,15 @@ class Kuisioner(BaseModel, SQLModel, table=True):
         return self.link_dokumen_data_dukung is not None and self.link_dokumen_data_dukung.strip() != ""
 
     def get_completion_percentage(self) -> int:
-        """Get completion percentage (0-100) - UPDATED logic dengan dokumen data dukung."""
+        """Get completion percentage (0-100) - UPDATED: hanya 2 field untuk complete."""
         completed_items = 0
-        total_items = 3  # tanggal + file + link dokumen
+        total_items = 2  # CHANGED: hanya tanggal + file (tanpa link dokumen)
         
         if self.has_tanggal():
             completed_items += 1
         if self.has_file():
             completed_items += 1
-        if self.has_link_dokumen():
-            completed_items += 1
+        # REMOVED: link dokumen dari perhitungan completion
         
         return int((completed_items / total_items) * 100)
     
