@@ -1,6 +1,6 @@
-# 🏛️ Perwadag Backend - API Sistem Evaluasi Pemerintahan
+# 🏛️ SIELANGMERAH Backend - API Sistem Evaluasi Kinerja Perwakilan Perdagangan
 
-Backend API untuk **Sistem Evaluasi Perdagangan (Perwadag)** yang dibangun dengan FastAPI, PostgreSQL, dan arsitektur modern. Sistem ini menyediakan REST API yang komprehensif untuk mengelola proses evaluasi pemerintahan dengan fitur autentikasi, manajemen user, workflow evaluasi, dan pelaporan.
+Backend API untuk **SIELANGMERAH (Sistem Evaluasi Kinerja Perwakilan Perdagangan Metode Jarak Jauh)** yang dibangun dengan FastAPI, PostgreSQL, dan arsitektur modern. Platform digital untuk evaluasi kinerja perwakilan perdagangan Indonesia di luar negeri menggunakan metode jarak jauh, dikembangkan oleh Kementerian Perdagangan Republik Indonesia.
 
 ## 🏗️ Arsitektur Sistem
 
@@ -29,7 +29,7 @@ Pastikan Anda memiliki yang berikut terinstal:
 1. **Clone repository:**
 ```bash
 git clone https://github.com/DaffaJatmiko/backend-perwadag.git backend
-cd perwadag/backend
+cd sielangmerah/backend
 ```
 
 2. **Setup environment variables:**
@@ -94,7 +94,7 @@ File `.env` sudah dikonfigurasi untuk Docker dengan:
 POSTGRES_SERVER=postgres
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=password
-POSTGRES_DB=perwadag
+POSTGRES_DB=sielangmerah
 
 # Redis (Docker networking)
 REDIS_HOST=redis
@@ -118,7 +118,7 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 1. **Clone repository:**
 ```bash
 git clone https://github.com/DaffaJatmiko/backend-perwadag.git backend
-cd perwadag/backend
+cd sielangmerah/backend
 ```
 
 2. **Setup virtual environment:**
@@ -137,7 +137,7 @@ pip install -r requirements.txt
 4. **Setup database lokal:**
 ```bash
 # Buat database PostgreSQL
-createdb perwadag
+createdb sielangmerah
 
 # Update .env untuk local database
 # POSTGRES_SERVER=localhost
@@ -162,7 +162,7 @@ Buat file `.env` dengan konfigurasi berikut:
 
 ```env
 # Database
-DATABASE_URL=postgresql://username:password@localhost/perwadag_db
+DATABASE_URL=postgresql://username:password@localhost/sielangmerah_db
 
 # JWT
 SECRET_KEY=your-secret-key-here
@@ -190,7 +190,7 @@ AUTH_RATE_LIMIT_CALLS=5
 AUTH_RATE_LIMIT_PERIOD=60
 
 # Application
-PROJECT_NAME=Sistem Evaluasi Perwadag
+PROJECT_NAME=SIELANGMERAH - Sistem Evaluasi Kinerja Perwakilan Perdagangan Metode Jarak Jauh
 VERSION=1.0.0
 DEBUG=true
 ```
@@ -555,4 +555,4 @@ Jika Anda mengalami masalah atau memiliki pertanyaan:
 
 ---
 
-Dibangun dengan ❤️ untuk Sistem Evaluasi Pemerintahan Indonesia
+Dibangun dengan ❤️ oleh Kementerian Perdagangan Republik Indonesia untuk Sistem Evaluasi Kinerja Perwakilan Perdagangan Indonesia
