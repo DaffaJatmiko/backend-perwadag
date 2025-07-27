@@ -67,28 +67,30 @@ class FileType(str, Enum):
     @classmethod
     def get_allowed_extensions(cls, file_type: str) -> list:
         """Get allowed file extensions for specific file type."""
+        # 🔥 UPDATED: Tambah .xls, .xlsx, .png, .jpg, .jpeg, .webp untuk semua tipe
         extensions_map = {
-            cls.SURAT_TUGAS.value: ['.pdf', '.doc', '.docx'],
-            cls.SURAT_PEMBERITAHUAN.value: ['.pdf', '.doc', '.docx'],
-            cls.MEETING_BUKTI.value: ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'],
-            cls.MATRIKS.value: ['.pdf', '.doc', '.docx', '.xls', '.xlsx'],
-            cls.LAPORAN_HASIL.value: ['.pdf', '.doc', '.docx'],
-            cls.KUISIONER.value: ['.pdf', '.doc', '.docx', '.xls', '.xlsx'],
-            cls.FORMAT_KUISIONER.value: ['.pdf', '.doc', '.docx', '.xls', '.xlsx']
+            cls.SURAT_TUGAS.value: ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.webp'],
+            cls.SURAT_PEMBERITAHUAN.value: ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.webp'],
+            cls.MEETING_BUKTI.value: ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.webp'],
+            cls.MATRIKS.value: ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.webp'],
+            cls.LAPORAN_HASIL.value: ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.webp'],
+            cls.KUISIONER.value: ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.webp'],
+            cls.FORMAT_KUISIONER.value: ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.webp']
         }
         return extensions_map.get(file_type, ['.pdf', '.doc', '.docx'])
     
     @classmethod
     def get_max_file_size(cls, file_type: str) -> int:
         """Get max file size in bytes for specific file type."""
+        # 🔥 UPDATED: Semua jadi 10MB
         size_map = {
             cls.SURAT_TUGAS.value: 10 * 1024 * 1024,  # 10MB
             cls.SURAT_PEMBERITAHUAN.value: 10 * 1024 * 1024,  # 10MB
-            cls.MEETING_BUKTI.value: 15 * 1024 * 1024,  # 15MB (bisa foto)
-            cls.MATRIKS.value: 20 * 1024 * 1024,  # 20MB (bisa Excel besar)
-            cls.LAPORAN_HASIL.value: 50 * 1024 * 1024,  # 50MB (laporan lengkap)
-            cls.KUISIONER.value: 20 * 1024 * 1024,  # 20MB
-            cls.FORMAT_KUISIONER.value: 20 * 1024 * 1024  # 20MB
+            cls.MEETING_BUKTI.value: 10 * 1024 * 1024,  # 10MB (was 15MB)
+            cls.MATRIKS.value: 10 * 1024 * 1024,  # 10MB (was 20MB)
+            cls.LAPORAN_HASIL.value: 10 * 1024 * 1024,  # 10MB (was 50MB)
+            cls.KUISIONER.value: 10 * 1024 * 1024,  # 10MB (was 20MB)
+            cls.FORMAT_KUISIONER.value: 10 * 1024 * 1024  # 10MB (was 20MB)
         }
         return size_map.get(file_type, 10 * 1024 * 1024)  # Default 10MB
     
@@ -158,7 +160,7 @@ class FileCategory(str, Enum):
     """Enum untuk kategori file (untuk organizasi folder)."""
     DOCUMENT = "document"  # PDF, DOC, DOCX
     SPREADSHEET = "spreadsheet"  # XLS, XLSX
-    IMAGE = "image"  # JPG, JPEG, PNG
+    IMAGE = "image"  # JPG, JPEG, PNG, WEBP
     
     @classmethod
     def get_category_by_extension(cls, extension: str) -> str:
@@ -169,7 +171,7 @@ class FileCategory(str, Enum):
             return cls.DOCUMENT.value
         elif extension in ['.xls', '.xlsx']:
             return cls.SPREADSHEET.value
-        elif extension in ['.jpg', '.jpeg', '.png']:
+        elif extension in ['.jpg', '.jpeg', '.png', '.webp']:  # 🔥 UPDATED: Tambah .webp
             return cls.IMAGE.value
         else:
             return cls.DOCUMENT.value  # Default
@@ -189,7 +191,8 @@ class FileCategory(str, Enum):
             ],
             cls.IMAGE.value: [
                 'image/jpeg',
-                'image/png'
+                'image/png',
+                'image/webp'  # 🔥 UPDATED: Tambah webp
             ]
         }
         return mime_map.get(category, [])

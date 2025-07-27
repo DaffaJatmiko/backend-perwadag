@@ -112,9 +112,9 @@ def create_application() -> FastAPI:
         """,
         debug=settings.DEBUG,
         lifespan=lifespan,
-        docs_url="/docs" if settings.DEBUG else None,
-        redoc_url="/redoc" if settings.DEBUG else None,
-        openapi_url="/openapi.json" if settings.DEBUG else None,
+        docs_url="/docs" if not settings.is_production else None,       
+        redoc_url="/redoc" if not settings.is_production else None,      
+        openapi_url="/openapi.json" if not settings.is_production else None,  
     )
 
     # CORS middleware (configure appropriately for production)

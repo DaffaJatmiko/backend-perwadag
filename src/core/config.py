@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str
     VERSION: str = "1.0.0"
     DEBUG: bool = False
+    ENVIRONMENT: str = "development" 
     API_V1_STR: str = "/api/v1"
     API_BASE_URL: str = "http://localhost:8000"
 
@@ -163,6 +164,16 @@ class Settings(BaseSettings):
     def ALLOWED_FILE_TYPES_LIST(self) -> List[str]:
         """Convert ALLOWED_FILE_TYPES string to list."""
         return [file_type.strip() for file_type in self.ALLOWED_FILE_TYPES.split(",")]
+
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production."""
+        return self.ENVIRONMENT.lower() == "production"
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",
