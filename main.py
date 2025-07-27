@@ -127,8 +127,8 @@ def create_application() -> FastAPI:
         expose_headers=["*"],
     )
 
-    # # Add rate limiting middleware
-    # add_rate_limiting(app)
+    # Add rate limiting middleware
+    add_rate_limiting(app)
 
     app.add_middleware(ActivityLoggingMiddleware)
 

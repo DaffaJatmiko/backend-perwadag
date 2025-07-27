@@ -3,6 +3,8 @@
 
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, status
+from sqlalchemy import text, select, func
+from src.models.penilaian_risiko import PenilaianRisiko
 
 from src.repositories.periode_evaluasi import PeriodeEvaluasiRepository
 from src.repositories.penilaian_risiko import PenilaianRisikoRepository
@@ -152,7 +154,7 @@ class PeriodeEvaluasiService:
         user_id: str
     ) -> SuccessResponse:
         """
-        Delete periode evaluasi dengan cascade delete penilaian risiko.
+        Delete periode evaluasi dengan cascade delete penilaian risiko - FIXED.
         
         Hard delete karena data penilaian risiko tidak bermakna tanpa periode.
         """
@@ -165,12 +167,12 @@ class PeriodeEvaluasiService:
             )
         
         try:
-            # Get count penilaian yang akan dihapus untuk info
-            count_query_result = await self.penilaian_repo.session.execute(
-                "SELECT COUNT(*) FROM penilaian_risiko WHERE periode_id = :periode_id",
-                {"periode_id": periode_id}
+            # ✅ FIXED: Get count penilaian yang akan dihapus menggunakan SQLAlchemy query
+            count_query = select(func.count(PenilaianRisiko.id)).where(
+                PenilaianRisiko.periode_id == periode_id
             )
-            penilaian_count = count_query_result.scalar() or 0
+            count_result = await self.periode_repo.session.execute(count_query)
+            penilaian_count = count_result.scalar() or 0
             
             # Hard delete dengan cascade
             success = await self.periode_repo.hard_delete(periode_id)
@@ -196,6 +198,7 @@ class PeriodeEvaluasiService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Gagal menghapus periode evaluasi: {str(e)}"
             )
+    
     
     async def get_statistics(self) -> Dict[str, Any]:
         """Get statistik periode evaluasi."""

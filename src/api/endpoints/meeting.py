@@ -92,7 +92,7 @@ async def get_all_meetings_by_surat_tugas(
 async def update_meeting(
     meeting_id: str,
     update_data: MeetingUpdate,
-    current_user: dict = Depends(require_auto_generated_edit_access()),
+    current_user: dict = Depends(require_evaluasi_read_access()),
     service: MeetingService = Depends(get_meeting_service)
 ):
     """Update meeting (tanggal, zoom link, daftar hadir link)."""
@@ -105,7 +105,7 @@ async def upload_meeting_files(
     meeting_id: str,
     files: List[UploadFile] = File(..., description="Multiple files untuk meeting"),
     replace_existing: bool = Query(False, description="Replace existing files or add to existing"),
-    current_user: dict = Depends(require_auto_generated_edit_access()),
+    current_user: dict = Depends(require_evaluasi_read_access()),
     service: MeetingService = Depends(get_meeting_service)
 ):
     """Upload multiple files ke meeting."""
@@ -116,7 +116,7 @@ async def upload_meeting_files(
 async def delete_meeting_file(
     meeting_id: str,
     filename: str = Path(..., description="Filename to delete"),
-    current_user: dict = Depends(require_auto_generated_edit_access()),
+    current_user: dict = Depends(require_evaluasi_read_access()),
     service: MeetingService = Depends(get_meeting_service)
 ):
     """Delete specific file dari meeting."""

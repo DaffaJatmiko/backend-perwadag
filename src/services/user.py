@@ -23,8 +23,12 @@ class UserService:
         # No more role_repo needed!
     
     async def create_user(self, user_data: UserCreate) -> UserResponse:
-        """Create user dengan simplified validation."""
-        # 1. Validate inspektorat requirements based on role
+        """Create user dengan debug username generation."""
+        
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # 1. Validate inspektorat requirements
         if user_data.role == UserRole.INSPEKTORAT:
             if not user_data.inspektorat:
                 raise HTTPException(
@@ -37,7 +41,6 @@ class UserService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Inspektorat diperlukan untuk role perwadag"
                 )
-        # ADMIN role does NOT require inspektorat
         
         # 2. Validate email uniqueness
         if user_data.email and await self.user_repo.email_exists(user_data.email):
@@ -46,19 +49,48 @@ class UserService:
                 detail="Email sudah terdaftar"
             )
         
-        # 3. Generate username based on role
+        # 3. Generate username dengan debug
+        logger.info(f"Generating username for: {user_data.nama}, role: {user_data.role}")
         username = self._generate_username_by_role(user_data.nama, user_data.role, user_data.inspektorat)
+        logger.info(f"Generated username: {username}")
         
-        # 4. Check username availability and resolve conflicts
-        if await self.user_repo.username_exists(username):
-            username = await self._generate_available_username(
-                user_data.nama, user_data.role, user_data.inspektorat
-            )
+        # 4. Check username availability dengan debug
+        username_exists = await self.user_repo.username_exists(username)
+        logger.info(f"Username '{username}' exists: {username_exists}")
         
-        # 5. Create user in database
-        user = await self.user_repo.create(user_data, username)
+        if username_exists:
+            logger.info(f"Username conflict detected, generating alternative...")
+            try:
+                username = await self._generate_available_username(
+                    user_data.nama, user_data.role, user_data.inspektorat
+                )
+                logger.info(f"Alternative username generated: {username}")
+            except Exception as e:
+                logger.error(f"Error generating alternative username: {str(e)}")
+                # Fallback dengan timestamp
+                import time
+                username = f"{username}_{int(time.time() % 10000)}"
+                logger.info(f"Fallback username: {username}")
         
-        # 6. Convert Model → Schema Response
+        # 5. Final check sebelum create
+        final_check = await self.user_repo.username_exists(username)
+        logger.info(f"Final username check for '{username}': {final_check}")
+        
+        if final_check:
+            # Emergency fallback
+            import uuid
+            username = f"{username}_{str(uuid.uuid4())[:8]}"
+            logger.warning(f"Emergency fallback username: {username}")
+        
+        # 6. Create user
+        try:
+            user = await self.user_repo.create(user_data, username)
+            logger.info(f"User created successfully with username: {username}")
+        except Exception as e:
+            logger.error(f"Failed to create user with username '{username}': {str(e)}")
+            raise e
+        
+        # 7. Convert Model → Schema Response
         return UserResponse.from_user_model(user)
     
     async def get_user_or_404(self, user_id: str) -> UserResponse:
@@ -88,22 +120,33 @@ class UserService:
                 detail="Email sudah terdaftar"
             )
         
-        # 3. If role changed to/from perwadag, validate inspektorat
+        # 3. FIXED: Handle role and inspektorat validation properly
         old_role = existing_user.role
-        if user_data.role:
-            if user_data.role == UserRole.PERWADAG and not user_data.inspektorat:
+        new_role = user_data.role if user_data.role else old_role
+        
+        # Check if role is changing to one that requires inspektorat
+        if new_role in [UserRole.INSPEKTORAT, UserRole.PERWADAG]:
+            # If inspektorat is being updated, use the new value
+            # If not being updated, check the existing value
+            inspektorat_value = user_data.inspektorat if user_data.inspektorat is not None else existing_user.inspektorat
+            
+            if not inspektorat_value or not inspektorat_value.strip():
+                role_name = "inspektorat" if new_role == UserRole.INSPEKTORAT else "perwadag"
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Inspektorat diperlukan untuk role 'perwadag'"
+                    detail=f"Inspektorat diperlukan untuk role '{role_name}'. Silakan kirim field 'inspektorat' bersama dengan 'role'."
                 )
-            elif user_data.role != UserRole.PERWADAG and user_data.inspektorat:
-                # Auto-clear inspektorat for non-perwadag roles
+        
+        # 4. If role is changing to ADMIN, clear inspektorat (optional for admin)
+        elif new_role == UserRole.ADMIN and old_role != UserRole.ADMIN:
+            # Only auto-clear if not explicitly provided
+            if user_data.inspektorat is None:
                 user_data.inspektorat = None
         
-        # 4. Update user in database
+        # 5. Update user in database
         updated_user = await self.user_repo.update(user_id, user_data)
         
-        # 5. NEW: Check if role changed, mark for re-login
+        # 6. Check if role changed, mark for re-login
         if user_data.role and old_role != user_data.role:
             import logging
             logger = logging.getLogger(__name__)
@@ -115,7 +158,7 @@ class UserService:
                 logger.error(f"Failed to mark role change for user {user_id}: {str(e)}")
                 # Don't fail the update if Redis fails, just log
         
-        # 6. Convert Model → Schema Response
+        # 7. Convert Model → Schema Response
         return UserResponse.from_user_model(updated_user)
     
     async def change_password(self, user_id: str, password_data: UserChangePassword) -> MessageResponse:
@@ -220,18 +263,43 @@ class UserService:
         return MessageResponse(message=f"User {user.nama} berhasil dihapus")
     
     async def get_all_users_with_filters(self, filters: UserFilterParams) -> UserListResponse:
-        """Get users dengan simplified filters."""
+        """Get users dengan error handling untuk data bermasalah."""
+        
         # 1. Get users from repository
         users, total = await self.user_repo.get_all_users_filtered(filters)
-                
-        # 3. Convert semua models ke responses
-        user_responses = [UserResponse.from_user_model(user) for user in users]
         
+        # 2. Convert models ke responses dengan error handling
+        user_responses = []
+        problematic_users = []
+        
+        for user in users:
+            try:
+                user_response = UserResponse.from_user_model(user)
+                user_responses.append(user_response)
+            except Exception as e:
+                # Log user bermasalah tapi jangan stop proses
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to convert user {user.id} ({user.username}): {str(e)}")
+                logger.error(f"User data: nama='{user.nama}', role={user.role}, inspektorat='{user.inspektorat}', email='{user.email}'")
+                
+                problematic_users.append({
+                    "id": user.id,
+                    "username": user.username,
+                    "error": str(e)
+                })
+        
+        # 3. Log summary jika ada user bermasalah
+        if problematic_users:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Found {len(problematic_users)} problematic users that couldn't be converted")
+            
         pages = (total + filters.size - 1) // filters.size if total > 0 else 0
 
         return UserListResponse(
-            items=user_responses,  # ✅ users → items
-            total=total,
+            items=user_responses,
+            total=len(user_responses),  # Use actual converted count
             page=filters.page,
             size=filters.size,
             pages=pages

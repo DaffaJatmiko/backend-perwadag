@@ -129,28 +129,61 @@ class UserResponse(UserBase):
     
     @classmethod
     def from_user_model(cls, user) -> "UserResponse":
-        """Create UserResponse from User model."""
-        return cls(
-            id=user.id,
-            nama=user.nama,
-            username=user.username,
-            # tempat_lahir=user.tempat_lahir,
-            # tanggal_lahir=user.tanggal_lahir,
-            # pangkat=user.pangkat,
-            jabatan=user.jabatan,
-            email=user.email,
-            is_active=user.is_active,
-            role=user.role,
-            inspektorat=user.inspektorat,
-            display_name=user.display_name,
-            # age=user.age,
-            has_email=user.has_email(),
-            last_login=user.last_login,
-            role_display=user.get_role_display(),
-            created_at=user.created_at,
-            updated_at=user.updated_at
-        )
-    
+        """Create UserResponse from User model dengan comprehensive data cleaning."""
+        
+        # 🔧 Handle missing inspektorat untuk role yang memerlukan
+        inspektorat_value = user.inspektorat
+        if user.role in [UserRole.INSPEKTORAT, UserRole.PERWADAG]:
+            if not inspektorat_value or not str(inspektorat_value).strip():
+                inspektorat_value = f"[Perlu Update - {user.role.value}]"
+        
+        # 🔧 Handle problematic email values
+        email_value = None
+        if user.email:
+            email_str = str(user.email).strip()
+            # Exclude invalid email strings
+            if email_str.lower() not in ['none', '[null]', 'null', '']:
+                try:
+                    # Validate email format
+                    from pydantic import EmailStr
+                    # If it passes EmailStr validation, use it
+                    email_value = email_str
+                except:
+                    # If email is invalid, set to None
+                    email_value = None
+        
+        # 🔧 Handle other potential None-as-string values
+        nama = user.nama if user.nama and str(user.nama).lower() != 'none' else 'Unknown'
+        username = user.username if user.username and str(user.username).lower() != 'none' else 'unknown'
+        jabatan = user.jabatan if user.jabatan and str(user.jabatan).lower() != 'none' else 'Unknown'
+        
+        try:
+            return cls(
+                id=user.id,
+                nama=nama,
+                username=username,
+                jabatan=jabatan,
+                email=email_value,
+                is_active=user.is_active,
+                role=user.role,
+                inspektorat=inspektorat_value,
+                display_name=user.display_name,
+                has_email=bool(email_value),  # Calculate based on cleaned email
+                last_login=user.last_login,
+                role_display=user.get_role_display(),
+                created_at=user.created_at,
+                updated_at=user.updated_at
+            )
+        except Exception as e:
+            # Log error untuk debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error creating UserResponse for user {user.id}: {str(e)}")
+            logger.error(f"Cleaned data: nama='{nama}', email='{email_value}', inspektorat='{inspektorat_value}'")
+            
+            # Re-raise dengan info lebih detail
+            raise ValueError(f"Failed to create UserResponse for user {user.username}: {str(e)}")
+        
     model_config = ConfigDict(from_attributes=True)
 
 
