@@ -28,7 +28,7 @@ Pastikan Anda memiliki yang berikut terinstal:
 
 1. **Clone repository:**
 ```bash
-git clone [repository-url]
+git clone https://github.com/DaffaJatmiko/backend-perwadag.git backend
 cd perwadag/backend
 ```
 
@@ -117,7 +117,7 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 
 1. **Clone repository:**
 ```bash
-git clone [repository-url]
+git clone https://github.com/DaffaJatmiko/backend-perwadag.git backend
 cd perwadag/backend
 ```
 
