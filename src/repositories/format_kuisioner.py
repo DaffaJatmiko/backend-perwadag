@@ -178,3 +178,38 @@ class FormatKuisionerRepository:
         await self.session.commit()
         await self.session.refresh(format_kuisioner)
         return format_kuisioner
+
+    async def get_active_template(self) -> Optional[FormatKuisioner]:
+        """Get currently active format kuisioner."""
+        query = select(FormatKuisioner).where(
+            and_(
+                FormatKuisioner.is_active == True,
+                FormatKuisioner.deleted_at.is_(None)
+            )
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def activate_template(self, format_kuisioner_id: str) -> Optional[FormatKuisioner]:
+        """Activate template and deactivate all others."""
+        from sqlalchemy import update
+        
+        # First deactivate all templates
+        await self.session.execute(
+            update(FormatKuisioner).where(
+                and_(
+                    FormatKuisioner.is_active == True,
+                    FormatKuisioner.deleted_at.is_(None)
+                )
+            ).values(is_active=False, updated_at=datetime.utcnow())
+        )
+        
+        # Then activate the specified template
+        await self.session.execute(
+            update(FormatKuisioner).where(
+                FormatKuisioner.id == format_kuisioner_id
+            ).values(is_active=True, updated_at=datetime.utcnow())
+        )
+        
+        await self.session.commit()
+        return await self.get_by_id(format_kuisioner_id)

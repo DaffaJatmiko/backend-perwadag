@@ -63,7 +63,7 @@ class FormatKuisionerResponse(BaseModel):
     display_name: str
     has_file: bool
     is_downloadable: bool
-    is_current_year: bool = Field(description="Whether template is for current year")
+    is_active: bool = Field(description="Whether template is currently active")
     
     # Usage statistics
     usage_count: int = Field(description="How many times template has been downloaded")

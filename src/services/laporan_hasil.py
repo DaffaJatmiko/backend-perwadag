@@ -120,27 +120,56 @@ class LaporanHasilService:
         update_data: LaporanHasilUpdate, 
         updated_by: str
     ) -> LaporanHasilResponse:
-        """Update laporan hasil."""
-        laporan_hasil = await self.laporan_hasil_repo.update(laporan_hasil_id, update_data)
+        """Update laporan hasil dengan nomor laporan uniqueness validation."""
+        
+        # 1. Get existing laporan
+        laporan_hasil = await self.laporan_hasil_repo.get_by_id(laporan_hasil_id)
         if not laporan_hasil:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Laporan hasil tidak ditemukan"
             )
 
+        # 2. Get surat tugas data untuk date validation
         surat_tugas_data = await self._get_surat_tugas_basic_info(laporan_hasil.surat_tugas_id)
         
-        # 🔥 VALIDASI AKSES TANGGAL
+        # 3. Date validation
         validate_laporan_hasil_date_access(
             tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
             operation="update"
         )
 
-        # Set updated_by
-        laporan_hasil.updated_by = updated_by
+        # 🔥 4. NEW: Validate nomor laporan uniqueness
+        if hasattr(update_data, 'nomor_laporan') and update_data.nomor_laporan is not None:
+            nomor_laporan = update_data.nomor_laporan.strip() if update_data.nomor_laporan else ""
+            
+            # Only check if nomor_laporan is not empty
+            if nomor_laporan:
+                is_duplicate = await self.laporan_hasil_repo.check_nomor_laporan_exists(
+                    nomor_laporan=nomor_laporan,
+                    exclude_id=laporan_hasil_id
+                )
+                
+                if is_duplicate:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Nomor laporan '{nomor_laporan}' sudah digunakan oleh laporan hasil lain"
+                    )
+
+        # 5. Continue dengan update seperti biasa
+        updated_laporan = await self.laporan_hasil_repo.update(laporan_hasil_id, update_data)
+        if not updated_laporan:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Laporan hasil tidak ditemukan"
+            )
+
+        # 6. Set updated_by
+        updated_laporan.updated_by = updated_by
         await self.laporan_hasil_repo.session.commit()
         
         return await self.get_laporan_hasil_or_404(laporan_hasil_id)
+
     
     async def upload_file(
         self, 
@@ -402,7 +431,7 @@ class LaporanHasilService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Gagal menghapus file: {str(e)}"
             )
-            
+
     async def _get_surat_tugas_basic_info(self, surat_tugas_id: str) -> Optional[Dict[str, Any]]:
         """Get basic surat tugas information - FIXED SQL query."""
         
@@ -444,6 +473,46 @@ class LaporanHasilService:
             'tahun_evaluasi': tahun_evaluasi,  # Calculated value
             'perwadag_nama': row[5],  # Adjusted index
             'evaluation_status': 'active'
+        }
+
+    async def check_nomor_laporan_available(
+        self, 
+        nomor_laporan: str, 
+        exclude_laporan_hasil_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Check availability nomor laporan dan berikan info detail.
+        
+        Args:
+            nomor_laporan: Nomor laporan yang akan dicek
+            exclude_laporan_hasil_id: ID laporan hasil yang dikecualikan
+        
+        Returns:
+            Dict dengan info availability
+        """
+        if not nomor_laporan or nomor_laporan.strip() == "":
+            return {
+                "available": True,
+                "message": "Nomor laporan kosong"
+            }
+        
+        nomor_laporan = nomor_laporan.strip()
+        
+        is_duplicate = await self.laporan_hasil_repo.check_nomor_laporan_exists(
+            nomor_laporan=nomor_laporan,
+            exclude_id=exclude_laporan_hasil_id
+        )
+        
+        if is_duplicate:
+            return {
+                "available": False,
+                "message": f"Nomor laporan '{nomor_laporan}' sudah digunakan",
+                "suggestion": f"Coba gunakan: {nomor_laporan}-01, {nomor_laporan}-02, atau format lain"
+            }
+        
+        return {
+            "available": True,
+            "message": f"Nomor laporan '{nomor_laporan}' tersedia"
         }
     
     async def _build_enriched_response(

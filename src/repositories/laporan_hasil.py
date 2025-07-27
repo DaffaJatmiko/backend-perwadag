@@ -317,3 +317,41 @@ class LaporanHasilRepository:
         await self.session.commit()
         await self.session.refresh(laporan_hasil)
         return laporan_hasil
+
+    async def check_nomor_laporan_exists(
+        self, 
+        nomor_laporan: str, 
+        exclude_id: Optional[str] = None
+    ) -> bool:
+        """
+        Check apakah nomor laporan sudah exists di database.
+        
+        Args:
+            nomor_laporan: Nomor laporan yang akan dicek
+            exclude_id: ID laporan hasil yang dikecualikan (untuk update case)
+        
+        Returns:
+            bool: True jika nomor laporan sudah exists, False jika belum
+        """
+        if not nomor_laporan or nomor_laporan.strip() == "":
+            return False
+        
+        # Clean nomor laporan
+        nomor_laporan = nomor_laporan.strip()
+        
+        # Build query
+        query = select(LaporanHasil.id).where(
+            and_(
+                LaporanHasil.nomor_laporan == nomor_laporan,
+                LaporanHasil.deleted_at.is_(None)
+            )
+        )
+        
+        # Exclude current record jika update
+        if exclude_id:
+            query = query.where(LaporanHasil.id != exclude_id)
+        
+        result = await self.session.execute(query)
+        existing_id = result.scalar_one_or_none()
+        
+        return existing_id is not None

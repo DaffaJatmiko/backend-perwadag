@@ -1,7 +1,7 @@
 # ===== src/services/format_kuisioner.py =====
 """Service untuk format kuisioner master templates - FIXED."""
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 from datetime import datetime
 from fastapi import HTTPException, status, UploadFile
 
@@ -277,6 +277,25 @@ class FormatKuisionerService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Gagal menghapus file: {str(e)}"
             )
+
+    async def get_active_template(self) -> Optional[FormatKuisionerResponse]:
+        """Get active format kuisioner template."""
+        template = await self.format_kuisioner_repo.get_active_template()
+        if not template:
+            return None
+        return self._build_response(template)
+
+    async def activate_template(self, format_kuisioner_id: str) -> FormatKuisionerResponse:
+        """Activate format kuisioner template (auto-deactivate others)."""
+        format_kuisioner = await self.format_kuisioner_repo.get_by_id(format_kuisioner_id)
+        if not format_kuisioner:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Format kuisioner tidak ditemukan"
+            )
+        
+        activated = await self.format_kuisioner_repo.activate_template(format_kuisioner_id)
+        return self._build_response(activated)
     
     def _build_response(self, format_kuisioner) -> FormatKuisionerResponse:
         """Build response from model - ENHANCED."""
@@ -307,10 +326,6 @@ class FormatKuisionerService:
                     is_viewable=file_info.get('content_type', '').startswith(('image/', 'application/pdf'))
                 )
         
-        # Calculate additional fields
-        current_year = datetime.now().year
-        is_current_year = format_kuisioner.tahun == current_year
-        
         # Mock usage statistics (implement proper tracking if needed)
         usage_count = 0
         last_used = None
@@ -331,7 +346,7 @@ class FormatKuisionerService:
             display_name=getattr(format_kuisioner, 'display_name', format_kuisioner.nama_template),
             has_file=bool(format_kuisioner.link_template),
             is_downloadable=bool(format_kuisioner.link_template),
-            is_current_year=is_current_year,
+            is_active=format_kuisioner.is_active,
             
             # Usage statistics
             usage_count=usage_count,

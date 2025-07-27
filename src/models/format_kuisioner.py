@@ -39,6 +39,11 @@ class FormatKuisioner(BaseModel, SQLModel, table=True):
         description="Link ke file template (URL/Path)"
     )
     
+    is_active: bool = Field(
+        default=False,
+        description="Only one template can be active at a time"
+    )
+
     def is_active_for_year(self, year: int) -> bool:
         """Check apakah template aktif untuk tahun tertentu."""
         return self.tahun == year

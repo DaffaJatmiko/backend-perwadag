@@ -1,7 +1,7 @@
 # ===== src/api/endpoints/format_kuisioner.py =====
 """API endpoints untuk format kuisioner master templates."""
 
-from fastapi import APIRouter, Depends, UploadFile, File, Form, Query, Path
+from fastapi import APIRouter, Depends, UploadFile, File, Form, Query, Path, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
@@ -61,6 +61,22 @@ async def get_all_format_kuisioner(
     return await service.get_all_format_kuisioner(filters)
 
 
+# 🔥 PENTING: LETAKKAN /active SEBELUM /{format_kuisioner_id}
+@router.get("/active", response_model=FormatKuisionerResponse)
+async def get_active_template(
+    current_user: dict = Depends(require_evaluasi_read_access()),
+    service: FormatKuisionerService = Depends(get_format_kuisioner_service)
+):
+    """Get currently active format kuisioner template."""
+    template = await service.get_active_template()
+    if not template:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tidak ada template format kuisioner yang aktif"
+        )
+    return template
+
+
 @router.get("/tahun/{tahun}")
 async def get_format_kuisioner_by_tahun(
     tahun: int,
@@ -95,6 +111,21 @@ async def update_format_kuisioner(
 ):
     """Update format kuisioner - Admin only."""
     return await service.update_format_kuisioner(format_kuisioner_id, update_data, current_user["id"])
+
+
+@router.post("/{format_kuisioner_id}/activate", response_model=FormatKuisionerResponse)
+async def activate_template(
+    format_kuisioner_id: str,
+    current_user: dict = Depends(require_format_kuisioner_access()),
+    service: FormatKuisionerService = Depends(get_format_kuisioner_service)
+):
+    """
+    Activate format kuisioner template - Admin only.
+    
+    Activates the specified template and automatically deactivates all others.
+    Only one template can be active at a time.
+    """
+    return await service.activate_template(format_kuisioner_id)
 
 
 @router.post("/{format_kuisioner_id}/upload-file", response_model=FormatKuisionerFileUploadResponse)
@@ -138,7 +169,7 @@ async def download_format_kuisioner(
         )
     
     from fastapi.responses import RedirectResponse
-    return RedirectResponse(url=format_kuisioner.link_template_url)
+    return RedirectResponse(url=format_kuisioner.file_urls.file_url if format_kuisioner.file_urls else "")
 
 
 # ===== UTILITY ENDPOINTS =====
@@ -149,7 +180,7 @@ async def get_format_kuisioner_statistics(
     session: AsyncSession = Depends(get_db)
 ):
     """Get statistics template kuisioner - Admin only."""
-    from sqlalchemy import select, func
+    from sqlalchemy import select, func, and_
     from src.models.format_kuisioner import FormatKuisioner
     
     # Total templates
@@ -178,13 +209,25 @@ async def get_format_kuisioner_statistics(
     files_result = await session.execute(files_query)
     templates_with_files = files_result.scalar() or 0
     
+    # Active template
+    active_query = select(func.count()).select_from(FormatKuisioner).where(
+        and_(
+            FormatKuisioner.deleted_at.is_(None),
+            FormatKuisioner.is_active == True
+        )
+    )
+    active_result = await session.execute(active_query)
+    active_templates = active_result.scalar() or 0
+    
     return {
         "total_templates": total_templates,
         "templates_by_year": templates_by_year,
         "templates_with_files": templates_with_files,
         "templates_without_files": total_templates - templates_with_files,
+        "active_templates": active_templates,
         "completion_rate": round((templates_with_files / max(total_templates, 1)) * 100, 2)
     }
+
 
 @router.delete("/{format_kuisioner_id}/files/{filename}", response_model=FileDeleteResponse)
 async def delete_format_kuisioner_file(
