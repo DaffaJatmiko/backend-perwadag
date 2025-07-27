@@ -18,11 +18,102 @@ API ini dirancang dengan arsitektur berlapis yang bersih dan modular:
 
 Pastikan Anda memiliki yang berikut terinstal:
 
+- **Docker** & **Docker Compose** (Recommended)
+- **Python** >= 3.11 (untuk development tanpa Docker)
+- **PostgreSQL** >= 14 (jika tidak menggunakan Docker)
+
+## 🐳 Docker Setup (Recommended)
+
+### Quick Start dengan Docker
+
+1. **Clone repository:**
+```bash
+git clone [repository-url]
+cd perwadag/backend
+```
+
+2. **Setup environment variables:**
+```bash
+# File .env sudah ada dengan konfigurasi default
+# Edit .env untuk production atau sesuai kebutuhan
+```
+
+3. **Start semua services:**
+```bash
+# Start database & redis
+docker compose up -d postgres redis
+
+# Build dan start application
+docker compose up -d app
+
+# Jalankan database migration
+docker compose exec app alembic upgrade head
+```
+
+4. **Akses aplikasi:**
+- API: `http://localhost:8000`
+- API Docs: `http://localhost:8000/docs`
+- Database: `localhost:5432` (untuk debugging)
+
+### Docker Commands
+
+```bash
+# Stop semua services
+docker compose down
+
+# Stop dan hapus volumes (reset database)
+docker compose down -v
+
+# Rebuild application (setelah code changes)
+docker compose build --no-cache app
+docker compose up -d app
+
+# View logs
+docker compose logs app
+docker compose logs postgres
+
+# Execute commands dalam container
+docker compose exec app alembic upgrade head
+docker compose exec app python scripts/seed_data.py
+docker compose exec postgres psql -U postgres -d perwadag
+```
+
+### Hot Reload untuk Development
+
+Docker sudah dikonfigurasi untuk hot reload:
+- Source code di-mount ke container
+- FastAPI otomatis restart ketika ada perubahan kode
+- Ubah kode → simpan → aplikasi otomatis restart
+
+### Environment Variables untuk Docker
+
+File `.env` sudah dikonfigurasi untuk Docker dengan:
+
+```env
+# Database (Docker networking)
+POSTGRES_SERVER=postgres
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=password
+POSTGRES_DB=perwadag
+
+# Redis (Docker networking)
+REDIS_HOST=redis
+
+# Application
+DEBUG=true
+CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+```
+
+## 💻 Local Development (Tanpa Docker)
+
+### Prerequisites Local
+
 - **Python** >= 3.11
 - **PostgreSQL** >= 14
-- **pip** atau **poetry** untuk dependency management
+- **Redis** >= 6
+- **pip** untuk dependency management
 
-### Installation
+### Installation Local
 
 1. **Clone repository:**
 ```bash
@@ -43,18 +134,18 @@ venv\Scripts\activate     # Windows
 pip install -r requirements.txt
 ```
 
-4. **Setup environment variables:**
-```bash
-cp .env.example .env
-# Edit .env file dengan konfigurasi database dan secrets
-```
-
-5. **Setup database:**
+4. **Setup database lokal:**
 ```bash
 # Buat database PostgreSQL
-createdb perwadag_db
+createdb perwadag
 
-# Jalankan migrasi
+# Update .env untuk local database
+# POSTGRES_SERVER=localhost
+# REDIS_HOST=localhost
+```
+
+5. **Jalankan migrasi:**
+```bash
 alembic upgrade head
 ```
 
@@ -243,6 +334,24 @@ Lihat [doc-api.md](./doc-api.md) untuk dokumentasi API yang komprehensif dengan:
 
 ### Migrasi Database
 
+#### Dengan Docker:
+```bash
+# Buat migrasi baru
+docker compose exec app alembic revision --autogenerate -m "Deskripsi perubahan"
+
+# Jalankan migrasi
+docker compose exec app alembic upgrade head
+
+# Rollback migrasi
+docker compose exec app alembic downgrade -1
+
+# Reset database lengkap
+docker compose down -v
+docker compose up -d postgres redis
+docker compose exec app alembic upgrade head
+```
+
+#### Tanpa Docker:
 ```bash
 # Buat migrasi baru
 alembic revision --autogenerate -m "Deskripsi perubahan"
@@ -254,11 +363,33 @@ alembic upgrade head
 alembic downgrade -1
 ```
 
-### Seed Data
+### Initial Database Setup
+
+Database migration `001_initial_setup.py` sudah menyertakan:
+
+**Sample Users dengan password default: `@Kemendag123`**
+
+1. **Admin User:**
+   - Username: `administrator`
+   - Email: `projectkemendag@gmail.com`
+   - Role: `ADMIN`
+
+2. **Inspektorat Users** (12 users):
+   - Inspektorat 1-4 dengan format username: `{nama_depan}_ir{nomor}`
+   - Role: `INSPEKTORAT`
+
+3. **Perwadag Users** (54 users):
+   - Berbagai perwakilan dagang global
+   - Format username: `{prefix}_{location}`
+   - Role: `PERWADAG`
+
+### Database Reset untuk Production
 
 ```bash
-# Jalankan script untuk create initial data
-python scripts/seed_data.py
+# HATI-HATI: Ini akan menghapus semua data!
+docker compose down -v
+docker compose up -d postgres redis
+docker compose exec app alembic upgrade head
 ```
 
 ## 🧪 Testing
@@ -289,30 +420,78 @@ tests/
 
 ## 🚀 Deployment
 
-### Development
+### Development dengan Docker
 
 ```bash
-python main.py
+# Hot reload enabled untuk development
+docker compose up -d
 ```
 
 ### Production dengan Docker
 
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+1. **Update .env untuk production:**
+```env
+DEBUG=false
+POSTGRES_PASSWORD=strong-production-password
+JWT_SECRET_KEY=secure-production-jwt-key-min-32-chars
+CORS_ORIGINS=https://yourdomain.com
+EMAIL_SMTP_USERNAME=your-production-email
+EMAIL_SMTP_PASSWORD=your-app-password
 ```
 
-### Production dengan Uvicorn
+2. **Build dan deploy:**
+```bash
+# Remove --reload flag dari Dockerfile untuk production
+# Edit Dockerfile: CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Build production image
+docker compose build --no-cache app
+
+# Start production
+docker compose up -d
+```
+
+### Production Docker Compose Override
+
+Buat `docker-compose.prod.yml`:
+```yaml
+services:
+  app:
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+    environment:
+      - DEBUG=false
+    volumes:
+      # Remove source code mounting untuk production
+      - ./static/uploads:/app/static/uploads
+      - ./logs:/app/logs
+  
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+```
+
+Deploy production:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+### Production tanpa Docker
 
 ```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Set production environment
+export DEBUG=false
+export POSTGRES_SERVER=your-db-host
+export JWT_SECRET_KEY=your-secure-key
+
+# Run dengan multiple workers
 uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 

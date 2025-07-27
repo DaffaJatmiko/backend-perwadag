@@ -1,0 +1,78 @@
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.pytest_cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# Environment files
+.env.local
+.env.production
+.env.example
+
+# Virtual Environment
+venv/
+env/
+ENV/
+perwadag-venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs (will be mounted as volume)
+logs/
+
+# Uploads (will be mounted as volume)
+static/uploads/
+
+# Database files
+*.db
+*.sqlite
+
+# Backup files
+*.bak
+*.backup
+
+# Documentation
+README.md
+docs/
+
+# Development tools
+.flake8
+.black
+pytest.ini
+
+# Alembic (included, but ignore temp files)
+alembic/versions/*.pyc

@@ -1,0 +1,121 @@
+services:
+  # FastAPI Application
+  app:
+    build: .
+    container_name: gov-auth-app
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount uploads directory untuk persistent file storage
+      - ./static/uploads:/app/static/uploads
+      # Mount logs directory
+      - ./logs:/app/logs
+      # Mount source code for hot reload in development
+      - ./src:/app/src
+      - ./main.py:/app/main.py
+      - ./run.py:/app/run.py
+    environment:
+      # Override database dan redis hosts untuk Docker networking
+      - POSTGRES_SERVER=postgres
+      - REDIS_HOST=redis
+      # Load dari .env file juga
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - gov-auth-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: gov-auth-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      # Persistent data storage
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Expose untuk akses dari host (optional, untuk debugging)
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - gov-auth-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: gov-auth-redis
+    command: redis-server --appendonly yes
+    volumes:
+      # Persistent Redis data (optional)
+      - redis_data:/data
+    ports:
+      # Expose untuk akses dari host (optional, untuk debugging)
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - gov-auth-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Database Migration (Run once)
+  alembic:
+    build: .
+    container_name: gov-auth-migrations
+    environment:
+      - POSTGRES_SERVER=postgres
+      - REDIS_HOST=redis
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - gov-auth-network
+    command: ["alembic", "upgrade", "head"]
+    profiles:
+      - migration
+    # This service only runs when explicitly called
+    # docker-compose --profile migration up alembic
+
+# Named volumes untuk persistent data
+volumes:
+  postgres_data:
+    driver: local
+    # Optional: specify host path
+    # driver_opts:
+    #   type: none
+    #   o: bind
+    #   device: /var/lib/docker/volumes/postgres_data
+  
+  redis_data:
+    driver: local
+
+# Custom network
+networks:
+  gov-auth-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
