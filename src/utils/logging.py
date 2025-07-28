@@ -42,9 +42,6 @@ def setup_logging():
     # Create logs directory
     try:
         os.makedirs(settings.LOG_DIRECTORY, exist_ok=True)
-        print(f"Log directory: {settings.LOG_DIRECTORY}")
-        print(f"Directory exists: {os.path.exists(settings.LOG_DIRECTORY)}")
-        print(f"Directory writable: {os.access(settings.LOG_DIRECTORY, os.W_OK)}")
     except OSError as e:
         print(f"Error creating log directory: {e}")
 
@@ -103,48 +100,12 @@ def setup_logging():
         logging.config.dictConfig(LOGGING_CONFIG)
     except Exception as e:
         print(f"Error setting up logging configuration: {e}")
-        print(f"Log file path: {log_file_path}")
-        print(f"Log file exists: {os.path.exists(log_file_path)}")
-        if os.path.exists(log_file_path):
-            print(f"Log file writable: {os.access(log_file_path, os.W_OK)}")
-        # Fallback to console-only logging if file logging fails
-        fallback_config = {
-            'version': 1,
-            'disable_existing_loggers': False,
-            'formatters': {
-                'simple': {
-                    'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                },
-            },
-            'handlers': {
-                'console': {
-                    'class': 'logging.StreamHandler',
-                    'level': 'INFO',
-                    'formatter': 'simple',
-                    'stream': 'ext://sys.stdout',
-                },
-            },
-            'loggers': {
-                '': {
-                    'level': 'INFO',
-                    'handlers': ['console'],
-                    'propagate': False,
-                },
-                'uvicorn': {
-                    'level': 'INFO',
-                    'handlers': ['console'],
-                    'propagate': False,
-                },
-                'uvicorn.access': {
-                    'level': 'INFO',
-                    'handlers': ['console'],
-                    'propagate': False,
-                },
-            },
-        }
-        try:
-            logging.config.dictConfig(fallback_config)
-            print("Using console-only logging as fallback")
-        except Exception as fallback_error:
-            print(f"Fallback logging configuration also failed: {fallback_error}")
-            logging.basicConfig(level=logging.INFO)
+        # Fallback to basic config
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.StreamHandler(),
+                logging.FileHandler(log_file_path) if os.path.exists(settings.LOG_DIRECTORY) else logging.StreamHandler()
+            ]
+        )
