@@ -42,6 +42,9 @@ def setup_logging():
     # Create logs directory
     try:
         os.makedirs(settings.LOG_DIRECTORY, exist_ok=True)
+        print(f"Log directory: {settings.LOG_DIRECTORY}")
+        print(f"Directory exists: {os.path.exists(settings.LOG_DIRECTORY)}")
+        print(f"Directory writable: {os.access(settings.LOG_DIRECTORY, os.W_OK)}")
     except OSError as e:
         print(f"Error creating log directory: {e}")
 
@@ -100,6 +103,10 @@ def setup_logging():
         logging.config.dictConfig(LOGGING_CONFIG)
     except Exception as e:
         print(f"Error setting up logging configuration: {e}")
+        print(f"Log file path: {log_file_path}")
+        print(f"Log file exists: {os.path.exists(log_file_path)}")
+        if os.path.exists(log_file_path):
+            print(f"Log file writable: {os.access(log_file_path, os.W_OK)}")
         # Fallback to console-only logging if file logging fails
         fallback_config = {
             'version': 1,
