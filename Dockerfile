@@ -16,6 +16,9 @@ RUN apt-get update \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Create non-root user early
+RUN adduser --disabled-password --gecos '' --shell /bin/bash user
+
 # Copy requirements first (for better Docker layer caching)
 COPY requirements.txt .
 
@@ -23,32 +26,19 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy application code and set ownership
+COPY --chown=user:user . .
 
-# Create directories and set proper permissions
-RUN mkdir -p static \
-    && mkdir -p logs
-
-# CREATE USER AND GROUP (ini yang hilang!)
-RUN groupadd -r -g 1000 appgroup \
-    && useradd -r -u 1000 -g appgroup -m -d /home/appuser -s /bin/bash appuser
-
-# IMPORTANT: Set ownership BEFORE setting permissions
-RUN chown -R appuser:appgroup /app
-
-# Then set permissions
-RUN chmod -R 755 /app \
-    && chmod -R 777 /app/static \
-    && chmod -R 777 /app/logs
+# Create the full directory structure with proper permissions
+RUN mkdir -p static/uploads/evaluasi/surat-tugas \
+    && mkdir -p logs \
+    && chown -R user:user /app \
+    && chmod -R 755 /app/static \
+    && chmod -R 775 /app/static/uploads \
+    && chmod -R 755 /app/logs
 
 # Switch to non-root user
-USER appuser
-
-RUN whoami \
-    && ls -la /app \
-    && touch /app/test_write_permission \
-    && rm /app/test_write_permission
+USER user
 
 # Expose port
 EXPOSE 8000
@@ -58,4 +48,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "run.py"]
