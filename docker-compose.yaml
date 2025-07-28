@@ -4,7 +4,7 @@ services:
     build: .
     container_name: gov-auth-app
     ports:
-      - "8000:8000"
+      - '8000:8000'
     volumes:
       # Mount uploads directory untuk persistent file storage
       - ./static/uploads:/app/static/uploads
@@ -30,7 +30,7 @@ services:
     networks:
       - gov-auth-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -47,14 +47,14 @@ services:
     volumes:
       # Persistent data storage
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      # Expose untuk akses dari host (optional, untuk debugging)
-      - "5432:5432"
+    # ports:
+    #   # Expose untuk akses dari host (optional, untuk debugging)
+    #   - '5433:5432'
     restart: unless-stopped
     networks:
       - gov-auth-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -67,14 +67,14 @@ services:
     volumes:
       # Persistent Redis data (optional)
       - redis_data:/data
-    ports:
-      # Expose untuk akses dari host (optional, untuk debugging)
-      - "6379:6379"
+    # ports:
+    #   # Expose untuk akses dari host (optional, untuk debugging)
+    #   - '6379:6379'
     restart: unless-stopped
     networks:
       - gov-auth-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -93,7 +93,7 @@ services:
         condition: service_healthy
     networks:
       - gov-auth-network
-    command: ["alembic", "upgrade", "head"]
+    command: ['alembic', 'upgrade', 'head']
     profiles:
       - migration
     # This service only runs when explicitly called
@@ -108,7 +108,7 @@ volumes:
     #   type: none
     #   o: bind
     #   device: /var/lib/docker/volumes/postgres_data
-  
+
   redis_data:
     driver: local
 
