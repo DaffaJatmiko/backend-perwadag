@@ -36,9 +36,13 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         
         # Check if request should be rate limited
         if await self._is_rate_limited(request, client_ip):
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Terlalu banyak permintaan. Silakan coba lagi nanti."
+                content={
+                    "detail": "Rate limit exceeded. Too many requests.",
+                    "retry_after": self.period
+                },
+                headers={"Retry-After": str(self.period)}
             )
         
         # Update request count
@@ -160,9 +164,13 @@ class AuthRateLimitingMiddleware(BaseHTTPMiddleware):
         
         # Check rate limit for auth endpoints
         if await self._is_auth_rate_limited(client_ip):
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Terlalu banyak percobaan login. Silakan coba lagi dalam 5 menit."
+                content={
+                    "detail": "Too many authentication attempts. Please try again later.",
+                    "retry_after": self.period
+                },
+                headers={"Retry-After": str(self.period)}
             )
         
         response = await call_next(request)
