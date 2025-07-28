@@ -27,7 +27,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 COPY . .
 
 # Create directories and set proper permissions
-RUN mkdir -p static/uploads \
+RUN mkdir -p static \
     && mkdir -p logs
 
 # CREATE USER AND GROUP (ini yang hilang!)
@@ -45,13 +45,13 @@ RUN chmod -R 755 /app \
 # Switch to non-root user
 USER appuser
 
-# Expose port
-EXPOSE 8000
-
 RUN whoami \
     && ls -la /app \
     && touch /app/test_write_permission \
     && rm /app/test_write_permission
+
+# Expose port
+EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
