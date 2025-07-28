@@ -1,8 +1,8 @@
-"""Authentication service for government project (revised)."""
+"""Authentication service for government project (revised) with Cookie Support."""
 
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Response
 
 from src.repositories.user import UserRepository
 from src.services.user import UserService
@@ -13,6 +13,7 @@ from src.schemas.user import (
 from src.auth.jwt import create_access_token, create_refresh_token, verify_token
 from src.services.email import EmailService
 from src.utils.password import generate_password_reset_token, mask_email
+from src.utils.cookies import set_auth_cookies, clear_auth_cookies
 from src.core.config import settings
 
 
@@ -26,7 +27,7 @@ class AuthService:
         # No more role_repo needed!
     
 
-    async def login(self, login_data: UserLogin) -> Token:
+    async def login(self, login_data: UserLogin, response: Response) -> Token:
         """Login user with simplified role handling."""
         # Authenticate user
         user = await self.user_service.authenticate_user(
@@ -85,16 +86,24 @@ class AuthService:
             logger.warning(f"Failed to clear logout flag: {e}")
             # Jangan gagalkan login jika Redis error
         
-        # ✅ RETURN TOKEN RESPONSE
-        return Token(
+        # ✅ SET COOKIES INSTEAD OF RETURNING TOKENS
+        set_auth_cookies(
+            response=response,
             access_token=access_token,
             refresh_token=refresh_token,
+            access_token_expires_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        )
+        
+        # ✅ RETURN TOKEN RESPONSE WITHOUT ACTUAL TOKENS (for backward compatibility)
+        return Token(
+            access_token="",  # Empty - token is in cookie
+            refresh_token="",  # Empty - token is in cookie  
             token_type="bearer",
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             user=user_response
         )
     
-    async def refresh_token(self, refresh_token: str) -> Token:
+    async def refresh_token(self, refresh_token: str, response: Response) -> Token:
         """Refresh access token dengan blacklist check."""
         from src.core.redis import redis_is_token_blacklisted, redis_is_role_changed
         
@@ -158,9 +167,17 @@ class AuthService:
             
             user_response = UserResponse.from_user_model(user)
             
-            return Token(
+            # ✅ SET NEW ACCESS TOKEN COOKIE
+            set_auth_cookies(
+                response=response,
                 access_token=access_token,
                 refresh_token=refresh_token,  # Keep same refresh token
+                access_token_expires_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+            )
+            
+            return Token(
+                access_token="",  # Empty - token is in cookie
+                refresh_token="",  # Empty - token is in cookie
                 token_type="bearer",
                 expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
                 user=user_response
@@ -318,7 +335,7 @@ class AuthService:
         
         return MessageResponse(message="Reset password berhasil")
     
-    async def logout(self, token: str) -> MessageResponse:
+    async def logout(self, token: str, response: Response) -> MessageResponse:
         """Logout user - invalidate ALL tokens untuk user ini."""
         import time
         from src.core.redis import redis_blacklist_token, redis_mark_role_changed
@@ -346,6 +363,10 @@ class AuthService:
             # 🔥 TAMBAHAN: Invalidate SEMUA tokens user (access + refresh)
             await redis_mark_role_changed(user_id, ttl_seconds=86400)
             logger.info(f"All tokens invalidated for user {user_id}")
+            
+            # ✅ CLEAR COOKIES
+            clear_auth_cookies(response)
+            logger.info(f"Auth cookies cleared for user {user_id}")
             
             logger.info(f"User {user_id} logged out successfully")
             return MessageResponse(message="Logout berhasil")

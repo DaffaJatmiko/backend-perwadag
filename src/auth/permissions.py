@@ -1,4 +1,4 @@
-"""Fixed authorization and permission checking - SINGLE ROLE SYSTEM."""
+"""Fixed authorization and permission checking - SINGLE ROLE SYSTEM with Cookie Support."""
 
 from typing import List, Dict, Optional
 from fastapi import Depends, HTTPException, status, Request
@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.jwt import verify_token
 from src.core.database import get_db
+from src.utils.cookies import get_access_token_from_cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
 
@@ -15,28 +16,39 @@ logger = logging.getLogger(__name__)
 
 
 class JWTBearer(HTTPBearer):
-    """Custom JWT Bearer handler."""
+    """Custom JWT Bearer handler with cookie support."""
     
     def __init__(self, auto_error: bool = True):
         super(JWTBearer, self).__init__(auto_error=auto_error)
 
     async def __call__(self, request: Request):
-        credentials: HTTPAuthorizationCredentials = await super(
-            JWTBearer, self
-        ).__call__(request)
-        
-        if credentials:
-            if not credentials.scheme == "Bearer":
+        # First try to get token from Authorization header
+        try:
+            credentials: HTTPAuthorizationCredentials = await super(
+                JWTBearer, self
+            ).__call__(request)
+            
+            if credentials:
+                if not credentials.scheme == "Bearer":
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Invalid authentication scheme.",
+                    )
+                return credentials.credentials
+        except HTTPException:
+            # If Authorization header fails, try cookie
+            token = get_access_token_from_cookie(request)
+            if token:
+                return token
+            
+            # If both fail and auto_error is True, raise exception
+            if self.auto_error:
                 raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Invalid authentication scheme.",
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Not authenticated. Token required in Authorization header or cookie.",
+                    headers={"WWW-Authenticate": "Bearer"},
                 )
-            return credentials.credentials
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid authorization code.",
-            )
+            return None
 
 
 jwt_bearer = JWTBearer()

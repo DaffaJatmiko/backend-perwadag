@@ -1,6 +1,6 @@
-"""Authentication endpoints (simplified - nama as username)."""
+"""Authentication endpoints (simplified - nama as username) with Cookie Support."""
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
@@ -33,8 +33,9 @@ async def get_auth_service(session: AsyncSession = Depends(get_db)) -> AuthServi
 @router.post("/login", response_model=Token, summary="Login user")
 async def login(
     login_data: UserLogin,
-    request: Request,  # 🔥 TAMBAH INI
-    session: AsyncSession = Depends(get_db),  # 🔥 TAMBAH INI
+    request: Request,
+    response: Response,  # 🔥 TAMBAH INI UNTUK COOKIE
+    session: AsyncSession = Depends(get_db),
     auth_service: AuthService = Depends(get_auth_service)
 ):
     """
@@ -59,8 +60,8 @@ async def login(
     ip_address = get_client_ip(request)
     
     try:
-        # Execute login
-        result = await auth_service.login(login_data)
+        # Execute login with response for cookies
+        result = await auth_service.login(login_data, response)
         
         # 🔥 TAMBAH: Log successful login
         try:
@@ -116,22 +117,32 @@ async def login(
 
 @router.post("/refresh", response_model=Token, summary="Refresh access token")
 async def refresh_access_token(
-    token_data: TokenRefresh,
+    request: Request,
+    response: Response,  # 🔥 TAMBAH INI UNTUK COOKIE
     auth_service: AuthService = Depends(get_auth_service)
 ):
     """
-    Refresh access token using refresh token.
-    
-    - **refresh_token**: Valid refresh token
+    Refresh access token using refresh token from cookie.
     
     Returns new access token with updated user information.
     """
-    return await auth_service.refresh_token(token_data.refresh_token)
+    from src.utils.cookies import get_refresh_token_from_cookie
+    
+    # Get refresh token from cookie
+    refresh_token = get_refresh_token_from_cookie(request)
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token not found in cookie"
+        )
+    
+    return await auth_service.refresh_token(refresh_token, response)
 
 
 @router.post("/logout", response_model=MessageResponse, summary="Logout user")
 async def logout(
-    token: str = Depends(get_token_string),  # Tambahkan ini
+    response: Response,  # 🔥 TAMBAH INI UNTUK COOKIE
+    token: str = Depends(get_token_string),
     auth_service: AuthService = Depends(get_auth_service)
 ):
     """
@@ -146,7 +157,7 @@ async def logout(
     - Token benar-benar invalid setelah logout (tidak seperti client-side logout)
     - Stolen token tidak bisa digunakan setelah legitimate user logout
     """
-    return await auth_service.logout(token)
+    return await auth_service.logout(token, response)
 
 
 # @router.get("/me", response_model=UserResponse, summary="Get current user info")

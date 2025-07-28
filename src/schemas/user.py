@@ -217,9 +217,9 @@ class UserLogin(BaseModel):
 
 
 class Token(BaseModel):
-    """Schema for token response."""
-    access_token: str
-    refresh_token: str
+    """Schema for token response (with cookie-based auth)."""
+    access_token: str = Field("", description="Empty - token is in HTTP-only cookie")
+    refresh_token: str = Field("", description="Empty - token is in HTTP-only cookie")
     token_type: str = "bearer"
     expires_in: int = Field(..., description="Token expiry in seconds")
     user: UserResponse
