@@ -26,28 +26,17 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# Create logs directory with proper permissions BEFORE copying code
-RUN mkdir -p logs \
-    && touch logs/gov-auth-api.log \
-    && chown -R user:user logs \
-    && chmod 777 logs \
-    && chmod 777 logs/gov-auth-api.log
-
 # Copy application code and set ownership
-COPY --chown=user:user . .
+COPY  . .
 
 # Remove logs folder that might have been copied and recreate with correct permissions
-RUN rm -rf logs \
-    && mkdir -p logs \
+RUN mkdir -p logs \
     && mkdir -p static/uploads/evaluasi/{surat-tugas,surat-pemberitahuan,meetings/{entry,konfirmasi,exit},matriks,laporan-hasil,kuisioner,format-kuisioner} \
     && chown -R user:user /app \
-    && chmod -R 755 /app \
-    && chmod 777 logs 
-    
-RUN echo "DEBUG: Checking logs permissions:" \
-    && ls -la logs \
-    && whoami \
-    && id
+    && chmod -R 777 /app \
+    && chmod 777 logs  \
+    && chmod 777 static 
+
 
 # Switch to non-root user
 USER user
