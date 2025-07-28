@@ -26,16 +26,18 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# Copy application code and set ownership
-COPY  . .
-
-# Remove logs folder that might have been copied and recreate with correct permissions
+# Create directories with proper permissions first
 RUN mkdir -p logs \
     && mkdir -p static/uploads/evaluasi/{surat-tugas,surat-pemberitahuan,meetings/{entry,konfirmasi,exit},matriks,laporan-hasil,kuisioner,format-kuisioner} \
-    && chown -R user:user /app \
-    && chmod -R 777 /app \
-    && chmod 777 logs  \
-    && chmod 777 static 
+    && chown -R user:user /app
+
+# Copy application code and set ownership
+COPY --chown=user:user . .
+
+# Ensure proper permissions for logs and static directories
+RUN chmod -R 755 /app \
+    && chmod -R 777 logs \
+    && chmod -R 777 static
 
 
 # Switch to non-root user
