@@ -24,7 +24,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
 # Create non-root user for security (do this early)
-RUN adduser --disabled-password --gecos '' --shell /bin/bash miko
+RUN adduser --disabled-password --gecos '' --shell /bin/bash perwadaguser
 
 # Copy application code
 COPY . .
@@ -32,13 +32,13 @@ COPY . .
 # Create all necessary directories and set proper permissions
 RUN mkdir -p static/uploads \
     && mkdir -p logs \
-    # && chown -R miko:miko /app \
-    # && chmod -R 755 /app \
-    # && chmod -R 777 static/uploads \
-    # && chmod -R 777 logs
+    && chown -R perwadaguser:perwadaguser /app \
+    && chmod -R 755 /app \
+    && chmod -R 777 static/uploads \
+    && chmod -R 777 logs
 
 # Switch to non-root user AFTER setting permissions
-USER miko
+USER perwadaguser
 
 # Expose port
 EXPOSE 8000
