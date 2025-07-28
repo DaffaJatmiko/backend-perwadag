@@ -23,22 +23,27 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# Create non-root user for security (do this early)
-RUN adduser --disabled-password --gecos '' --shell /bin/bash perwadaguser
-
 # Copy application code
 COPY . .
 
-# Create all necessary directories and set proper permissions
+# Create directories and set proper permissions
 RUN mkdir -p static/uploads \
-    && mkdir -p logs \
-    && chown -R perwadaguser:perwadaguser /app \
-    && chmod -R 755 /app \
-    && chmod -R 777 static \
-    && chmod -R 777 logs
+    && mkdir -p logs
 
-# Switch to non-root user AFTER setting permissions
-USER perwadaguser
+# CREATE USER AND GROUP (ini yang hilang!)
+RUN groupadd -r -g 1000 appgroup \
+    && useradd -r -u 1000 -g appgroup -m -d /home/appuser -s /bin/bash appuser
+
+# IMPORTANT: Set ownership BEFORE setting permissions
+RUN chown -R appuser:appgroup /app
+
+# Then set permissions
+RUN chmod -R 755 /app \
+    && chmod -R 777 /app/static \
+    && chmod -R 777 /app/logs
+
+# Switch to non-root user
+USER appuser
 
 # Expose port
 EXPOSE 8000
@@ -48,5 +53,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the application
-# Production mode (no --reload)
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
