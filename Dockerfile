@@ -42,7 +42,11 @@ RUN rm -rf logs \
     && mkdir -p static/uploads/evaluasi/{surat-tugas,surat-pemberitahuan,meetings/{entry,konfirmasi,exit},matriks,laporan-hasil,kuisioner,format-kuisioner} \
     && chown -R user:user /app \
     && chmod -R 755 /app \
-    && chmod 777 logs
+    && chmod 777 logs \
+    && echo "DEBUG: Checking logs permissions:" \
+    && ls -la logs \
+    && whoami \
+    && id
 
 # Switch to non-root user
 USER user
