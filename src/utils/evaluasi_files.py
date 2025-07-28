@@ -19,27 +19,11 @@ class EvaluasiFileManager:
     def __init__(self):
         self.base_path = Path(settings.UPLOADS_PATH) / "evaluasi"
         self.base_url = "/static/uploads/evaluasi"
-        
-        # Ensure directories exist
-        self._create_directories()
     
-    def _create_directories(self) -> None:
-        """Create all required directories."""
-        directories = [
-            "surat-tugas",
-            "surat-pemberitahuan", 
-            "meetings/entry",
-            "meetings/konfirmasi",
-            "meetings/exit",
-            "matriks",
-            "laporan-hasil",
-            "kuisioner",
-            "format-kuisioner"
-        ]
-        
-        for directory in directories:
-            dir_path = self.base_path / directory
-            dir_path.mkdir(parents=True, exist_ok=True)
+    def _ensure_directory_exists(self, directory: str) -> None:
+        """Ensure a specific directory exists."""
+        dir_path = self.base_path / directory
+        dir_path.mkdir(parents=True, exist_ok=True)
     
     def _generate_unique_filename(self, original_filename: str) -> str:
         """Generate unique filename dengan timestamp dan UUID."""
@@ -81,6 +65,9 @@ class EvaluasiFileManager:
     
     async def _save_file(self, file: UploadFile, folder: str, filename: str) -> str:
         """Save file to specified folder."""
+        # Ensure directory exists
+        self._ensure_directory_exists(folder)
+        
         file_path = self.base_path / folder / filename
         
         # Write file
