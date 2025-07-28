@@ -39,34 +39,13 @@ def setup_logging():
     """Setup application logging."""
     import logging.config
     
-    # Create logs directory with full path
-    log_directory = os.path.abspath(settings.LOG_DIRECTORY)
-    print(f"DEBUG: LOG_DIRECTORY setting: {settings.LOG_DIRECTORY}")
-    print(f"DEBUG: Resolved log directory: {log_directory}")
-    print(f"DEBUG: Current working directory: {os.getcwd()}")
-    
+    # Create logs directory
     try:
-        os.makedirs(log_directory, exist_ok=True)
-        print(f"DEBUG: Successfully created directory: {log_directory}")
-        
-        # Test write permissions
-        test_file = os.path.join(log_directory, 'test_write.tmp')
-        with open(test_file, 'w') as f:
-            f.write('test')
-        os.remove(test_file)
-        print(f"DEBUG: Write test successful in: {log_directory}")
-    except (OSError, PermissionError) as e:
-        print(f"Error with log directory {log_directory}: {e}")
-        print("Falling back to console-only logging")
-        # Fallback to console-only logging
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[logging.StreamHandler()]
-        )
-        return
+        os.makedirs(settings.LOG_DIRECTORY, exist_ok=True)
+    except OSError as e:
+        print(f"Error creating log directory: {e}")
 
-    log_file_path = os.path.join(log_directory, f'{settings.SERVICE_NAME}.log')
+    log_file_path = os.path.join(settings.LOG_DIRECTORY, f'{settings.SERVICE_NAME}.log')
     
     # Logging configuration
     LOGGING_CONFIG = {
@@ -101,44 +80,32 @@ def setup_logging():
         'loggers': {
             '': {  # Root logger
                 'level': 'INFO',
-                'handlers': ['console'],
+                'handlers': ['console', 'file'],
                 'propagate': False,
             },
             'uvicorn': {
                 'level': 'INFO',
-                'handlers': ['console'],
+                'handlers': ['console', 'file'],
                 'propagate': False,
             },
             'uvicorn.access': {
                 'level': 'INFO',
-                'handlers': ['console'],
+                'handlers': ['console', 'file'],
                 'propagate': False,
             },
         },
     }
     
     try:
-        # Test if log file can be created first
-        test_log_file = os.path.join(log_directory, 'test_handler.log')
-        handler = logging.handlers.RotatingFileHandler(
-            test_log_file, 
-            maxBytes=settings.LOG_MAX_BYTES,
-            backupCount=settings.LOG_BACKUP_COUNT,
-            encoding='utf-8'
-        )
-        handler.close()
-        os.remove(test_log_file)
-        print(f"DEBUG: Handler test successful")
-        
         logging.config.dictConfig(LOGGING_CONFIG)
-        print(f"DEBUG: Logging configuration applied successfully")
     except Exception as e:
         print(f"Error setting up logging configuration: {e}")
-        import traceback
-        print(f"Full traceback: {traceback.format_exc()}")
-        # Fallback to console-only logging
+        # Fallback to basic config
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[logging.StreamHandler()]
+            handlers=[
+                logging.StreamHandler(),
+                logging.FileHandler(log_file_path) if os.path.exists(settings.LOG_DIRECTORY) else logging.StreamHandler()
+            ]
         )
