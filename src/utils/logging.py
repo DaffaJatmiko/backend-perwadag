@@ -41,13 +41,20 @@ def setup_logging():
     
     # Create logs directory with full path
     log_directory = os.path.abspath(settings.LOG_DIRECTORY)
+    print(f"DEBUG: LOG_DIRECTORY setting: {settings.LOG_DIRECTORY}")
+    print(f"DEBUG: Resolved log directory: {log_directory}")
+    print(f"DEBUG: Current working directory: {os.getcwd()}")
+    
     try:
         os.makedirs(log_directory, exist_ok=True)
+        print(f"DEBUG: Successfully created directory: {log_directory}")
+        
         # Test write permissions
         test_file = os.path.join(log_directory, 'test_write.tmp')
         with open(test_file, 'w') as f:
             f.write('test')
         os.remove(test_file)
+        print(f"DEBUG: Write test successful in: {log_directory}")
     except (OSError, PermissionError) as e:
         print(f"Error with log directory {log_directory}: {e}")
         print("Falling back to console-only logging")
