@@ -100,12 +100,44 @@ def setup_logging():
         logging.config.dictConfig(LOGGING_CONFIG)
     except Exception as e:
         print(f"Error setting up logging configuration: {e}")
-        # Fallback to basic config
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.StreamHandler(),
-                logging.FileHandler(log_file_path) if os.path.exists(settings.LOG_DIRECTORY) else logging.StreamHandler()
-            ]
-        )
+        # Fallback to console-only logging if file logging fails
+        fallback_config = {
+            'version': 1,
+            'disable_existing_loggers': False,
+            'formatters': {
+                'simple': {
+                    'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                },
+            },
+            'handlers': {
+                'console': {
+                    'class': 'logging.StreamHandler',
+                    'level': 'INFO',
+                    'formatter': 'simple',
+                    'stream': 'ext://sys.stdout',
+                },
+            },
+            'loggers': {
+                '': {
+                    'level': 'INFO',
+                    'handlers': ['console'],
+                    'propagate': False,
+                },
+                'uvicorn': {
+                    'level': 'INFO',
+                    'handlers': ['console'],
+                    'propagate': False,
+                },
+                'uvicorn.access': {
+                    'level': 'INFO',
+                    'handlers': ['console'],
+                    'propagate': False,
+                },
+            },
+        }
+        try:
+            logging.config.dictConfig(fallback_config)
+            print("Using console-only logging as fallback")
+        except Exception as fallback_error:
+            print(f"Fallback logging configuration also failed: {fallback_error}")
+            logging.basicConfig(level=logging.INFO)

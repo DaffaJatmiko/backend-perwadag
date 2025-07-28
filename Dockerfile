@@ -35,7 +35,9 @@ RUN mkdir -p static/uploads/evaluasi/{surat-tugas,surat-pemberitahuan,meetings/{
     && chown -R user:user /app \
     && chmod -R 755 /app \
     && chmod 755 logs \
-    && chown user:user logs
+    && touch logs/gov-auth-api.log \
+    && chown user:user logs/gov-auth-api.log \
+    && chmod 644 logs/gov-auth-api.log
 
 # Switch to non-root user
 USER user
