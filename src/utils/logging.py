@@ -101,17 +101,17 @@ def setup_logging():
         'loggers': {
             '': {  # Root logger
                 'level': 'INFO',
-                'handlers': ['console', 'file'],
+                'handlers': ['console'],
                 'propagate': False,
             },
             'uvicorn': {
                 'level': 'INFO',
-                'handlers': ['console', 'file'],
+                'handlers': ['console'],
                 'propagate': False,
             },
             'uvicorn.access': {
                 'level': 'INFO',
-                'handlers': ['console', 'file'],
+                'handlers': ['console'],
                 'propagate': False,
             },
         },
