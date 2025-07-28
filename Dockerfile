@@ -26,12 +26,13 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copy application code
 COPY . .
 
-# Create directory for uploads if not exists
-RUN mkdir -p static/uploads
-
 # Create non-root user for security
-RUN adduser --disabled-password --gecos '' --shell /bin/bash user \
+RUN adduser --disabled-password --gecos '' --shell /bin/bash user
+
+# Create directories with proper ownership
+RUN mkdir -p static/uploads logs \
     && chown -R user:user /app
+
 USER user
 
 # Expose port
