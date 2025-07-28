@@ -39,13 +39,27 @@ def setup_logging():
     """Setup application logging."""
     import logging.config
     
-    # Create logs directory
+    # Create logs directory with full path
+    log_directory = os.path.abspath(settings.LOG_DIRECTORY)
     try:
-        os.makedirs(settings.LOG_DIRECTORY, exist_ok=True)
-    except OSError as e:
-        print(f"Error creating log directory: {e}")
+        os.makedirs(log_directory, exist_ok=True)
+        # Test write permissions
+        test_file = os.path.join(log_directory, 'test_write.tmp')
+        with open(test_file, 'w') as f:
+            f.write('test')
+        os.remove(test_file)
+    except (OSError, PermissionError) as e:
+        print(f"Error with log directory {log_directory}: {e}")
+        print("Falling back to console-only logging")
+        # Fallback to console-only logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            handlers=[logging.StreamHandler()]
+        )
+        return
 
-    log_file_path = os.path.join(settings.LOG_DIRECTORY, f'{settings.SERVICE_NAME}.log')
+    log_file_path = os.path.join(log_directory, f'{settings.SERVICE_NAME}.log')
     
     # Logging configuration
     LOGGING_CONFIG = {

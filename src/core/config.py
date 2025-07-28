@@ -54,8 +54,8 @@ class Settings(BaseSettings):
     
     # Storage Configuration
     STORAGE_PROVIDER: str = "local"  # Options: local, aws_s3, gcp, azure_blob
-    STATIC_FILES_PATH: str = "static"
-    UPLOADS_PATH: str = "static/uploads"
+    STATIC_FILES_PATH: str = "./static"
+    UPLOADS_PATH: str = "./static/uploads"
     
     # AWS S3 Configuration
     AWS_ACCESS_KEY_ID: Optional[str] = None
@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     AZURE_STORAGE_CONTAINER: Optional[str] = None
 
     # Logging
-    LOG_DIRECTORY: str = "logs"
+    LOG_DIRECTORY: str = "./logs"
     LOG_MAX_BYTES: int = 10 * 1024 * 1024  # 10MB
     LOG_BACKUP_COUNT: int = 5
     SERVICE_NAME: str
