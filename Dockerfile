@@ -34,7 +34,7 @@ RUN mkdir -p static/uploads \
     && mkdir -p logs \
     && chown -R perwadaguser:perwadaguser /app \
     && chmod -R 755 /app \
-    && chmod -R 777 static/uploads \
+    && chmod -R 777 static \
     && chmod -R 777 logs
 
 # Switch to non-root user AFTER setting permissions
