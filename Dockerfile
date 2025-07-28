@@ -34,7 +34,8 @@ RUN mkdir -p static/uploads/evaluasi/{surat-tugas,surat-pemberitahuan,meetings/{
     && mkdir -p logs \
     && chown -R user:user /app \
     && chmod -R 755 /app \
-    && chmod -R 775 logs
+    && chmod 755 logs \
+    && chown user:user logs
 
 # Switch to non-root user
 USER user
