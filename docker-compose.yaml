@@ -8,8 +8,6 @@ services:
     volumes:
       # Mount uploads directory untuk persistent file storage
       - ./static/uploads:/app/static/uploads
-      # Mount logs directory
-      - ./logs:/app/logs
       # Mount source code for hot reload in development
       - ./src:/app/src
       - ./main.py:/app/main.py

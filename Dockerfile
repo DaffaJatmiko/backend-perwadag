@@ -33,15 +33,6 @@ RUN adduser --disabled-password --gecos '' --shell /bin/bash user
 RUN mkdir -p static/uploads logs \
     && chown -R user:user /app
 
-# Create a startup script to handle log file permissions
-RUN echo '#!/bin/bash\n\
-# Remove any existing log files that might have wrong permissions\n\
-if [ -w /app/logs ]; then\n\
-    rm -f /app/logs/*.log\n\
-fi\n\
-exec "$@"' > /app/startup.sh \
-    && chmod +x /app/startup.sh
-
 USER user
 
 # Expose port
@@ -51,5 +42,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the application with startup script
-CMD ["/app/startup.sh", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Run the application
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
