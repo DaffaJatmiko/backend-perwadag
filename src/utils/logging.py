@@ -118,9 +118,24 @@ def setup_logging():
     }
     
     try:
+        # Test if log file can be created first
+        test_log_file = os.path.join(log_directory, 'test_handler.log')
+        handler = logging.handlers.RotatingFileHandler(
+            test_log_file, 
+            maxBytes=settings.LOG_MAX_BYTES,
+            backupCount=settings.LOG_BACKUP_COUNT,
+            encoding='utf-8'
+        )
+        handler.close()
+        os.remove(test_log_file)
+        print(f"DEBUG: Handler test successful")
+        
         logging.config.dictConfig(LOGGING_CONFIG)
+        print(f"DEBUG: Logging configuration applied successfully")
     except Exception as e:
         print(f"Error setting up logging configuration: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         # Fallback to console-only logging
         logging.basicConfig(
             level=logging.INFO,
