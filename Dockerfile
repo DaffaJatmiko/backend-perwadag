@@ -1,14 +1,14 @@
 FROM python:3.11-slim
 
-# Set environment variables
+# Set environment
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
-# Set work directory
+# Workdir
 WORKDIR /app
 
-# Install system dependencies
+# System deps
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
@@ -16,23 +16,26 @@ RUN apt-get update \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first (for better Docker layer caching)
+# Copy requirements and install deps
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy source
 COPY . .
 
-# Create non-root user for security
+# Tambahkan user non-root
 RUN adduser --disabled-password --gecos '' --shell /bin/bash perwadaguser
 
-# Create directories with proper ownership
-RUN mkdir -p static/uploads logs \
+# Buat direktori dan beri kepemilikan
+RUN mkdir -p /app/static/uploads /app/logs \
     && chown -R perwadaguser:perwadaguser /app
 
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Gunakan user non-root
 USER perwadaguser
 
 # Expose port
@@ -42,5 +45,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the application
+# Gunakan entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Jalankan aplikasi
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
