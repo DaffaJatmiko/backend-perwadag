@@ -32,12 +32,11 @@ COPY --chown=user:user . .
 # Create directory structure with proper permissions
 RUN mkdir -p static/uploads/evaluasi/{surat-tugas,surat-pemberitahuan,meetings/{entry,konfirmasi,exit},matriks,laporan-hasil,kuisioner,format-kuisioner} \
     && mkdir -p logs \
+    && touch logs/gov-auth-api.log \
     && chown -R user:user /app \
     && chmod -R 755 /app \
-    && chmod 755 logs \
-    && touch logs/gov-auth-api.log \
-    && chown user:user logs/gov-auth-api.log \
-    && chmod 644 logs/gov-auth-api.log
+    && chmod 775 logs \
+    && chmod 664 logs/gov-auth-api.log
 
 # Switch to non-root user
 USER user
