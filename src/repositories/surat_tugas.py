@@ -252,8 +252,7 @@ class SuratTugasRepository:
         """Check if nomor surat already exists."""
         query = select(SuratTugas.id).where(
             and_(
-                SuratTugas.no_surat == no_surat,
-                SuratTugas.deleted_at.is_(None)
+                SuratTugas.no_surat == no_surat
             )
         )
         
