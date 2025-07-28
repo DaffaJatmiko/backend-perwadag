@@ -24,7 +24,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
 # Create non-root user for security (do this early)
-RUN adduser --disabled-password --gecos '' --shell /bin/bash user
+RUN adduser --disabled-password --gecos '' --shell /bin/bash miko
 
 # Copy application code
 COPY . .
@@ -32,13 +32,13 @@ COPY . .
 # Create all necessary directories and set proper permissions
 RUN mkdir -p static/uploads \
     && mkdir -p logs \
-    && chown -R user:user /app \
-    && chmod -R 755 /app \
-    && chmod -R 777 static/uploads \
-    && chmod -R 777 logs
+    # && chown -R miko:miko /app \
+    # && chmod -R 755 /app \
+    # && chmod -R 777 static/uploads \
+    # && chmod -R 777 logs
 
 # Switch to non-root user AFTER setting permissions
-USER user
+USER miko
 
 # Expose port
 EXPOSE 8000
