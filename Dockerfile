@@ -29,6 +29,9 @@ COPY . .
 # Create directory for uploads if not exists
 RUN mkdir -p static/uploads
 
+RUN chmod -R 777 static/uploads
+RUN chmod -R 777 logs
+
 # Create non-root user for security
 RUN adduser --disabled-password --gecos '' --shell /bin/bash user \
     && chown -R user:user /app
