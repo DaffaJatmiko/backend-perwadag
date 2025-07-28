@@ -100,12 +100,9 @@ def setup_logging():
         logging.config.dictConfig(LOGGING_CONFIG)
     except Exception as e:
         print(f"Error setting up logging configuration: {e}")
-        # Fallback to basic config
+        # Fallback to console-only logging
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.StreamHandler(),
-                logging.FileHandler(log_file_path) if os.path.exists(settings.LOG_DIRECTORY) else logging.StreamHandler()
-            ]
+            handlers=[logging.StreamHandler()]
         )
