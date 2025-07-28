@@ -23,19 +23,21 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
+# Create non-root user for security (do this early)
+RUN adduser --disabled-password --gecos '' --shell /bin/bash user
+
 # Copy application code
 COPY . .
 
-# Create directory for uploads if not exists
-RUN mkdir -p static/uploads
-RUN chmod -R 777 static/uploads
+# Create all necessary directories and set proper permissions
+RUN mkdir -p static/uploads \
+    && mkdir -p logs \
+    && chown -R user:user /app \
+    && chmod -R 755 /app \
+    && chmod -R 777 static/uploads \
+    && chmod -R 777 logs
 
-RUN mkdir -p logs
-RUN chmod -R 777 logs
-
-# Create non-root user for security
-RUN adduser --disabled-password --gecos '' --shell /bin/bash user \
-    && chown -R user:user /app
+# Switch to non-root user AFTER setting permissions
 USER user
 
 # Expose port
