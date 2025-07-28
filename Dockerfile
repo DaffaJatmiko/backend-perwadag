@@ -33,7 +33,8 @@ COPY --chown=user:user . .
 RUN mkdir -p static/uploads/evaluasi/{surat-tugas,surat-pemberitahuan,meetings/{entry,konfirmasi,exit},matriks,laporan-hasil,kuisioner,format-kuisioner} \
     && mkdir -p logs \
     && chown -R user:user /app \
-    && chmod -R 755 /app
+    && chmod -R 755 /app \
+    && chmod -R 775 logs
 
 # Switch to non-root user
 USER user
