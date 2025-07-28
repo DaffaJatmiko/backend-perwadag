@@ -35,8 +35,10 @@ RUN mkdir -p /app/static/uploads /app/logs \
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Gunakan user non-root
-USER perwadaguser
+# Install gosu untuk user switching
+RUN apt-get update && apt-get install -y gosu && rm -rf /var/lib/apt/lists/*
+
+# Keep as root for entrypoint, will switch to perwadaguser in entrypoint script
 
 # Expose port
 EXPOSE 8000

@@ -1,10 +1,12 @@
 #!/bin/bash
+set -e
 
-# Pastikan direktori dimiliki oleh user yang benar
-chown -R perwadaguser:perwadaguser /app/logs /app/static/uploads
+# Fix permissions for mounted volumes as root
+chown -R perwadaguser:perwadaguser /app/static/uploads /app/logs 2>/dev/null || true
+chmod -R 755 /app/static/uploads /app/logs 2>/dev/null || true
 
-# Set permission direktori (hanya perwadaguser bisa tulis)
-chmod -R 755 /app/logs /app/static/uploads
+# Remove any existing log files that might have wrong permissions
+rm -f /app/logs/*.log 2>/dev/null || true
 
-# Jalankan command default
-exec "$@"
+# Switch to perwadaguser and execute command
+exec gosu perwadaguser "$@"
