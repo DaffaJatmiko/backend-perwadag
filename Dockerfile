@@ -29,13 +29,11 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copy application code and set ownership
 COPY --chown=user:user . .
 
-# Create the full directory structure with proper permissions
-RUN mkdir -p static/uploads/evaluasi/surat-tugas \
+# Create directory structure with proper permissions
+RUN mkdir -p static/uploads/evaluasi/{surat-tugas,surat-pemberitahuan,meetings/{entry,konfirmasi,exit},matriks,laporan-hasil,kuisioner,format-kuisioner} \
     && mkdir -p logs \
     && chown -R user:user /app \
-    && chmod -R 755 /app/static \
-    && chmod -R 775 /app/static/uploads \
-    && chmod -R 755 /app/logs
+    && chmod -R 755 /app
 
 # Switch to non-root user
 USER user
