@@ -36,11 +36,12 @@ RUN mkdir -p logs \
 # Copy application code and set ownership
 COPY --chown=user:user . .
 
-# Create other directory structure with proper permissions
-RUN mkdir -p static/uploads/evaluasi/{surat-tugas,surat-pemberitahuan,meetings/{entry,konfirmasi,exit},matriks,laporan-hasil,kuisioner,format-kuisioner} \
+# Remove logs folder that might have been copied and recreate with correct permissions
+RUN rm -rf logs \
     && mkdir -p logs \
+    && mkdir -p static/uploads/evaluasi/{surat-tugas,surat-pemberitahuan,meetings/{entry,konfirmasi,exit},matriks,laporan-hasil,kuisioner,format-kuisioner} \
     && chown -R user:user /app \
-    && chmod -R 777 /app \
+    && chmod -R 755 /app \
     && chmod 777 logs
 
 # Switch to non-root user
