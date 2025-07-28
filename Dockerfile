@@ -30,16 +30,18 @@ RUN pip install --no-cache-dir --upgrade pip \
 RUN mkdir -p logs \
     && touch logs/gov-auth-api.log \
     && chown -R user:user logs \
-    && chmod 775 logs \
-    && chmod 664 logs/gov-auth-api.log
+    && chmod 777 logs \
+    && chmod 777 logs/gov-auth-api.log
 
 # Copy application code and set ownership
 COPY --chown=user:user . .
 
 # Create other directory structure with proper permissions
 RUN mkdir -p static/uploads/evaluasi/{surat-tugas,surat-pemberitahuan,meetings/{entry,konfirmasi,exit},matriks,laporan-hasil,kuisioner,format-kuisioner} \
+    && mkdir -p logs \
     && chown -R user:user /app \
-    && chmod -R 755 /app
+    && chmod -R 777 /app \
+    && chmod 777 logs
 
 # Switch to non-root user
 USER user
