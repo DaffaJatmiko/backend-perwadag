@@ -9,11 +9,30 @@ import logging
 import json
 from typing import Dict, Tuple, Optional
 import asyncio
+from src.core.config import settings
+
 
 from src.core.redis import get_redis
 
 logger = logging.getLogger(__name__)
 
+def get_cors_headers(request: Request) -> dict:
+    """Get CORS headers based on request origin and settings."""
+    origin = request.headers.get("Origin", "")
+    
+    # Check if origin is allowed
+    allowed_origins = settings.CORS_ORIGINS_LIST
+    
+    if "*" in allowed_origins or origin in allowed_origins:
+        return {
+            "Access-Control-Allow-Origin": origin if origin else "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Expose-Headers": "*"
+        }
+    
+    return {}
 
 class RateLimitingMiddleware(BaseHTTPMiddleware):
     """Rate limiting middleware with Redis-based tracking."""
@@ -36,13 +55,19 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         
         # Check if request should be rate limited
         if await self._is_rate_limited(request, client_ip):
+            cors_headers = get_cors_headers(request)
+            
+            headers = {
+                "Retry-After": str(self.period),
+                **cors_headers  # Merge CORS headers
+            }
+            
             return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 content={
-                    "detail": "Rate limit exceeded. Too many requests.",
-                    "retry_after": self.period
+                    "detail": "Terlalu banyak permintaan. Silakan coba lagi nanti."
                 },
-                headers={"Retry-After": str(self.period)}
+                headers=headers
             )
         
         # Update request count
@@ -164,13 +189,19 @@ class AuthRateLimitingMiddleware(BaseHTTPMiddleware):
         
         # Check rate limit for auth endpoints
         if await self._is_auth_rate_limited(client_ip):
+            cors_headers = get_cors_headers(request)
+            
+            headers = {
+                "Retry-After": str(self.period),
+                **cors_headers  # Merge CORS headers
+            }
+            
             return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 content={
-                    "detail": "Too many authentication attempts. Please try again later.",
-                    "retry_after": self.period
+                    "detail": "Terlalu banyak percobaan login. Silakan coba lagi dalam 5 menit."
                 },
-                headers={"Retry-After": str(self.period)}
+                headers=headers
             )
         
         response = await call_next(request)
