@@ -38,7 +38,8 @@ class SuratTugasService:
         meeting_repo: MeetingRepository,
         matriks_repo: MatriksRepository,
         laporan_hasil_repo: LaporanHasilRepository,
-        kuisioner_repo: KuisionerRepository
+        kuisioner_repo: KuisionerRepository,
+        user_repo=None  # Add user_repo as optional parameter
     ):
         self.surat_tugas_repo = surat_tugas_repo
         self.surat_pemberitahuan_repo = surat_pemberitahuan_repo
@@ -46,6 +47,7 @@ class SuratTugasService:
         self.matriks_repo = matriks_repo
         self.laporan_hasil_repo = laporan_hasil_repo
         self.kuisioner_repo = kuisioner_repo
+        self.user_repo = user_repo
     
     # ===== MAIN CREATE WITH AUTO-GENERATE =====
     
@@ -727,9 +729,16 @@ class SuratTugasService:
         # Build recent surat tugas objects
         recent_items = [RecentSuratTugasItem(**item) for item in recent_surat_tugas_data]
         
+        # Get total perwadag count for admin/inspektorat (not affected by year filter)
+        total_perwadag = None
+        if user_role in ["ADMIN", "INSPEKTORAT"] and self.user_repo:
+            total_perwadag = await self.user_repo.get_total_perwadag_count(
+                user_role, user_inspektorat
+            )
+        
         return {
             "statistics": DashboardStatistics(
-                total_surat_tugas=total_evaluasi,
+                total_perwadag=total_perwadag,
                 average_progress=average_progress,
                 year_filter_applied=year is not None,
                 filtered_year=year
@@ -757,11 +766,19 @@ class SuratTugasService:
         
         # Get perwadag info
         perwadag = await self.surat_tugas_repo.get_perwadag_by_id(surat_tugas.user_perwadag_id)
-        perwadag_info = PerwardagSummary(
-            id=perwadag.id,
-            nama=perwadag.nama,
-            inspektorat=perwadag.inspektorat
-        ) if perwadag else None
+        if perwadag:
+            perwadag_info = PerwardagSummary(
+                id=perwadag.id,
+                nama=perwadag.nama,
+                inspektorat=perwadag.inspektorat
+            )
+        else:
+            # Provide fallback when perwadag is not found
+            perwadag_info = PerwardagSummary(
+                id=surat_tugas.user_perwadag_id,
+                nama=surat_tugas.nama_perwadag,
+                inspektorat=surat_tugas.inspektorat
+            )
         
         # Build file information
         file_urls = None

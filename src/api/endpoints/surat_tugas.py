@@ -33,12 +33,15 @@ router = APIRouter()
 
 async def get_surat_tugas_service(session: AsyncSession = Depends(get_db)) -> SuratTugasService:
     """Dependency untuk SuratTugasService."""
+    from src.repositories.user import UserRepository
+    
     surat_tugas_repo = SuratTugasRepository(session)
     surat_pemberitahuan_repo = SuratPemberitahuanRepository(session)
     meeting_repo = MeetingRepository(session)
     matriks_repo = MatriksRepository(session)
     laporan_hasil_repo = LaporanHasilRepository(session)
     kuisioner_repo = KuisionerRepository(session)
+    user_repo = UserRepository(session)
     
     return SuratTugasService(
         surat_tugas_repo,
@@ -46,7 +49,8 @@ async def get_surat_tugas_service(session: AsyncSession = Depends(get_db)) -> Su
         meeting_repo,
         matriks_repo,
         laporan_hasil_repo,
-        kuisioner_repo
+        kuisioner_repo,
+        user_repo
     )
 
 
@@ -438,6 +442,19 @@ async def get_dashboard_summary(
         DashboardSummaryResponse, DashboardSummaryData, UserInfo, QuickActions
     )
     
+    # Prepare quick actions based on user role
+    quick_actions_data = {
+        "can_create_surat_tugas": current_user["role"] in ["ADMIN", "INSPEKTORAT"],
+        "can_manage_templates": current_user["role"] == "ADMIN"
+    }
+    
+    # Only show total_evaluasi for admin/inspektorat, use total_perwadag if available
+    if current_user["role"] in ["ADMIN", "INSPEKTORAT"]:
+        quick_actions_data["total_evaluasi"] = summary["statistics"].total_perwadag or 0
+    else:
+        # For perwadag, don't show total_evaluasi
+        quick_actions_data["total_evaluasi"] = None
+
     return DashboardSummaryResponse(
         user_info=UserInfo(
             nama=current_user["nama"],
@@ -446,11 +463,7 @@ async def get_dashboard_summary(
         ),
         year_filter=year,
         summary=DashboardSummaryData(**summary),
-        quick_actions=QuickActions(
-            can_create_surat_tugas=current_user["role"] in ["ADMIN", "INSPEKTORAT"],
-            can_manage_templates=current_user["role"] == "ADMIN",
-            total_evaluasi=summary["statistics"].total_surat_tugas
-        )
+        quick_actions=QuickActions(**quick_actions_data)
     )
 
 @router.get("/{surat_tugas_id}/download", response_class=FileResponse)

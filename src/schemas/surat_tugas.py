@@ -292,7 +292,7 @@ class CompletionStats(BaseModel):
 class DashboardStatistics(BaseModel):
     """Schema untuk dashboard statistics."""
     
-    total_surat_tugas: int = Field(ge=0, description="Total surat tugas (filtered by year)")
+    total_perwadag: Optional[int] = Field(None, ge=0, description="Total perwadag (only for admin/inspektorat)")
     average_progress: int = Field(ge=0, le=100, description="Average progress percentage")
     year_filter_applied: bool = Field(description="Whether year filter is applied")
     filtered_year: Optional[int] = Field(None, description="Year filter value")
@@ -347,7 +347,7 @@ class QuickActions(BaseModel):
     
     can_create_surat_tugas: bool
     can_manage_templates: bool
-    total_evaluasi: int
+    total_evaluasi: Optional[int] = Field(None, description="Total evaluasi (not shown for perwadag)")
 
 
 class DashboardSummaryResponse(BaseModel):

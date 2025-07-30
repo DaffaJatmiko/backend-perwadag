@@ -445,6 +445,31 @@ class UserRepository:
             "users_by_role": users_by_role
         }
 
+    async def get_total_perwadag_count(
+        self, 
+        user_role: str, 
+        user_inspektorat: Optional[str] = None
+    ) -> int:
+        """Get total perwadag count based on user role."""
+        
+        # Base query for perwadag users
+        query = select(func.count(User.id)).where(
+            and_(
+                User.role == UserRole.PERWADAG,
+                User.deleted_at.is_(None),
+                User.is_active == True
+            )
+        )
+        
+        # Apply role-based filtering
+        if user_role == "INSPEKTORAT" and user_inspektorat:
+            # Inspektorat only sees perwadag affiliated with their inspektorat
+            query = query.where(User.inspektorat == user_inspektorat)
+        # Admin sees all perwadag
+        
+        result = await self.session.execute(query)
+        return result.scalar() or 0
+
     async def search_perwadag_users_paginated(
         self, 
         search: str = None,
