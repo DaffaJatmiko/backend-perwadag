@@ -1,6 +1,6 @@
 """Simplified User Repository tanpa Role tables."""
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Any
 from datetime import datetime, date
 from sqlalchemy import select, and_, or_, func, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -88,6 +88,113 @@ class UserRepository:
         await self.session.commit()
         await self.session.refresh(user)
         return user
+
+    async def update_cascade_nama_perwadag(self, user_id: str, new_nama: str) -> int:
+        """Update nama_perwadag di surat_tugas table untuk cascade update."""
+        from src.models.surat_tugas import SuratTugas
+        from sqlalchemy import update as sql_update, func
+        
+        update_query = (
+            sql_update(SuratTugas)
+            .where(
+                and_(
+                    SuratTugas.user_perwadag_id == user_id,
+                    SuratTugas.deleted_at.is_(None)
+                )
+            )
+            .values(
+                nama_perwadag=new_nama,
+                updated_at=func.now()
+            )
+        )
+        
+        result = await self.session.execute(update_query)
+        return result.rowcount
+    
+    async def update_cascade_inspektorat_perwadag(self, user_id: str, new_inspektorat: str) -> Dict[str, int]:
+        """Update inspektorat di surat_tugas dan penilaian_risiko untuk cascade update."""
+        from src.models.surat_tugas import SuratTugas
+        from src.models.penilaian_risiko import PenilaianRisiko
+        from sqlalchemy import update as sql_update, func
+        
+        # Update surat_tugas
+        surat_tugas_update = (
+            sql_update(SuratTugas)
+            .where(
+                and_(
+                    SuratTugas.user_perwadag_id == user_id,
+                    SuratTugas.deleted_at.is_(None)
+                )
+            )
+            .values(
+                inspektorat=new_inspektorat,
+                updated_at=func.now()
+            )
+        )
+        
+        surat_tugas_result = await self.session.execute(surat_tugas_update)
+        surat_tugas_affected = surat_tugas_result.rowcount
+        
+        # Update penilaian_risiko
+        penilaian_update = (
+            sql_update(PenilaianRisiko)
+            .where(
+                and_(
+                    PenilaianRisiko.user_perwadag_id == user_id,
+                    PenilaianRisiko.deleted_at.is_(None)
+                )
+            )
+            .values(
+                inspektorat=new_inspektorat,
+                updated_at=func.now()
+            )
+        )
+        
+        penilaian_result = await self.session.execute(penilaian_update)
+        penilaian_affected = penilaian_result.rowcount
+        
+        return {
+            'surat_tugas': surat_tugas_affected,
+            'penilaian_risiko': penilaian_affected,
+            'total': surat_tugas_affected + penilaian_affected
+        }
+    
+    async def check_cascade_impact(self, user_id: str, user_role: UserRole) -> Dict[str, Any]:
+        """Check berapa records yang akan terpengaruh cascade update."""
+        
+        if user_role != UserRole.PERWADAG:
+            return {'total_records': 0, 'affected_tables': {}}
+        
+        from src.models.surat_tugas import SuratTugas
+        from src.models.penilaian_risiko import PenilaianRisiko
+        
+        # Count surat_tugas records
+        surat_tugas_count_query = select(func.count(SuratTugas.id)).where(
+            and_(
+                SuratTugas.user_perwadag_id == user_id,
+                SuratTugas.deleted_at.is_(None)
+            )
+        )
+        surat_tugas_result = await self.session.execute(surat_tugas_count_query)
+        surat_tugas_count = surat_tugas_result.scalar() or 0
+        
+        # Count penilaian_risiko records
+        penilaian_count_query = select(func.count(PenilaianRisiko.id)).where(
+            and_(
+                PenilaianRisiko.user_perwadag_id == user_id,
+                PenilaianRisiko.deleted_at.is_(None)
+            )
+        )
+        penilaian_result = await self.session.execute(penilaian_count_query)
+        penilaian_count = penilaian_result.scalar() or 0
+        
+        return {
+            'total_records': surat_tugas_count + penilaian_count,
+            'affected_tables': {
+                'surat_tugas': surat_tugas_count,
+                'penilaian_risiko': penilaian_count
+            }
+        }
     
     async def update_password(self, user_id: str, new_hashed_password: str) -> bool:
         """Update user password."""

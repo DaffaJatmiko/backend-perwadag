@@ -104,7 +104,8 @@ class UserService:
         return UserResponse.from_user_model(user)
     
     async def update_user(self, user_id: str, user_data: UserUpdate) -> UserResponse:
-        """Update user information dengan role change detection."""
+        """Update user dengan CASCADE UPDATE untuk data denormalized - SIMPLE VERSION."""
+        
         # 1. Check if user exists
         existing_user = await self.user_repo.get_by_id(user_id)
         if not existing_user:
@@ -120,14 +121,12 @@ class UserService:
                 detail="Email sudah terdaftar"
             )
         
-        # 3. FIXED: Handle role and inspektorat validation properly
+        # 3. Handle role and inspektorat validation properly
         old_role = existing_user.role
         new_role = user_data.role if user_data.role else old_role
         
         # Check if role is changing to one that requires inspektorat
         if new_role in [UserRole.INSPEKTORAT, UserRole.PERWADAG]:
-            # If inspektorat is being updated, use the new value
-            # If not being updated, check the existing value
             inspektorat_value = user_data.inspektorat if user_data.inspektorat is not None else existing_user.inspektorat
             
             if not inspektorat_value or not inspektorat_value.strip():
@@ -136,12 +135,47 @@ class UserService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Inspektorat diperlukan untuk role '{role_name}'. Silakan kirim field 'inspektorat' bersama dengan 'role'."
                 )
-        
-        # 4. If role is changing to ADMIN, clear inspektorat (optional for admin)
         elif new_role == UserRole.ADMIN and old_role != UserRole.ADMIN:
-            # Only auto-clear if not explicitly provided
             if user_data.inspektorat is None:
                 user_data.inspektorat = None
+        
+        # 🎯 4. DETECT & EXECUTE CASCADE UPDATES (hanya untuk PERWADAG)
+        cascade_results = {'total_affected': 0, 'details': []}
+        
+        if existing_user.role == UserRole.PERWADAG:
+            try:
+                # Check nama change
+                if user_data.nama and user_data.nama != existing_user.nama:
+                    affected = await self.user_repo.update_cascade_nama_perwadag(user_id, user_data.nama)
+                    cascade_results['total_affected'] += affected
+                    cascade_results['details'].append(f"Updated nama_perwadag in {affected} surat_tugas records")
+                
+                # Check inspektorat change
+                if (user_data.inspektorat is not None and 
+                    user_data.inspektorat != existing_user.inspektorat):
+                    
+                    affected = await self.user_repo.update_cascade_inspektorat_perwadag(user_id, user_data.inspektorat)
+                    cascade_results['total_affected'] += affected['total']
+                    cascade_results['details'].append(f"Updated inspektorat in {affected['surat_tugas']} surat_tugas and {affected['penilaian_risiko']} penilaian_risiko records")
+                
+                # Log cascade results
+                if cascade_results['total_affected'] > 0:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info(f"Cascade update for user {existing_user.nama}: {cascade_results['total_affected']} records updated")
+                
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Cascade update failed for user {user_id}: {str(e)}")
+                
+                # Rollback user update
+                await self.user_repo.session.rollback()
+                
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Gagal mengupdate user dan data terkait. Perubahan dibatalkan."
+                )
         
         # 5. Update user in database
         updated_user = await self.user_repo.update(user_id, user_data)

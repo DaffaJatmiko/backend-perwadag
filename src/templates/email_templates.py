@@ -10,7 +10,7 @@ class EmailTemplates:
     @staticmethod
     def password_reset_template(nama: str, reset_link: str) -> Dict[str, Any]:
         return {
-            "subject": "Reset Password - Government Auth System",
+            "subject": "Reset Password - Si Elang Merah",
             "htmlContent": f"""
             <!DOCTYPE html>
             <html>
@@ -39,7 +39,7 @@ class EmailTemplates:
                     .logo {{
                         font-size: 24px;
                         font-weight: bold;
-                        color: #2563eb;
+                        color: #333;
                     }}
                     .content {{
                         line-height: 1.6;
@@ -59,12 +59,26 @@ class EmailTemplates:
                         border-radius: 5px;
                         margin: 20px 0;
                     }}
+                    .button {{
+                        display: inline-block;
+                        padding: 12px 24px;
+                        background-color: #004DAF;
+                        color: #ffffff;
+                        font-size: 14px;
+                        font-weight: 600;
+                        text-decoration: none;
+                        border-radius: 6px;
+                        transition: background-color 0.2s;
+                    }}
+                    .button:hover {{
+                        background-color: #003a8c;
+                    }}
                 </style>
             </head>
             <body>
                 <div class="container">
                     <div class="header">
-                        <div class="logo">Government Auth System</div>
+                        <div class="logo">Si Elang Merah</div>
                     </div>
 
                     <div class="content">
@@ -75,8 +89,8 @@ class EmailTemplates:
 
                         <p>Untuk reset password, silakan klik tombol di bawah ini:</p>
 
-                        <div style="text-align: center;">
-                            <a href="{reset_link}" style="display: inline-block; padding: 10px 24px; background-color: #2563eb; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 6px;">
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="{reset_link}" style="display: inline-block; padding: 12px 24px; background-color: #004DAF; color: #ffffff !important; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 6px;">
                                 Reset Password
                             </a>
                         </div>
@@ -99,14 +113,14 @@ class EmailTemplates:
                     <div class="footer">
                         <p>Email ini dikirim secara otomatis, mohon tidak membalas email ini.</p>
                         <p>Jika Anda mengalami masalah, silakan hubungi administrator sistem.</p>
-                        <p>&copy; 2025 Sistem Evaluasi Perwadag. All rights reserved.</p>
+                        <p>&copy; 2025 Kementerian Perdagangan RI. All rights reserved.</p>
                     </div>
                 </div>
             </body>
             </html>
             """,
             "textContent": f"""
-            Reset Password - Government Auth System
+            Reset Password - Si Elang Merah
 
             Dear {nama},
 
@@ -124,7 +138,7 @@ class EmailTemplates:
 
             Email ini dikirim secara otomatis, mohon tidak membalas email ini.
 
-            © 2024 Government Auth System. All rights reserved.
+            © 2025 Kementerian Perdagangan RI. All rights reserved.
             """
         }
 
@@ -141,7 +155,7 @@ class EmailTemplates:
             Email template data untuk Brevo API
         """
         return {
-            "subject": "Password Reset Successful - Government Auth System",
+            "subject": "Password Reset Successful - Si Elang Merah",
             "htmlContent": f"""
             <!DOCTYPE html>
             <html>
@@ -152,16 +166,29 @@ class EmailTemplates:
                     body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }}
                     .container {{ max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
                     .header {{ text-align: center; margin-bottom: 30px; }}
-                    .logo {{ font-size: 24px; font-weight: bold; color: #2563eb; }}
+                    .logo {{ font-size: 24px; font-weight: bold; color: #333; }}
                     .content {{ line-height: 1.6; color: #333; }}
-                    .success {{ background-color: #d1fae5; border: 1px solid #10b981; padding: 15px; border-radius: 5px; margin: 20px 0; }}
+                    .success {{ 
+                        background-color: #d1fae5; 
+                        border: 1px solid #10b981; 
+                        padding: 15px; 
+                        border-radius: 5px; 
+                        margin: 20px 0;
+                        text-align: center;
+                    }}
                     .footer {{ margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; }}
+                    .tips {{ 
+                        background-color: #fef3c7; 
+                        border-left: 4px solid #f59e0b; 
+                        padding: 15px; 
+                        margin: 20px 0; 
+                    }}
                 </style>
             </head>
             <body>
                 <div class="container">
                     <div class="header">
-                        <div class="logo">Government Auth System</div>
+                        <div class="logo">Si Elang Merah</div>
                     </div>
                     
                     <div class="content">
@@ -172,35 +199,38 @@ class EmailTemplates:
                             <strong>✅ Password Anda telah berhasil direset!</strong>
                         </div>
                         
-                        <p>Password akun Anda telah berhasil diubah. Anda sekarang dapat login dengan password baru Anda.</p>
+                        <p>Password akun Anda telah berhasil diubah. Anda sekarang dapat login dengan password baru Anda ke sistem Si Elang Merah.</p>
                         
                         <p>Jika Anda tidak melakukan perubahan password ini, segera hubungi administrator sistem untuk keamanan akun Anda.</p>
                         
-                        <p><strong>Tips Keamanan:</strong></p>
-                        <ul>
-                            <li>Gunakan password yang kuat dan unik</li>
-                            <li>Jangan bagikan password kepada siapa pun</li>
-                            <li>Logout dari semua perangkat setelah menggunakan</li>
-                        </ul>
+                        <div class="tips">
+                            <p><strong>Tips Keamanan:</strong></p>
+                            <ul>
+                                <li>Gunakan password yang kuat dan unik</li>
+                                <li>Jangan bagikan password kepada siapa pun</li>
+                                <li>Logout dari semua perangkat setelah menggunakan</li>
+                                <li>Ganti password secara berkala untuk keamanan optimal</li>
+                            </ul>
+                        </div>
                     </div>
                     
                     <div class="footer">
                         <p>Email ini dikirim secara otomatis, mohon tidak membalas email ini.</p>
                         <p>Jika Anda mengalami masalah, silakan hubungi administrator sistem.</p>
-                        <p>&copy; 2024 Government Auth System. All rights reserved.</p>
+                        <p>&copy; 2025 Kementerian Perdagangan RI. All rights reserved.</p>
                     </div>
                 </div>
             </body>
             </html>
             """,
             "textContent": f"""
-            Password Reset Successful - Government Auth System
+            Password Reset Successful - Si Elang Merah
             
             Dear {nama},
             
             ✅ Password Anda telah berhasil direset!
             
-            Password akun Anda telah berhasil diubah. Anda sekarang dapat login dengan password baru Anda.
+            Password akun Anda telah berhasil diubah. Anda sekarang dapat login dengan password baru Anda ke sistem Si Elang Merah.
             
             Jika Anda tidak melakukan perubahan password ini, segera hubungi administrator sistem untuk keamanan akun Anda.
             
@@ -208,9 +238,10 @@ class EmailTemplates:
             - Gunakan password yang kuat dan unik
             - Jangan bagikan password kepada siapa pun
             - Logout dari semua perangkat setelah menggunakan
+            - Ganti password secara berkala untuk keamanan optimal
             
             Email ini dikirim secara otomatis, mohon tidak membalas email ini.
             
-            © 2025 Sistem Evaluasi Perwadag. All rights reserved.
+            © 2025 Kementerian Perdagangan RI. All rights reserved.
             """
         }
