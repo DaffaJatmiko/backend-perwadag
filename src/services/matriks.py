@@ -124,7 +124,7 @@ class MatriksService:
         update_data: MatriksUpdate, 
         updated_by: str
     ) -> MatriksResponse:
-        """Update matriks dengan temuan-rekomendasi support."""
+        """Update matriks dengan kondisi-kriteria-rekomendasi support."""
         
         matriks = await self.matriks_repo.get_by_id(matriks_id)
         if not matriks:
@@ -417,7 +417,7 @@ class MatriksService:
 
         if matriks_obj and hasattr(matriks_obj, 'get_temuan_rekomendasi_summary'):
             summary_data = matriks_obj.get_temuan_rekomendasi_summary()
-            has_temuan_rekomendasi = len(summary_data.get('data', [])) > 0  # ← SIMPLIFIED
+            has_temuan_rekomendasi = len(summary_data.get('data', [])) > 0  # 3-field structure
             temuan_rekomendasi_summary = TemuanRekomendasiSummary(**summary_data)
 
         is_completed = has_file  # Completion = has file only

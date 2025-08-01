@@ -20,21 +20,46 @@ class MatriksCreate(BaseModel):
 
 
 class TemuanRekomendasiItem(BaseModel):
-    """Schema untuk 1 pasang temuan-rekomendasi."""
+    """
+    Schema untuk 1 set kondisi-kriteria-rekomendasi.
     
-    temuan: str = Field(..., min_length=1, max_length=1000, description="Temuan evaluasi")
-    rekomendasi: str = Field(..., min_length=1, max_length=1000, description="Rekomendasi perbaikan")
+    3-field structure untuk evaluasi:
+    1. Kondisi: Situasi/keadaan yang ditemukan saat evaluasi
+    2. Kriteria: Standar/aturan/ketentuan yang harus dipenuhi  
+    3. Rekomendasi: Saran perbaikan untuk memenuhi kriteria
+    """
     
-    @field_validator('temuan', 'rekomendasi')
+    kondisi: str = Field(
+        ..., 
+        min_length=1, 
+        max_length=1000, 
+        description="Kondisi/situasi yang ditemukan saat evaluasi"
+    )
+    
+    kriteria: str = Field(
+        ..., 
+        min_length=1, 
+        max_length=1000, 
+        description="Kriteria/standar/ketentuan yang harus dipenuhi"
+    )
+    
+    rekomendasi: str = Field(
+        ..., 
+        min_length=1, 
+        max_length=1000, 
+        description="Saran perbaikan untuk memenuhi kriteria"
+    )
+    
+    @field_validator('kondisi', 'kriteria', 'rekomendasi')
     @classmethod
     def validate_not_empty(cls, value: str) -> str:
         value = value.strip()
         if not value:
-            raise ValueError("Temuan dan rekomendasi tidak boleh kosong")
+            raise ValueError("Kondisi, kriteria, dan rekomendasi tidak boleh kosong")
         return value
 
 class TemuanRekomendasiData(BaseModel):
-    """Schema untuk collection temuan-rekomendasi."""
+    """Schema untuk collection kondisi-kriteria-rekomendasi."""
     
     items: List[TemuanRekomendasiItem] = Field(default_factory=list)
     
@@ -42,7 +67,7 @@ class TemuanRekomendasiData(BaseModel):
     @classmethod
     def validate_items(cls, items: List[TemuanRekomendasiItem]) -> List[TemuanRekomendasiItem]:
         if len(items) > 20:
-            raise ValueError("Maksimal 20 pasang temuan-rekomendasi")
+            raise ValueError("Maksimal 20 set kondisi-kriteria-rekomendasi")
         return items
 
 class TemuanRekomendasiSummary(BaseModel):
@@ -54,8 +79,9 @@ class MatriksUpdate(BaseModel):
     """Schema untuk update matriks."""
     temuan_rekomendasi: Optional[TemuanRekomendasiData] = Field(
         None, 
-        description="Data temuan dan rekomendasi (REPLACE strategy)"
+        description="Data kondisi, kriteria dan rekomendasi (REPLACE strategy)"
     )
+
 
 # ===== RESPONSE SCHEMAS =====
 

@@ -60,7 +60,12 @@ class Matriks(BaseModel, SQLModel, table=True):
         return None
 
     def get_temuan_rekomendasi_items(self) -> List[Dict[str, str]]:
-        """Parse JSON ke list of temuan-rekomendasi pairs."""
+        """
+        Parse JSON ke list of kondisi-kriteria-rekomendasi sets.
+        
+        Returns:
+            List of dicts with keys: id, kondisi, kriteria, rekomendasi
+        """
         if not self.temuan_rekomendasi:
             return []
         
@@ -72,7 +77,12 @@ class Matriks(BaseModel, SQLModel, table=True):
             return []
 
     def set_temuan_rekomendasi_items(self, items: List[Dict[str, str]]) -> None:
-        """Set JSON data - REPLACE strategy."""
+        """
+        Set JSON data dengan 3-field structure - REPLACE strategy.
+        
+        Args:
+            items: List of dicts dengan keys: kondisi, kriteria, rekomendasi
+        """
         import json
         from datetime import datetime
         
@@ -81,37 +91,47 @@ class Matriks(BaseModel, SQLModel, table=True):
             if not isinstance(item, dict):
                 continue
                 
-            temuan = str(item.get('temuan', '')).strip()
+            kondisi = str(item.get('kondisi', '')).strip()
+            kriteria = str(item.get('kriteria', '')).strip()
             rekomendasi = str(item.get('rekomendasi', '')).strip()
             
-            if temuan and rekomendasi:
+            # Validate all 3 fields are present
+            if kondisi and kriteria and rekomendasi:
                 validated_items.append({
                     'id': i + 1,
-                    'temuan': temuan,
+                    'kondisi': kondisi,
+                    'kriteria': kriteria,
                     'rekomendasi': rekomendasi
                 })
         
         self.temuan_rekomendasi = json.dumps({
             'items': validated_items,
             'total': len(validated_items),
-            'last_updated': datetime.utcnow().isoformat()
+            'last_updated': datetime.utcnow().isoformat(),
+            'structure_version': '3-field'  # Version marker
         }, ensure_ascii=False)
 
     def has_temuan_rekomendasi(self) -> bool:
-        """Check apakah ada data temuan-rekomendasi - SIMPLIFIED."""
+        """Check apakah ada data kondisi-kriteria-rekomendasi."""
         items = self.get_temuan_rekomendasi_items()
         return len(items) > 0
 
     def get_temuan_rekomendasi_summary(self) -> Dict[str, Any]:
-        """Get summary untuk display - SIMPLIFIED."""
+        """
+        Get summary untuk display dengan 3-field structure.
+        
+        Returns:
+            Dict with 'data' key containing all kondisi-kriteria-rekomendasi items
+        """
         items = self.get_temuan_rekomendasi_items()
         
         return {
-            'data': items  # Return all items, not just preview
+            'data': items  # Return all items dengan kondisi, kriteria, rekomendasi
         }
 
+
     def clear_temuan_rekomendasi(self) -> None:
-        """Clear all temuan-rekomendasi data."""
+        """Clear all kondisi-kriteria-rekomendasi data."""
         self.temuan_rekomendasi = None
     
     def __repr__(self) -> str:

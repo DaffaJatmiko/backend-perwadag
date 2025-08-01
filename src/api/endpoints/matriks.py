@@ -94,13 +94,13 @@ async def update_matriks(
     service: MatriksService = Depends(get_matriks_service)
 ):
     """
-    Update matriks dengan temuan-rekomendasi support.
+    Update matriks dengan kondisi-kriteria-rekomendasi support.
 
     **Accessible by**: Admin dan Inspektorat
 
     **Features:**
-    - Update temuan dan rekomendasi (REPLACE strategy)
-    - Maksimal 20 pasang temuan-rekomendasi
+    - Update kondisi, kriteria dan rekomendasi (REPLACE strategy)
+    - Maksimal 20 set kondisi-kriteria-rekomendasi
     - Date access validation
 
     **Example Request:**
@@ -109,26 +109,38 @@ async def update_matriks(
         "temuan_rekomendasi": {
             "items": [
                 {
-                    "temuan": "Belum ada prosedur standar untuk evaluasi",
-                    "rekomendasi": "Membuat SOP evaluasi yang jelas dan terstruktur"
+                    "kondisi": "Sistem pencatatan perdagangan masih menggunakan buku manual dan belum terintegrasi",
+                    "kriteria": "Sesuai Permendagri No. 20/2021, sistem pencatatan harus digital dan terintegrasi",
+                    "rekomendasi": "Implementasi sistem pencatatan digital terintegrasi dengan database terpusat"
                 },
                 {
-                    "temuan": "Dokumentasi kurang lengkap",
-                    "rekomendasi": "Melengkapi dokumentasi sesuai standar yang berlaku"
+                    "kondisi": "Dokumen perizinan pedagang tersebar di berbagai file fisik tanpa backup",
+                    "kriteria": "Standar ISO 27001 mengharuskan backup data digital untuk dokumen penting",
+                    "rekomendasi": "Membuat sistem backup digital dan database perizinan yang mudah diakses"
+                },
+                {
+                    "kondisi": "Proses verifikasi barang dagangan memakan waktu 2-3 hari per pedagang",
+                    "kriteria": "SOP pelayanan publik maksimal 1 hari untuk verifikasi rutin",
+                    "rekomendasi": "Merancang SOP verifikasi streamlined dan training petugas untuk efisiensi"
                 }
             ]
         }
     }
     ```
 
+    **3-Field Structure:**
+    - **Kondisi**: Situasi/keadaan yang ditemukan saat evaluasi
+    - **Kriteria**: Standar/aturan/ketentuan yang harus dipenuhi
+    - **Rekomendasi**: Saran perbaikan untuk memenuhi kriteria
+
     **Strategy**: REPLACE - Data lama akan diganti dengan data baru
     
     **Validation**:
-    - Temuan dan rekomendasi tidak boleh kosong
-    - Maksimal 20 pasang data
+    - Kondisi, kriteria, dan rekomendasi tidak boleh kosong
+    - Maksimal 20 set data
     - Hanya bisa update jika evaluasi belum selesai
     
-    **Response**: Enriched matriks data dengan summary temuan-rekomendasi
+    **Response**: Enriched matriks data dengan summary kondisi-kriteria-rekomendasi
     """
     return await service.update_matriks(matriks_id, update_data, current_user["id"])
 
