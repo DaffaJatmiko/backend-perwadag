@@ -181,43 +181,37 @@ class AuthRateLimitingMiddleware(BaseHTTPMiddleware):
         self.redis_prefix = "auth_rate_limit"
     
     async def dispatch(self, request: Request, call_next):
-        # Only apply to auth endpoints
         if not self._is_auth_endpoint(request):
             return await call_next(request)
         
         client_ip = self._get_client_ip(request)
         
-        # Check rate limit for auth endpoints
+        # Step 1: Check current rate limit status
         if await self._is_auth_rate_limited(client_ip):
+            logger.warning(f"Auth rate limit exceeded for IP {client_ip}")
             cors_headers = get_cors_headers(request)
-            
-            headers = {
-                "Retry-After": str(self.period),
-                **cors_headers  # Merge CORS headers
-            }
             
             return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                content={
-                    "detail": "Terlalu banyak percobaan login. Silakan coba lagi dalam 5 menit."
-                },
-                headers=headers
+                content={"detail": "Terlalu banyak percobaan otentikasi. Silakan coba lagi dalam 5 menit."},
+                headers={"Retry-After": str(self.period), **cors_headers}
             )
         
+        # Step 2: IMPORTANT - Increment counter BEFORE processing
+        await self._update_auth_attempt_count(client_ip)
+        
+        # Step 3: Process request
         response = await call_next(request)
         
-        # If auth attempt failed, increment counter
-        if self._is_failed_auth(response):
-            await self._update_auth_attempt_count(client_ip)
-        elif self._is_successful_auth(response):
-            # Reset counter on successful auth
+        # Step 4: Reset counter if successful (optional optimization)
+        if self._is_successful_auth(response):
             await self._reset_auth_attempts(client_ip)
         
         return response
     
     def _is_auth_endpoint(self, request: Request) -> bool:
         """Check if request is to an authentication endpoint."""
-        auth_paths = ["/api/v1/auth/login", "/api/v1/auth/register"]
+        auth_paths = ["/api/v1/auth/login", "/api/v1/auth/register","/api/v1/auth/request-password-reset"]
         return request.url.path in auth_paths and request.method == "POST"
     
     def _get_client_ip(self, request: Request) -> str:
@@ -250,24 +244,31 @@ class AuthRateLimitingMiddleware(BaseHTTPMiddleware):
             else:
                 client_data = {"attempts": [], "blocked_until": 0}
             
-            # Check if blocked
+            # Check if explicitly blocked
             if current_time < client_data["blocked_until"]:
+                logger.info(f"IP {client_ip} is explicitly blocked until {client_data['blocked_until']}")
                 return True
             
-            # Clean old attempts
+            # Clean old attempts (sliding window)
             client_data["attempts"] = [
                 attempt_time for attempt_time in client_data["attempts"]
-                if current_time - attempt_time < self.period
+                if current_time - attempt_time < self.period  # 300 seconds
             ]
             
-            return len(client_data["attempts"]) >= self.calls
+            # Check if limit would be exceeded with this request
+            if len(client_data["attempts"]) >= self.calls:  # >= 5
+                logger.info(f"IP {client_ip} has {len(client_data['attempts'])} attempts in window, limit is {self.calls}")
+                return True
+            
+            logger.info(f"IP {client_ip} has {len(client_data['attempts'])}/{self.calls} attempts in window")
+            return False
             
         except Exception as e:
             logger.error(f"Redis error checking auth rate limit: {e}")
             return False
     
     async def _update_auth_attempt_count(self, client_ip: str) -> None:
-        """Update failed auth attempt count in Redis."""
+        """Add one attempt to the counter."""
         redis = await get_redis()
         if not redis:
             return
@@ -283,13 +284,20 @@ class AuthRateLimitingMiddleware(BaseHTTPMiddleware):
             else:
                 client_data = {"attempts": [], "blocked_until": 0}
             
-            # Add failed attempt
+            # Clean old attempts first
+            client_data["attempts"] = [
+                attempt_time for attempt_time in client_data["attempts"]
+                if current_time - attempt_time < self.period
+            ]
+            
+            # Add current attempt
             client_data["attempts"].append(current_time)
             
-            # If limit reached, block for the period
+            # If we've hit the limit, set blocked_until
             if len(client_data["attempts"]) >= self.calls:
+                # Block for the period from now
                 client_data["blocked_until"] = current_time + self.period
-                logger.warning(f"Auth rate limit exceeded for IP {client_ip}")
+                logger.warning(f"Auth rate limit reached for IP {client_ip}. Blocked until {client_data['blocked_until']}")
             
             # Save to Redis with TTL
             await redis.setex(
@@ -297,6 +305,8 @@ class AuthRateLimitingMiddleware(BaseHTTPMiddleware):
                 self.period * 2,  # TTL longer than period
                 json.dumps(client_data)
             )
+            
+            logger.info(f"Updated attempts for IP {client_ip}: {len(client_data['attempts'])}/{self.calls}")
             
         except Exception as e:
             logger.error(f"Redis error updating auth attempt count: {e}")
@@ -318,11 +328,52 @@ class AuthRateLimitingMiddleware(BaseHTTPMiddleware):
     
     def _is_failed_auth(self, response) -> bool:
         """Check if response indicates failed authentication."""
-        return response.status_code in [401, 403, 423]  # Unauthorized, Forbidden, Locked
+        return response.status_code in [401, 403, 404, 423]  # Unauthorized, Forbidden, Locked
     
     def _is_successful_auth(self, response) -> bool:
         """Check if response indicates successful authentication."""
         return response.status_code == 200
+
+    async def _debug_rate_limit_state(self, client_ip: str) -> dict:
+        """Debug helper to see current rate limit state."""
+        redis = await get_redis()
+        if not redis:
+            return {"error": "Redis not available"}
+            
+        redis_key = f"{self.redis_prefix}:{client_ip}"
+        
+        try:
+            client_data_str = await redis.get(redis_key)
+            if client_data_str:
+                client_data = json.loads(client_data_str)
+                current_time = time.time()
+                
+                # Clean old attempts for accurate count
+                valid_attempts = [
+                    attempt_time for attempt_time in client_data["attempts"]
+                    if current_time - attempt_time < self.period
+                ]
+                
+                return {
+                    "ip": client_ip,
+                    "total_attempts_stored": len(client_data["attempts"]),
+                    "valid_attempts_in_window": len(valid_attempts),
+                    "limit": self.calls,
+                    "blocked_until": client_data["blocked_until"],
+                    "currently_blocked": current_time < client_data["blocked_until"],
+                    "window_period": self.period,
+                    "current_time": current_time
+                }
+            else:
+                return {
+                    "ip": client_ip,
+                    "status": "No data in Redis",
+                    "limit": self.calls,
+                    "window_period": self.period
+                }
+                
+        except Exception as e:
+            return {"error": f"Redis error: {e}"}
 
 
 def add_rate_limiting(app):

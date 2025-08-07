@@ -223,23 +223,11 @@ async def check_password_reset_eligibility(
 @router.post("/request-password-reset", response_model=MessageResponse, summary="Request password reset")
 async def request_password_reset(
     reset_data: PasswordReset,
-    background_tasks: BackgroundTasks,  # ⭐ TAMBAH PARAMETER INI
+    background_tasks: BackgroundTasks,
     auth_service: AuthService = Depends(get_auth_service)
 ):
     """
-    Request password reset token dengan BACKGROUND EMAIL SENDING.
-    
-    - **email**: User email address (must be set in profile first)
-    
-    **NEW FEATURE**: Email sending now runs in background for faster response!
-    
-    **Process**:
-    1. Validate user and email ✅ (blocking)
-    2. Generate and save reset token ✅ (blocking) 
-    3. Schedule email sending 📧 (background)
-    4. Return success response immediately 🚀
-    
-    **Performance**: Response time reduced from ~3s to ~200ms
+    Request password reset token dengan ERROR MESSAGES YANG JELAS.
     """
     import logging
     from src.utils.password import generate_password_reset_token, mask_email
@@ -250,24 +238,29 @@ async def request_password_reset(
     
     user = await auth_service.user_repo.get_by_email(reset_data.email)
     
-    # Always return success message to prevent email enumeration
-    success_message = "Jika email tersebut terdaftar dan terkait dengan akun, link reset password telah dikirim"
-    
+    # 🔥 PERUBAHAN: RAISE ERROR UNTUK USER BOOMER
     # Case 1: Email tidak ditemukan di database
     if not user:
         logger.warning(f"Reset password request for unregistered email: {mask_email(reset_data.email)}")
-        return MessageResponse(message=success_message)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Email tidak ditemukan dalam sistem. Pastikan email yang Anda masukkan sudah terdaftar."
+        )
     
     # Case 2: User tidak aktif
     if not user.is_active:
         logger.warning(f"Reset password request for inactive user: {user.nama} ({mask_email(reset_data.email)})")
-        return MessageResponse(message=success_message)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Akun Anda sedang dinonaktifkan. Silakan hubungi administrator untuk mengaktifkan akun."
+        )
     
     # Case 3: User aktif tapi tidak punya email (edge case)
     if not user.has_email():
         logger.warning(f"Reset password request for user without email: {user.nama}")
-        return MessageResponse(
-            message="Akun user tidak memiliki email yang dikonfigurasi. Silakan hubungi administrator."
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Akun Anda tidak memiliki email yang dikonfigurasi. Silakan hubungi administrator."
         )
     
     # Case 4: Semua validasi passed - process reset
@@ -286,13 +279,13 @@ async def request_password_reset(
         )
         logger.info(f"Password reset token created for user: {user.nama}")
     except Exception as e:
-        logger.error(f"Failed to create password reset token for {mask_email(user.email)}: {str(e)}")
-        return MessageResponse(
-            message="Gagal memproses permintaan reset password. Silakan coba lagi nanti.",
-            success=False
+        logger.error(f"Failed to create password reset token for {mask_email(reset_data.email)}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Gagal memproses permintaan reset password. Silakan coba lagi nanti."
         )
     
-    # 🚀 BACKGROUND EMAIL SENDING - PERUBAHAN UTAMA!
+    # 🚀 BACKGROUND EMAIL SENDING
     logger.info(f"Scheduling background email for {mask_email(user.email)}")
     
     background_tasks.add_task(
@@ -302,10 +295,12 @@ async def request_password_reset(
         token           # reset_token
     )
     
-    # ✅ RETURN IMMEDIATELY - email sedang dikirim di background
+    # ✅ RETURN SUCCESS MESSAGE WITH EMAIL MASKING
     logger.info(f"Password reset response sent immediately, email processing in background")
     
-    return MessageResponse(message=success_message)
+    return MessageResponse(
+        message=f"Link reset password telah dikirim ke email {mask_email(user.email)}. Silakan cek inbox atau spam folder Anda."
+    )
 
 
 
