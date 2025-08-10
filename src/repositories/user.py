@@ -520,3 +520,22 @@ class UserRepository:
         users = list(result.scalars().all())
         
         return users, total
+
+    async def get_users_by_inspektorat_and_roles(
+        self, 
+        inspektorat: str, 
+        roles: List[UserRole]
+    ) -> List[User]:
+        """Get users by inspektorat and specific roles."""
+        
+        query = (
+            select(User)
+            .where(User.inspektorat == inspektorat)
+            .where(User.role.in_([role.value for role in roles]))
+            .where(User.is_active == True)
+            .where(User.deleted_at.is_(None))
+            .order_by(User.nama)
+        )
+        
+        result = await self.session.execute(query)
+        return result.scalars().all()

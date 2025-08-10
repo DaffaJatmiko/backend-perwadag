@@ -73,9 +73,19 @@ class LaporanHasilRepository:
         # Role-based filtering
         if user_role == "PERWADAG" and user_id:
             laporan_query = laporan_query.where(SuratTugas.user_perwadag_id == user_id)
-        elif user_role == "INSPEKTORAT" and user_inspektorat:
+        elif user_role == "PIMPINAN" and user_inspektorat:
             laporan_query = laporan_query.where(SuratTugas.inspektorat == user_inspektorat)
-        
+        elif user_role == "INSPEKTORAT" and user_id:
+            # Assignment-based filtering
+            laporan_query = laporan_query.where(
+                or_(
+                    SuratTugas.pengedali_mutu_id == user_id,
+                    SuratTugas.pengendali_teknis_id == user_id,
+                    SuratTugas.ketua_tim_id == user_id,
+                    SuratTugas.anggota_tim_ids.like(f"%{user_id}%")
+                )
+            )
+            
         # Apply filters - FIXED field names sesuai model
         if filters.search:
             search_term = f"%{filters.search}%"

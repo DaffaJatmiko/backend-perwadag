@@ -221,23 +221,24 @@ def is_perwadag(user: Dict) -> bool:
     """Check if user is perwadag."""
     return has_role(user, "PERWADAG")
 
+def is_pimpinan(user: Dict) -> bool:
+    """Check if user is pimpinan."""
+    return has_role(user, "PIMPINAN")
+
 
 # Rate limiting by role - FIXED FOR SINGLE ROLE
 def get_rate_limit_by_role(user: Dict) -> int:
-    """
-    Get rate limit based on user role - SINGLE ROLE SYSTEM.
-    """
+    """Get rate limit based on user role - SINGLE ROLE SYSTEM."""
     user_role = user.get("role")
     
     if user_role == "ADMIN":
         return 1000  # Higher limit for admins
-    elif user_role == "INSPEKTORAT":
-        return 500   # Medium limit for inspektorat
+    elif user_role in ["PIMPINAN", "INSPEKTORAT"]:  # UBAH BARIS INI
+        return 500   # Medium limit for pimpinan and inspektorat
     elif user_role == "PERWADAG":
         return 300   # Medium limit for perwadag
     else:
         return 100   # Standard limit for other roles
-
 
 # Security utilities
 async def log_access_attempt(user: Dict, resource: str, success: bool = True):
@@ -267,5 +268,5 @@ async def log_access_attempt(user: Dict, resource: str, success: bool = True):
 # Government-specific role checks - UPDATED FOR YOUR SYSTEM
 def require_government_roles():
     """Require any government role."""
-    government_roles = ["ADMIN", "INSPEKTORAT", "PERWADAG"]
+    government_roles = ["ADMIN", "INSPEKTORAT", "PIMPINAN", "PERWADAG"] 
     return require_roles(government_roles)

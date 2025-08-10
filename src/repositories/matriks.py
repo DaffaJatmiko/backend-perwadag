@@ -73,8 +73,20 @@ class MatriksRepository:
         # Role-based filtering
         if user_role == "PERWADAG" and user_id:
             matriks_query = matriks_query.where(SuratTugas.user_perwadag_id == user_id)
-        elif user_role == "INSPEKTORAT" and user_inspektorat:
+        elif user_role == "PIMPINAN" and user_inspektorat:
+            # Pimpinan bisa lihat semua di inspektoratnya
             matriks_query = matriks_query.where(SuratTugas.inspektorat == user_inspektorat)
+        elif user_role == "INSPEKTORAT" and user_id:
+            # INSPEKTORAT hanya bisa lihat yang dia assigned di surat tugas
+            matriks_query = matriks_query.where(
+                or_(
+                    SuratTugas.pengedali_mutu_id == user_id,
+                    SuratTugas.pengendali_teknis_id == user_id,
+                    SuratTugas.ketua_tim_id == user_id,
+                    SuratTugas.anggota_tim_ids.like(f"%{user_id}%")
+                )
+            )
+        # Admin bisa lihat semua (tidak ada filter)
         
         # Apply filters - FIXED field names
         if filters.search:

@@ -91,9 +91,19 @@ class MeetingRepository:
         
         # Role-based filtering
         if user_role == "PERWADAG" and user_id:
-            meetings_query = meetings_query.where(SuratTugas.user_perwadag_id == user_id)
-        elif user_role == "INSPEKTORAT" and user_inspektorat:
-            meetings_query = meetings_query.where(SuratTugas.inspektorat == user_inspektorat)
+            meeting_query = meeting_query.where(SuratTugas.user_perwadag_id == user_id)
+        elif user_role == "PIMPINAN" and user_inspektorat:
+            meeting_query = meeting_query.where(SuratTugas.inspektorat == user_inspektorat)
+        elif user_role == "INSPEKTORAT" and user_id:
+            # Assignment-based filtering
+            meeting_query = meeting_query.where(
+                or_(
+                    SuratTugas.pengedali_mutu_id == user_id,
+                    SuratTugas.pengendali_teknis_id == user_id,
+                    SuratTugas.ketua_tim_id == user_id,
+                    SuratTugas.anggota_tim_ids.like(f"%{user_id}%")
+                )
+            )
         
         # Apply filters
         if filters.search:

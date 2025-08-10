@@ -20,14 +20,19 @@ class SuratTugasRepository:
     # ===== CREATE OPERATIONS =====
     
     async def create(self, surat_tugas_data: SuratTugasCreate, file_path: str) -> SuratTugas:
-        """Create surat tugas baru dengan data perwadag."""
+        """Create surat tugas baru dengan assignment fields."""
         
         # Get perwadag info
         perwadag = await self.get_perwadag_by_id(surat_tugas_data.user_perwadag_id)
         if not perwadag:
             raise ValueError("Perwadag not found")
         
-        # Create surat tugas instance
+        # Convert anggota_tim_ids list to string
+        anggota_tim_ids_str = None
+        if surat_tugas_data.anggota_tim_ids:
+            anggota_tim_ids_str = ','.join(surat_tugas_data.anggota_tim_ids)
+        
+        # Create surat tugas instance dengan field baru
         surat_tugas = SuratTugas(
             user_perwadag_id=surat_tugas_data.user_perwadag_id,
             nama_perwadag=perwadag.nama,
@@ -36,10 +41,12 @@ class SuratTugasRepository:
             tanggal_evaluasi_selesai=surat_tugas_data.tanggal_evaluasi_selesai,
             no_surat=surat_tugas_data.no_surat,
             
-            # UBAH: Handle None values dengan default
-            nama_pengedali_mutu=surat_tugas_data.nama_pengedali_mutu or "TBD",
-            nama_pengendali_teknis=surat_tugas_data.nama_pengendali_teknis or "TBD", 
-            nama_ketua_tim=surat_tugas_data.nama_ketua_tim or "TBD",
+            # GUNAKAN field ID baru:
+            pengedali_mutu_id=surat_tugas_data.pengedali_mutu_id,
+            pengendali_teknis_id=surat_tugas_data.pengendali_teknis_id,
+            ketua_tim_id=surat_tugas_data.ketua_tim_id,
+            anggota_tim_ids=anggota_tim_ids_str,
+            pimpinan_inspektorat_id=surat_tugas_data.pimpinan_inspektorat_id,
             
             file_surat_tugas=file_path
         )
@@ -83,9 +90,19 @@ class SuratTugasRepository:
         if user_role == "PERWADAG":
             # Perwadag hanya bisa lihat milik sendiri
             query = query.where(SuratTugas.user_perwadag_id == user_id)
-        elif user_role == "INSPEKTORAT" and user_inspektorat:
-            # Inspektorat hanya bisa lihat di wilayah kerjanya
+        elif user_role == "PIMPINAN" and user_inspektorat:
+            # Pimpinan bisa lihat semua di wilayah kerjanya
             query = query.where(SuratTugas.inspektorat == user_inspektorat)
+        elif user_role == "INSPEKTORAT" and user_id:
+            # Inspektorat hanya bisa lihat yang dia assigned
+            query = query.where(
+                or_(
+                    SuratTugas.pengedali_mutu_id == user_id,
+                    SuratTugas.pengendali_teknis_id == user_id,
+                    SuratTugas.ketua_tim_id == user_id,
+                    SuratTugas.anggota_tim_ids.like(f"%{user_id}%")
+                )
+            )
         # Admin bisa lihat semua
         
         # Apply search filter

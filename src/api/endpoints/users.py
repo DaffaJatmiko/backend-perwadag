@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Dict, Optional, Any
 
 from src.core.database import get_db
 from src.repositories.user import UserRepository
@@ -370,3 +371,29 @@ async def delete_user(
     
     # ✅ PASS current_user_id sebagai parameter
     return await user_service.delete_user(user_id, current_user["id"])
+
+@router.get("/by-inspektorat/{inspektorat}", response_model=List[UserSummary], summary="Get users by inspektorat for assignment")
+async def get_users_by_inspektorat(
+    inspektorat: str,
+    include_roles: str = Query("INSPEKTORAT,PIMPINAN", description="Comma-separated roles to include"),
+    current_user: dict = Depends(admin_or_inspektorat),
+    user_service: UserService = Depends(get_user_service)
+):
+    """
+    Get users dalam inspektorat tertentu untuk assignment selection.
+    
+    **Query Parameters**:
+    - include_roles: Roles yang disertakan (default: INSPEKTORAT,PIMPINAN)
+    
+    **Returns**: List users yang bisa di-assign ke surat tugas
+    """
+    # Parse roles
+    try:
+        roles = [UserRole(role.strip()) for role in include_roles.split(',')]
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid role in include_roles: {e}"
+        )
+    
+    return await user_service.get_users_by_inspektorat_and_roles(inspektorat, roles)

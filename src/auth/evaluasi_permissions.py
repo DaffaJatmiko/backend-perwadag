@@ -21,7 +21,7 @@ def require_evaluasi_read_access():
         user_role = current_user.get("role")
         
         # Semua role yang authenticated boleh read (dengan filtering di service layer)
-        if user_role in ["ADMIN", "INSPEKTORAT", "PERWADAG"]:
+        if user_role in ["ADMIN", "INSPEKTORAT", "PERWADAG", "PIMPINAN"]:
             return current_user
         
         raise HTTPException(
@@ -46,7 +46,7 @@ def require_evaluasi_write_access():
     ) -> Dict:
         user_role = current_user.get("role")
         
-        if user_role in ["ADMIN", "INSPEKTORAT"]:
+        if user_role in ["ADMIN", "INSPEKTORAT", "PIMPINAN"]:
             return current_user
         
         raise HTTPException(
@@ -71,7 +71,7 @@ def require_surat_tugas_create_access():
     ) -> Dict:
         user_role = current_user.get("role")
         
-        if user_role in ["ADMIN", "INSPEKTORAT"]:
+        if user_role in ["ADMIN", "INSPEKTORAT", "PIMPINAN"]:
             return current_user
         
         raise HTTPException(
@@ -96,7 +96,7 @@ def require_surat_tugas_delete_access():
     ) -> Dict:
         user_role = current_user.get("role")
         
-        if user_role in ["ADMIN", "INSPEKTORAT"]:
+        if user_role in ["ADMIN", "INSPEKTORAT", "PIMPINAN"]:
             return current_user
         
         raise HTTPException(
@@ -121,7 +121,7 @@ def require_kuisioner_upload_access():
     ) -> Dict:
         user_role = current_user.get("role")
         
-        if user_role in ["ADMIN", "INSPEKTORAT", "PERWADAG"]:
+        if user_role in ["ADMIN", "INSPEKTORAT", "PERWADAG", "PIMPINAN"]:
             return current_user
         
         raise HTTPException(
@@ -146,7 +146,7 @@ def require_laporan_edit_access():
     ) -> Dict:
         user_role = current_user.get("role")
         
-        if user_role in ["ADMIN", "INSPEKTORAT", "PERWADAG"]:
+        if user_role in ["ADMIN", "INSPEKTORAT", "PERWADAG", "PIMPINAN"]:
             return current_user
         
         raise HTTPException(
@@ -196,7 +196,7 @@ def require_auto_generated_edit_access():
     ) -> Dict:
         user_role = current_user.get("role")
         
-        if user_role in ["ADMIN", "INSPEKTORAT"]:
+        if user_role in ["ADMIN", "INSPEKTORAT", "PIMPINAN"]:
             return current_user
         
         raise HTTPException(
@@ -221,7 +221,7 @@ def require_statistics_access():
     ) -> Dict:
         user_role = current_user.get("role")
         
-        if user_role in ["ADMIN", "INSPEKTORAT", "PERWADAG"]:
+        if user_role in ["ADMIN", "INSPEKTORAT", "PERWADAG", "PIMPINAN"]:
             return current_user
         
         raise HTTPException(
@@ -240,7 +240,8 @@ def check_evaluasi_ownership(current_user: Dict, target_user_perwadag_id: str) -
     
     Rules:
     - Admin: Access semua
-    - Inspektorat: Access sesuai wilayah kerja
+    - Pimpinan: Access semua di wilayah kerjanya  # TAMBAH INI
+    - Inspektorat: Access hanya yang dia assigned  # UBAH INI
     - Perwadag: Access milik sendiri only
     """
     user_role = current_user.get("role")
@@ -248,10 +249,12 @@ def check_evaluasi_ownership(current_user: Dict, target_user_perwadag_id: str) -
     
     if user_role == "ADMIN":
         return True
+    elif user_role == "PIMPINAN":  # TAMBAH KONDISI INI
+        # Pimpinan bisa akses semua perwadag di wilayah kerjanya
+        return True  # Validasi di service layer berdasarkan inspektorat
     elif user_role == "INSPEKTORAT":
-        # Inspektorat bisa akses semua perwadag di wilayah kerjanya
-        # Validasi di service layer berdasarkan inspektorat field
-        return True
+        # PERLU ASSIGNMENT CHECK - akan divalidasi di service layer
+        return True  # Basic check, detailed check di service
     elif user_role == "PERWADAG":
         # Perwadag hanya bisa akses milik sendiri
         return user_id == target_user_perwadag_id
@@ -260,11 +263,7 @@ def check_evaluasi_ownership(current_user: Dict, target_user_perwadag_id: str) -
 
 
 def get_evaluasi_filter_scope(current_user: Dict) -> Dict[str, any]:
-    """
-    Get filter scope untuk query berdasarkan role user.
-    
-    Returns dict yang bisa digunakan di service layer untuk filtering.
-    """
+    """Get filter scope untuk query berdasarkan role user."""
     user_role = current_user.get("role")
     user_id = current_user.get("id")
     
@@ -273,11 +272,17 @@ def get_evaluasi_filter_scope(current_user: Dict) -> Dict[str, any]:
             "scope": "all",
             "user_role": user_role
         }
-    elif user_role == "INSPEKTORAT":
+    elif user_role == "PIMPINAN":  # TAMBAH KONDISI INI
         return {
             "scope": "inspektorat",
             "user_role": user_role,
-            "user_inspektorat": current_user.get("inspektorat"),  # Harus ada di JWT
+            "user_inspektorat": current_user.get("inspektorat"),
+        }
+    elif user_role == "INSPEKTORAT":
+        return {
+            "scope": "assigned_only",  # UBAH DARI "inspektorat" KE "assigned_only"
+            "user_role": user_role,
+            "user_id": user_id
         }
     elif user_role == "PERWADAG":
         return {
@@ -294,17 +299,7 @@ def validate_evaluasi_access(
     target_evaluasi_data: Dict,
     action: str = "read"
 ) -> bool:
-    """
-    Validate apakah user berhak melakukan action tertentu pada evaluasi data.
-    
-    Args:
-        current_user: Current user dari JWT
-        target_evaluasi_data: Data evaluasi yang ingin diakses (harus punya user_perwadag_id)
-        action: Jenis action (read, write, delete)
-    
-    Returns:
-        True jika access allowed, False jika tidak
-    """
+    """Validate apakah user berhak melakukan action tertentu pada evaluasi data."""
     user_role = current_user.get("role")
     target_perwadag_id = target_evaluasi_data.get("user_perwadag_id")
     
@@ -314,19 +309,16 @@ def validate_evaluasi_access(
     
     # Action-specific checks
     if action == "read":
-        # Semua role bisa read (sesuai scope masing-masing)
         return True
     elif action == "write":
-        # Hanya Admin & Inspektorat bisa write
-        return user_role in ["ADMIN", "INSPEKTORAT"]
+        # TAMBAH PIMPINAN
+        return user_role in ["ADMIN", "INSPEKTORAT", "PIMPINAN"]
     elif action == "delete":
-        # Hanya Admin & Inspektorat bisa delete
-        return user_role in ["ADMIN", "INSPEKTORAT"]
+        # TAMBAH PIMPINAN
+        return user_role in ["ADMIN", "INSPEKTORAT", "PIMPINAN"]
     elif action == "kuisioner_upload":
-        # Semua role bisa upload kuisioner (sesuai scope)
         return True
     elif action == "laporan_edit":
-        # Semua role bisa edit laporan hasil (sesuai scope)
         return True
     
     return False

@@ -64,9 +64,11 @@ async def create_surat_tugas(
     no_surat: str = Form(..., description="Nomor surat tugas"),
     
     # UBAH: Jadikan optional
-    nama_pengedali_mutu: Optional[str] = Form(None, description="Nama pengedali mutu (optional)"),
-    nama_pengendali_teknis: Optional[str] = Form(None, description="Nama pengendali teknis (optional)"),
-    nama_ketua_tim: Optional[str] = Form(None, description="Nama ketua tim (optional)"),
+    pengedali_mutu_id: Optional[str] = Form(None, description="ID pengedali mutu"),
+    pengendali_teknis_id: Optional[str] = Form(None, description="ID pengendali teknis"),
+    ketua_tim_id: Optional[str] = Form(None, description="ID ketua tim"),
+    anggota_tim_ids: Optional[str] = Form(None, description="Comma-separated anggota tim IDs"),
+    pimpinan_inspektorat_id: Optional[str] = Form(None, description="ID pimpinan inspektorat"),
     
     file: UploadFile = File(..., description="File surat tugas"),
     current_user: dict = Depends(require_surat_tugas_create_access()),
@@ -84,15 +86,22 @@ async def create_surat_tugas(
             detail="Invalid date format. Use YYYY-MM-DD"
         )
     
-    # Build create data - None values akan dihandle otomatis
+    # Parse anggota tim IDs
+    anggota_tim_list = None
+    if anggota_tim_ids:
+        anggota_tim_list = [uid.strip() for uid in anggota_tim_ids.split(',') if uid.strip()]
+    
+    # Build create data
     surat_tugas_data = SuratTugasCreate(
         user_perwadag_id=user_perwadag_id,
         tanggal_evaluasi_mulai=tanggal_mulai,
         tanggal_evaluasi_selesai=tanggal_selesai,
         no_surat=no_surat,
-        nama_pengedali_mutu=nama_pengedali_mutu,  # Bisa None
-        nama_pengendali_teknis=nama_pengendali_teknis,  # Bisa None
-        nama_ketua_tim=nama_ketua_tim  # Bisa None
+        pengedali_mutu_id=pengedali_mutu_id,
+        pengendali_teknis_id=pengendali_teknis_id,
+        ketua_tim_id=ketua_tim_id,
+        anggota_tim_ids=anggota_tim_list,
+        pimpinan_inspektorat_id=pimpinan_inspektorat_id
     )
     
     return await surat_tugas_service.create_surat_tugas(
