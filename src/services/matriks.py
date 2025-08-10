@@ -144,9 +144,15 @@ class MatriksService:
         # Update temuan-rekomendasi if provided
         if update_data.temuan_rekomendasi is not None:
             items = [item.model_dump() for item in update_data.temuan_rekomendasi.items]
-            updated_matriks = await self.matriks_repo.update_temuan_rekomendasi(
-                matriks_id, items
+            updated_matriks, success = await self.matriks_repo.update_temuan_rekomendasi(
+                matriks_id, items, update_data.expected_temuan_version
             )
+            
+            if not success:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Data telah diubah oleh user lain. Silakan refresh halaman dan coba lagi."
+                )
         else:
             # No temuan-rekomendasi update, just refresh
             updated_matriks = matriks
@@ -351,6 +357,7 @@ class MatriksService:
             updated_at = matriks.get('updated_at')
             created_by = matriks.get('created_by')
             updated_by = matriks.get('updated_by')
+            temuan_version = matriks.get('temuan_version', 0)
 
             temp_matriks = None
             if temuan_rekomendasi:
@@ -367,7 +374,8 @@ class MatriksService:
             updated_at = matriks.updated_at
             created_by = matriks.created_by
             updated_by = matriks.updated_by
-        
+            temuan_version = getattr(matriks, 'temuan_version', 0)
+
         # Build file information - FIXED: Remove await
         file_urls = None
         file_metadata = None
@@ -431,6 +439,7 @@ class MatriksService:
             nomor_matriks=None,  # Model doesn't have this field
             file_dokumen=file_dokumen_matriks,  # Map to expected response field name
             temuan_rekomendasi_summary=temuan_rekomendasi_summary,
+            temuan_version=temuan_version,
             
             # Enhanced file information
             file_urls=file_urls,

@@ -179,7 +179,8 @@ class MatriksRepository:
                 'created_at': matriks.created_at,
                 'updated_at': matriks.updated_at,
                 'created_by': matriks.created_by,
-                'updated_by': matriks.updated_by
+                'updated_by': matriks.updated_by,
+                'temuan_version': getattr(matriks, 'temuan_version', 0)
             }
             
             # Build surat tugas data (SAFE - akses langsung attribute)
@@ -230,21 +231,30 @@ class MatriksRepository:
     async def update_temuan_rekomendasi(
         self, 
         matriks_id: str, 
-        items: List[Dict[str, str]]
-    ) -> Optional[Matriks]:
-        """Update temuan-rekomendasi dengan REPLACE strategy."""
+        items: List[Dict[str, str]],
+        expected_version: Optional[int] = None
+    ) -> Tuple[Optional[Matriks], bool]:
+        """
+        Update temuan-rekomendasi dengan conflict detection.
         
+        Returns:
+            Tuple[matriks, success]: matriks object dan status berhasil/conflict
+        """
         matriks = await self.get_by_id(matriks_id)
         if not matriks:
-            return None
+            return None, False
         
-        # REPLACE strategy - replace all old data with new data
-        matriks.set_temuan_rekomendasi_items(items)
+        # Try to set with version check
+        success = matriks.set_temuan_rekomendasi_items(items, expected_version)
+        
+        if not success:
+            return matriks, False  # Conflict detected
+        
         matriks.updated_at = datetime.utcnow()
         
         await self.session.commit()
         await self.session.refresh(matriks)
-        return matriks
+        return matriks, True
     
     async def get_statistics(
         self,

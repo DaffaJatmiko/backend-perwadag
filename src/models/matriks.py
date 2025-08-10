@@ -35,6 +35,11 @@ class Matriks(BaseModel, SQLModel, table=True):
         default=None,
         description="JSON data untuk pasangan temuan dan rekomendasi",
     )
+
+    temuan_version: int = Field(
+        default=0,
+        description="Version number untuk conflict detection pada temuan"
+    )
     
     def is_completed(self) -> bool:
         """Check apakah matriks sudah completed."""
@@ -76,13 +81,25 @@ class Matriks(BaseModel, SQLModel, table=True):
         except (json.JSONDecodeError, TypeError):
             return []
 
-    def set_temuan_rekomendasi_items(self, items: List[Dict[str, str]]) -> None:
+    def set_temuan_rekomendasi_items(
+        self, 
+        items: List[Dict[str, str]], 
+        expected_version: Optional[int] = None
+    ) -> bool:
         """
-        Set JSON data dengan 3-field structure - REPLACE strategy.
+        Set JSON data dengan 3-field structure - CONFLICT-SAFE VERSION.
         
         Args:
             items: List of dicts dengan keys: kondisi, kriteria, rekomendasi
+            expected_version: Expected version untuk conflict detection
+            
+        Returns:
+            bool: True jika berhasil, False jika ada conflict
         """
+        # Check version conflict
+        if expected_version is not None and self.temuan_version != expected_version:
+            return False  # Conflict detected!
+        
         import json
         from datetime import datetime
         
@@ -108,8 +125,13 @@ class Matriks(BaseModel, SQLModel, table=True):
             'items': validated_items,
             'total': len(validated_items),
             'last_updated': datetime.utcnow().isoformat(),
-            'structure_version': '3-field'  # Version marker
+            'structure_version': '3-field'
         }, ensure_ascii=False)
+        
+        # INCREMENT VERSION
+        self.temuan_version += 1
+        
+        return True
 
     def has_temuan_rekomendasi(self) -> bool:
         """Check apakah ada data kondisi-kriteria-rekomendasi."""

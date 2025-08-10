@@ -94,7 +94,7 @@ async def update_matriks(
     service: MatriksService = Depends(get_matriks_service)
 ):
     """
-    Update matriks dengan kondisi-kriteria-rekomendasi support.
+    Update matriks dengan kondisi-kriteria-rekomendasi support dan conflict detection.
 
     **Accessible by**: Admin dan Inspektorat
 
@@ -102,6 +102,7 @@ async def update_matriks(
     - Update kondisi, kriteria dan rekomendasi (REPLACE strategy)
     - Maksimal 20 set kondisi-kriteria-rekomendasi
     - Date access validation
+    - **NEW: Conflict detection untuk mencegah race condition**
 
     **Example Request:**
     ```json
@@ -117,14 +118,10 @@ async def update_matriks(
                     "kondisi": "Dokumen perizinan pedagang tersebar di berbagai file fisik tanpa backup",
                     "kriteria": "Standar ISO 27001 mengharuskan backup data digital untuk dokumen penting",
                     "rekomendasi": "Membuat sistem backup digital dan database perizinan yang mudah diakses"
-                },
-                {
-                    "kondisi": "Proses verifikasi barang dagangan memakan waktu 2-3 hari per pedagang",
-                    "kriteria": "SOP pelayanan publik maksimal 1 hari untuk verifikasi rutin",
-                    "rekomendasi": "Merancang SOP verifikasi streamlined dan training petugas untuk efisiensi"
                 }
             ]
-        }
+        },
+        "expected_temuan_version": 0
     }
     ```
 
@@ -133,14 +130,32 @@ async def update_matriks(
     - **Kriteria**: Standar/aturan/ketentuan yang harus dipenuhi
     - **Rekomendasi**: Saran perbaikan untuk memenuhi kriteria
 
+    **Conflict Detection:**
+    - **expected_temuan_version**: Version yang diharapkan (dari GET response)
+    - Jika version tidak match → Error 409 Conflict
+    - **Workflow**: GET matriks → ambil `temuan_version` → kirim sebagai `expected_temuan_version`
+
     **Strategy**: REPLACE - Data lama akan diganti dengan data baru
     
     **Validation**:
     - Kondisi, kriteria, dan rekomendasi tidak boleh kosong
     - Maksimal 20 set data
     - Hanya bisa update jika evaluasi belum selesai
+    - Version harus match untuk mencegah race condition
     
-    **Response**: Enriched matriks data dengan summary kondisi-kriteria-rekomendasi
+    **Error Responses**:
+    - **409 Conflict**: "Data telah diubah oleh user lain. Silakan refresh halaman dan coba lagi."
+    - **403 Forbidden**: Akses ditolak (evaluasi sudah selesai)
+    - **422 Validation Error**: Data tidak valid
+    
+    **Response**: Enriched matriks data dengan summary kondisi-kriteria-rekomendasi dan `temuan_version` terbaru
+
+    **Multi-User Workflow:**
+    1. User A: GET `/matriks/{id}` → dapat `temuan_version: 0`
+    2. User B: GET `/matriks/{id}` → dapat `temuan_version: 0`
+    3. User A: PUT dengan `expected_temuan_version: 0` → **Success** (version jadi 1)
+    4. User B: PUT dengan `expected_temuan_version: 0` → **Error 409** (version sudah 1)
+    5. User B: GET ulang → dapat `temuan_version: 1` → PUT dengan version 1 → **Success**
     """
     return await service.update_matriks(matriks_id, update_data, current_user["id"])
 

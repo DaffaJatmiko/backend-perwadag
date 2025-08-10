@@ -66,8 +66,8 @@ class TemuanRekomendasiData(BaseModel):
     @field_validator('items')
     @classmethod
     def validate_items(cls, items: List[TemuanRekomendasiItem]) -> List[TemuanRekomendasiItem]:
-        if len(items) > 20:
-            raise ValueError("Maksimal 20 set kondisi-kriteria-rekomendasi")
+        if len(items) > 500:
+            raise ValueError("Maksimal 500 set kondisi-kriteria-rekomendasi")
         return items
 
 class TemuanRekomendasiSummary(BaseModel):
@@ -82,6 +82,11 @@ class MatriksUpdate(BaseModel):
         description="Data kondisi, kriteria dan rekomendasi (REPLACE strategy)"
     )
 
+    expected_temuan_version: Optional[int] = Field(
+        None,
+        description="Expected version untuk conflict detection"
+    )
+
 
 # ===== RESPONSE SCHEMAS =====
 
@@ -94,6 +99,8 @@ class MatriksResponse(BaseModel):
     # nomor_matriks: Optional[str] = None
     file_dokumen: Optional[str] = None
     temuan_rekomendasi_summary: Optional[TemuanRekomendasiSummary] = None
+    temuan_version: int = Field(default=0, description="Version untuk conflict detection")
+
     
     # Enhanced file information
     file_urls: Optional[FileUrls] = None
