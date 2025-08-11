@@ -116,6 +116,14 @@ class Settings(BaseSettings):
     ROLE_CHANGE_TTL_HOURS: int = 24
     TOKEN_BLACKLIST_CLEANUP_INTERVAL_HOURS: int = 6
 
+    # Google reCAPTCHA Settings
+    RECAPTCHA_SECRET_KEY: Optional[str] = None
+    RECAPTCHA_SITE_KEY: Optional[str] = None
+    RECAPTCHA_VERIFY_URL: str = "https://www.google.com/recaptcha/api/siteverify"
+    RECAPTCHA_THRESHOLD: float = 0.5  # Score threshold (0.0-1.0, higher = more human-like)
+    RECAPTCHA_ENABLED: bool = True
+    RECAPTCHA_TIMEOUT_SECONDS: int = 10
+
     @field_validator("DATABASE_URI", mode="before")
     def assemble_db_connection(cls, v: Optional[str], info: Dict[str, Any]) -> Any:
         """Build PostgreSQL connection string from components."""

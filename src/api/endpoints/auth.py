@@ -10,6 +10,7 @@ from src.schemas.log_activity import LogActivityCreate
 from datetime import datetime
 from src.services.user import UserService
 from src.services.auth import AuthService
+from src.services.captcha import captcha_service
 from src.schemas.user import (
     UserLogin, Token, TokenRefresh, PasswordReset, PasswordResetConfirm,
     MessageResponse, UserResponse, UserChangePassword
@@ -59,6 +60,53 @@ async def login(
     
     ip_address = get_client_ip(request)
     
+    # 🔒 CAPTCHA validation (if enabled and token provided)
+    if login_data.captcha_token and captcha_service.is_configured():
+        captcha_result = await captcha_service.verify_token(
+            token=login_data.captcha_token,
+            remote_ip=ip_address,
+            expected_action="login"
+        )
+        
+        if not captcha_result.is_human:
+            logger.warning(f"CAPTCHA verification failed for {login_data.username} from {ip_address}: {captcha_result.get_error_message()}")
+            
+            # Log failed CAPTCHA attempt
+            try:
+                from src.core.config import settings
+                base_url = settings.API_BASE_URL.rstrip('/')
+                full_url = f"{base_url}{request.url.path}"
+                
+                log_repo = LogActivityRepository(session)
+                log_data = LogActivityCreate(
+                    user_id=None,
+                    method="POST",
+                    url=full_url,
+                    activity="Failed CAPTCHA verification",
+                    date=datetime.utcnow(),
+                    user_name=f"Failed CAPTCHA: {login_data.username}",
+                    ip_address=ip_address,
+                    response_status=400
+                )
+                await log_repo.create(log_data)
+                await session.commit()
+            except Exception as log_error:
+                logger.error(f"Failed to log CAPTCHA failure: {log_error}")
+            
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verifikasi keamanan gagal. Silakan coba lagi atau refresh halaman."
+            )
+        
+        logger.info(f"CAPTCHA verification successful for {login_data.username} (score: {captcha_result.score or 'N/A'})")
+    elif captcha_service.is_configured() and not login_data.captcha_token:
+        # CAPTCHA is enabled but token not provided
+        logger.warning(f"Missing CAPTCHA token for login attempt from {ip_address}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token keamanan diperlukan untuk login."
+        )
+
     try:
         # Execute login with response for cookies
         result = await auth_service.login(login_data, response)
@@ -434,3 +482,18 @@ async def get_default_password_info(
             "recommendation": "Change your password after first login for security",
             "policy": "Set email address to enable password reset functionality"
         }
+
+
+@router.get("/captcha-config", summary="Get CAPTCHA configuration")
+async def get_captcha_config():
+    """
+    Get CAPTCHA configuration for frontend.
+    
+    Returns site key and enabled status for Google reCAPTCHA.
+    Public endpoint - no authentication required.
+    """
+    return {
+        "enabled": captcha_service.is_configured(),
+        "site_key": captcha_service.get_site_key(),
+        "version": "v3"
+    }

@@ -214,6 +214,7 @@ class UserLogin(BaseModel):
     """Schema for user login."""
     username: str = Field(..., description="Username for login")
     password: str = Field(..., min_length=1)
+    captcha_token: Optional[str] = Field(None, description="Google reCAPTCHA token")
 
 
 class Token(BaseModel):
