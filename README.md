@@ -189,6 +189,12 @@ RATE_LIMIT_PERIOD=60
 AUTH_RATE_LIMIT_CALLS=5
 AUTH_RATE_LIMIT_PERIOD=60
 
+# Google reCAPTCHA (Bot Protection)
+RECAPTCHA_SITE_KEY=your_site_key_from_google_console
+RECAPTCHA_SECRET_KEY=your_secret_key_from_google_console
+RECAPTCHA_ENABLED=true
+RECAPTCHA_THRESHOLD=0.5
+
 # Application
 PROJECT_NAME=SIELANGMERAH - Sistem Evaluasi Kinerja Perwakilan Perdagangan Metode Jarak Jauh
 VERSION=1.0.0
@@ -211,6 +217,7 @@ DEBUG=true
 - **JWT** - JSON Web Tokens untuk authentication
 - **bcrypt** - Password hashing yang aman
 - **python-jose** - JWT implementation untuk Python
+- **Google reCAPTCHA v3** - Invisible bot protection untuk login
 
 ### Validation & Serialization
 - **Pydantic** - Data validation menggunakan Python type hints
@@ -266,6 +273,7 @@ backend/
 │   ├── services/               # Business logic
 │   │   ├── auth.py            # Authentication service
 │   │   ├── user.py            # User service
+│   │   ├── captcha.py         # Google reCAPTCHA service
 │   │   ├── surat_tugas.py     # Surat tugas service
 │   │   └── email.py           # Email service
 │   └── utils/
@@ -290,6 +298,7 @@ backend/
 - **JWT-based Authentication** - Access dan refresh tokens
 - **Role-based Access Control** - Admin, Inspektorat, Perwadag roles
 - **Password Reset** - Reset password via email
+- **🆕 Google reCAPTCHA v3** - Invisible bot protection pada login dengan score-based validation
 
 ### 👥 User Management
 - **Multi-role User System** - Kelola user dengan berbagai role
@@ -519,6 +528,11 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 - **Input Validation** - Pydantic schema validation
 - **SQL Injection Protection** - SQLAlchemy ORM
 - **Rate Limiting** - Prevent abuse dan DDoS
+- **🆕 reCAPTCHA v3 Bot Protection** - Invisible CAPTCHA dengan score-based validation (threshold: 0.5)
+  - Automatic bot detection tanpa mengganggu user experience
+  - Real-time scoring dari Google (0.0 = bot, 1.0 = human)
+  - Comprehensive logging untuk monitoring dan debugging
+  - Graceful fallback jika service tidak tersedia
 
 ## 🤝 Contributing
 

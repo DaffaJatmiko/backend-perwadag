@@ -29,8 +29,8 @@ def set_auth_cookies(
         value=f"Bearer {access_token}",
         max_age=access_token_expires_minutes * 60,  # Convert to seconds
         httponly=True,  # Prevent XSS attacks
-        secure=True,    # Only send over HTTPS in production
-        samesite="strict",  # CSRF protection
+        secure=not settings.DEBUG,    # Only send over HTTPS in production (HTTP allowed in dev)
+        samesite="lax" if settings.DEBUG else "strict",  # Less strict in development
         path="/"
     )
     
@@ -40,8 +40,8 @@ def set_auth_cookies(
         value=f"Bearer {refresh_token}",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,  # Convert to seconds
         httponly=True,  # Prevent XSS attacks
-        secure=True,    # Only send over HTTPS in production
-        samesite="strict",  # CSRF protection
+        secure=not settings.DEBUG,    # Only send over HTTPS in production (HTTP allowed in dev)
+        samesite="lax" if settings.DEBUG else "strict",  # Less strict in development
         path="/"
     )
 
@@ -59,8 +59,8 @@ def clear_auth_cookies(response: Response) -> None:
         value="",
         max_age=0,
         httponly=True,
-        secure=True,
-        samesite="strict",
+        secure=not settings.DEBUG,
+        samesite="lax" if settings.DEBUG else "strict",
         path="/"
     )
     
@@ -70,8 +70,8 @@ def clear_auth_cookies(response: Response) -> None:
         value="",
         max_age=0,
         httponly=True,
-        secure=True,
-        samesite="strict",
+        secure=not settings.DEBUG,
+        samesite="lax" if settings.DEBUG else "strict",
         path="/"
     )
 
