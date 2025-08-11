@@ -76,6 +76,10 @@ class User(BaseModel, SQLModel, table=True):
     def is_inspektorat(self) -> bool:
         """Check if user is inspektorat."""
         return self.role == UserRole.INSPEKTORAT
+
+    def is_pimpinan(self) -> bool:
+        """Check if user is pimpinan."""
+        return self.role == UserRole.PIMPINAN
     
     def is_perwadag(self) -> bool:
         """Check if user is perwadag."""
@@ -86,6 +90,7 @@ class User(BaseModel, SQLModel, table=True):
         role_display = {
             UserRole.ADMIN: "Administrator",
             UserRole.INSPEKTORAT: "Inspektorat",
+            UserRole.PIMPINAN: "Pimpinan Inspektorat",
             UserRole.PERWADAG: "Perwakilan Dagang"
         }
         return role_display.get(self.role, self.role.value)

@@ -7,6 +7,7 @@ class UserRole(str, Enum):
     """User role enum yang match dengan database UPPERCASE values."""
     ADMIN = "ADMIN"           # Database: ADMIN
     INSPEKTORAT = "INSPEKTORAT"  # Database: INSPEKTORAT
+    PIMPINAN = "PIMPINAN"       # Database: PIMPINAN
     PERWADAG = "PERWADAG"     # Database: PERWADAG
     
     @classmethod

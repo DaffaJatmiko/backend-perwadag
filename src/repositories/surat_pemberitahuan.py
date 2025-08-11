@@ -139,10 +139,21 @@ class SuratPemberitahuanRepository:
         )
         
         # Apply role-based filtering
-        if user_role == "PERWADAG":
+        # Role-based filtering
+        if user_role == "PERWADAG" and user_id:
             query = query.where(SuratTugas.user_perwadag_id == user_id)
-        elif user_role == "INSPEKTORAT" and user_inspektorat:
+        elif user_role == "PIMPINAN" and user_inspektorat:
             query = query.where(SuratTugas.inspektorat == user_inspektorat)
+        elif user_role == "INSPEKTORAT" and user_id:
+            # Assignment-based filtering
+            query = query.where(
+                or_(
+                    SuratTugas.pengedali_mutu_id == user_id,
+                    SuratTugas.pengendali_teknis_id == user_id,
+                    SuratTugas.ketua_tim_id == user_id,
+                    SuratTugas.anggota_tim_ids.like(f"%{user_id}%")
+                )
+            )
         # Admin dapat melihat semua
         
         # Apply filters

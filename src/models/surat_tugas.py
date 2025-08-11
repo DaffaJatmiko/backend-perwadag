@@ -1,8 +1,8 @@
 """Model untuk surat tugas evaluasi."""
 
-from typing import Optional
+from typing import Optional, List
 from datetime import date
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, Relationship
 import uuid as uuid_lib
 
 from src.models.base import BaseModel
@@ -57,23 +57,52 @@ class SuratTugas(BaseModel, SQLModel, table=True):
     )
     
     # Data tim evaluasi
-    nama_pengedali_mutu: str = Field(
-        max_length=200,
-        description="Nama pengedali mutu"
+    pengedali_mutu_id: Optional[str] = Field(
+        default=None,
+        foreign_key="users.id",
+        max_length=36,
+        description="ID user pengedali mutu"
     )
-    nama_pengendali_teknis: str = Field(
-        max_length=200,
-        description="Nama pengendali teknis"
+    pengendali_teknis_id: Optional[str] = Field(
+        default=None,
+        foreign_key="users.id", 
+        max_length=36,
+        description="ID user pengendali teknis"
     )
-    nama_ketua_tim: str = Field(
-        max_length=200,
-        description="Nama ketua tim evaluasi"
+    ketua_tim_id: Optional[str] = Field(
+        default=None,
+        foreign_key="users.id",
+        max_length=36, 
+        description="ID user ketua tim evaluasi"
+    )
+    anggota_tim_ids: Optional[str] = Field(
+        default=None,
+        description="Comma-separated user IDs untuk anggota tim"
+    )
+    pimpinan_inspektorat_id: Optional[str] = Field(
+        default=None,
+        foreign_key="users.id",
+        max_length=36,
+        description="ID pimpinan inspektorat"
     )
     
     # File surat tugas
     file_surat_tugas: str = Field(
         max_length=500,
         description="Path file surat tugas yang diupload"
+    )
+
+    pengedali_mutu: Optional["User"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "SuratTugas.pengedali_mutu_id"}
+    )
+    pengendali_teknis: Optional["User"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "SuratTugas.pengendali_teknis_id"}
+    )
+    ketua_tim: Optional["User"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "SuratTugas.ketua_tim_id"}
+    )
+    pimpinan_inspektorat: Optional["User"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "SuratTugas.pimpinan_inspektorat_id"}
     )
     
     @property
@@ -112,6 +141,44 @@ class SuratTugas(BaseModel, SQLModel, table=True):
             return "active"
         else:
             return "completed"
+
+    def get_anggota_tim_list(self) -> List[str]:
+        """Get list of anggota tim IDs."""
+        if not self.anggota_tim_ids:
+            return []
+        return [uid.strip() for uid in self.anggota_tim_ids.split(',') if uid.strip()]
+
+    def set_anggota_tim_list(self, user_ids: List[str]) -> None:
+        """Set anggota tim dari list of user IDs."""
+        self.anggota_tim_ids = ','.join(user_ids) if user_ids else None
+
+    def is_user_assigned(self, user_id: str) -> bool:
+        """Check if user is assigned to this surat tugas."""
+        assigned_positions = [
+            self.pengedali_mutu_id,
+            self.pengendali_teknis_id, 
+            self.ketua_tim_id
+        ]
+        
+        # Check anggota tim
+        anggota_tim_list = self.get_anggota_tim_list()
+        assigned_positions.extend(anggota_tim_list)
+        
+        return user_id in [pos for pos in assigned_positions if pos]
+
+    def get_all_assigned_user_ids(self) -> List[str]:
+        """Get all assigned user IDs."""
+        assigned_ids = []
+        
+        # Add position holders
+        for user_id in [self.pengedali_mutu_id, self.pengendali_teknis_id, self.ketua_tim_id]:
+            if user_id:
+                assigned_ids.append(user_id)
+        
+        # Add anggota tim
+        assigned_ids.extend(self.get_anggota_tim_list())
+        
+        return list(set(assigned_ids))  # Remove duplicates
     
     def __repr__(self) -> str:
         return f"<SuratTugas(no_surat={self.no_surat}, perwadag={self.nama_perwadag})>"

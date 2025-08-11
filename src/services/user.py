@@ -2,11 +2,10 @@
 
 from typing import Optional, List
 from fastapi import HTTPException, status
-
 from src.repositories.user import UserRepository
 from src.schemas.user import (
     UserCreate, UserUpdate, UserResponse, UserListResponse, 
-    UserChangePassword, MessageResponse, PerwadagListResponse, PerwadagSummary
+    UserChangePassword, MessageResponse, PerwadagListResponse, PerwadagSummary, UserSummary
 )
 from src.schemas.filters import UserFilterParams, UsernameGenerationPreview, UsernameGenerationResponse
 from src.auth.jwt import get_password_hash, verify_password
@@ -438,16 +437,19 @@ class UserService:
     
     # ===== PRIVATE HELPER METHODS =====
     
-    def _generate_username_by_role(self, nama: str, role: UserRole, inspektorat: str = None) -> str:
-        """Generate username based on role."""
-        if role == UserRole.PERWADAG:
-            return self._generate_perwadag_username(nama)
-        elif role == UserRole.INSPEKTORAT:
+    def _generate_username_by_role(self, nama: str, role: UserRole, inspektorat: Optional[str] = None) -> str:
+        """Generate username berdasarkan role."""
+        
+        if role in [UserRole.ADMIN, UserRole.INSPEKTORAT, UserRole.PIMPINAN]:  # TAMBAH PIMPINAN
             if not inspektorat:
-                raise ValueError("Inspektorat diperlukan untuk role inspektorat")
+                raise ValueError(f"Inspektorat required untuk role {role.value}")
+            
+            # PIMPINAN MENGGUNAKAN FORMAT YANG SAMA seperti INSPEKTORAT
             return generate_username_from_name_and_inspektorat(nama, inspektorat)
-        elif role == UserRole.ADMIN:
-            return self._generate_admin_username(nama)  # <- INI YANG BERUBAH
+        
+        elif role == UserRole.PERWADAG:
+            return self._generate_perwadag_username(nama)
+        
         else:
             raise ValueError(f"Unknown role: {role}")
     
@@ -600,3 +602,25 @@ class UserService:
         
         result = await session.execute(query)
         return result.scalar() or 0
+
+    async def get_users_by_inspektorat_and_roles(
+        self, 
+        inspektorat: str, 
+        roles: List[UserRole]
+    ) -> List[UserSummary]:
+        """Get users by inspektorat and specific roles."""
+        
+        # GUNAKAN METHOD YANG SUDAH ADA
+        users = await self.user_repo.get_users_by_inspektorat_and_roles(inspektorat, roles)
+        
+        return [
+            UserSummary(
+                id=user.id,
+                nama=user.nama,
+                username=user.username,
+                role=user.role.value,
+                inspektorat=user.inspektorat,
+                jabatan=user.jabatan
+            )
+            for user in users
+        ]

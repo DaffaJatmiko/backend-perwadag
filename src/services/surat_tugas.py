@@ -3,6 +3,7 @@
 from typing import Optional, Dict, Any, List
 from fastapi import HTTPException, status, UploadFile
 from fastapi.responses import FileResponse
+from sqlalchemy import or_
 
 from src.repositories.surat_tugas import SuratTugasRepository
 from src.repositories.surat_pemberitahuan import SuratPemberitahuanRepository
@@ -13,7 +14,7 @@ from src.repositories.kuisioner import KuisionerRepository
 from src.schemas.surat_tugas import (
     SuratTugasCreate, SuratTugasUpdate, SuratTugasResponse, 
     SuratTugasListResponse, SuratTugasCreateResponse, SuratTugasOverview,
-    EvaluasiProgress, PerwardagSummary, SuratTugasStats
+    EvaluasiProgress, PerwardagSummary, SuratTugasStats, AssignmentInfo
 )
 from src.schemas.surat_pemberitahuan import SuratPemberitahuanCreate
 from src.schemas.meeting import MeetingCreate
@@ -805,7 +806,10 @@ class SuratTugasService:
                     uploaded_by=surat_tugas.updated_by,
                     is_viewable=file_info.get('content_type', '').startswith(('image/', 'application/pdf'))
                 )
-        
+
+        assignment_info = await self._get_assignment_info(surat_tugas)
+
+        # Build response
         return SuratTugasResponse(
             id=surat_tugas.id,
             user_perwadag_id=surat_tugas.user_perwadag_id,
@@ -814,10 +818,9 @@ class SuratTugasService:
             tanggal_evaluasi_mulai=surat_tugas.tanggal_evaluasi_mulai,
             tanggal_evaluasi_selesai=surat_tugas.tanggal_evaluasi_selesai,
             no_surat=surat_tugas.no_surat,
-            nama_pengedali_mutu=surat_tugas.nama_pengedali_mutu,
-            nama_pengendali_teknis=surat_tugas.nama_pengendali_teknis,
-            nama_ketua_tim=surat_tugas.nama_ketua_tim,
             file_surat_tugas=surat_tugas.file_surat_tugas,
+
+            assignment_info=assignment_info,
             
             # TAMBAHAN BARU:
             file_urls=file_urls,
@@ -835,6 +838,74 @@ class SuratTugasService:
             created_by=surat_tugas.created_by,
             updated_by=surat_tugas.updated_by
         )
+
+    async def _get_assignment_info(self, surat_tugas) -> AssignmentInfo:
+        """Get assignment information dengan user details."""
+        
+        from src.schemas.surat_tugas import AssignmentInfo
+        from src.schemas.user import UserSummary
+        from src.models.user import User
+        from sqlalchemy import select
+        
+        assignment_info = AssignmentInfo()
+        
+        # Helper function untuk create UserSummary
+        def create_user_summary(user: User) -> UserSummary:
+            return UserSummary(
+                id=user.id,
+                nama=user.nama,
+                username=user.username,
+                jabatan=user.jabatan,
+                role=user.role,
+                role_display=user.get_role_display(),
+                inspektorat=user.inspektorat,
+                has_email=user.has_email(),
+                is_active=user.is_active
+            )
+        
+        # Get pengedali mutu
+        if surat_tugas.pengedali_mutu_id:
+            query = select(User).where(User.id == surat_tugas.pengedali_mutu_id)
+            result = await self.surat_tugas_repo.session.execute(query)
+            user = result.scalar_one_or_none()
+            if user:
+                assignment_info.pengedali_mutu = create_user_summary(user)
+        
+        # Get pengendali teknis
+        if surat_tugas.pengendali_teknis_id:
+            query = select(User).where(User.id == surat_tugas.pengendali_teknis_id)
+            result = await self.surat_tugas_repo.session.execute(query)
+            user = result.scalar_one_or_none()
+            if user:
+                assignment_info.pengendali_teknis = create_user_summary(user)
+        
+        # Get ketua tim
+        if surat_tugas.ketua_tim_id:
+            query = select(User).where(User.id == surat_tugas.ketua_tim_id)
+            result = await self.surat_tugas_repo.session.execute(query)
+            user = result.scalar_one_or_none()
+            if user:
+                assignment_info.ketua_tim = create_user_summary(user)
+        
+        # Get pimpinan inspektorat
+        if surat_tugas.pimpinan_inspektorat_id:
+            query = select(User).where(User.id == surat_tugas.pimpinan_inspektorat_id)
+            result = await self.surat_tugas_repo.session.execute(query)
+            user = result.scalar_one_or_none()
+            if user:
+                assignment_info.pimpinan_inspektorat = create_user_summary(user)
+        
+        # Get anggota tim
+        anggota_tim_ids = surat_tugas.get_anggota_tim_list()
+        if anggota_tim_ids:
+            for user_id in anggota_tim_ids:
+                query = select(User).where(User.id == user_id)
+                result = await self.surat_tugas_repo.session.execute(query)
+                user = result.scalar_one_or_none()
+                if user:
+                    assignment_info.anggota_tim.append(create_user_summary(user))
+        
+        return assignment_info
     
     async def _calculate_progress(self, surat_tugas_id: str) -> EvaluasiProgress:
         """Calculate progress evaluasi berdasarkan completion status semua related records."""

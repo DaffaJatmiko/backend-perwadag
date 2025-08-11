@@ -7,6 +7,7 @@ from datetime import datetime, date
 from src.schemas.common import SuccessResponse
 from src.schemas.shared import BaseListResponse
 from src.schemas.shared import FileUrls, FileMetadata
+from src.schemas.user import UserSummary
 
 
 # ===== REQUEST SCHEMAS =====
@@ -32,21 +33,11 @@ class SuratTugasCreate(BaseModel):
         max_length=100, 
         description="Nomor surat tugas"
     )
-    nama_pengedali_mutu: Optional[str] = Field(
-        None,  # Default None
-        max_length=200,
-        description="Nama pengedali mutu (optional)"
-    )
-    nama_pengendali_teknis: Optional[str] = Field(
-        None,  # Default None
-        max_length=200,
-        description="Nama pengendali teknis (optional)"
-    )
-    nama_ketua_tim: Optional[str] = Field(
-        None,  # Default None
-        max_length=200,
-        description="Nama ketua tim evaluasi (optional)"
-    )
+    pengedali_mutu_id: Optional[str] = Field(None, description="ID user pengedali mutu")
+    pengendali_teknis_id: Optional[str] = Field(None, description="ID user pengendali teknis")
+    ketua_tim_id: Optional[str] = Field(None, description="ID user ketua tim")
+    anggota_tim_ids: Optional[List[str]] = Field(None, description="List ID anggota tim")
+    pimpinan_inspektorat_id: Optional[str] = Field(None, description="ID pimpinan inspektorat")
     
     @field_validator('tanggal_evaluasi_selesai')
     @classmethod
@@ -67,6 +58,16 @@ class SuratTugasCreate(BaseModel):
             raise ValueError("Nomor surat tidak boleh kosong")
         return no_surat
 
+    @field_validator('anggota_tim_ids')
+    @classmethod
+    def validate_anggota_tim_ids(cls, anggota_tim_ids: Optional[List[str]]) -> Optional[List[str]]:
+        """Validate anggota tim IDs."""
+        if anggota_tim_ids:
+            # Remove duplicates and empty strings
+            unique_ids = list(set([uid.strip() for uid in anggota_tim_ids if uid.strip()]))
+            return unique_ids if unique_ids else None
+        return None
+
 
 class SuratTugasUpdate(BaseModel):
     """Schema untuk update surat tugas."""
@@ -74,9 +75,11 @@ class SuratTugasUpdate(BaseModel):
     tanggal_evaluasi_mulai: Optional[date] = None
     tanggal_evaluasi_selesai: Optional[date] = None
     no_surat: Optional[str] = Field(None, min_length=1, max_length=100)
-    nama_pengedali_mutu: Optional[str] = Field(None, max_length=200)
-    nama_pengendali_teknis: Optional[str] = Field(None, max_length=200)
-    nama_ketua_tim: Optional[str] = Field(None, max_length=200)
+    pengedali_mutu_id: Optional[str] = None
+    pengendali_teknis_id: Optional[str] = None
+    ketua_tim_id: Optional[str] = None
+    anggota_tim_ids: Optional[List[str]] = None
+    pimpinan_inspektorat_id: Optional[str] = None
     
     @field_validator('no_surat')
     @classmethod
@@ -148,6 +151,14 @@ class PerwardagSummary(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
 
+class AssignmentInfo(BaseModel):
+    """Schema untuk assignment information."""
+    
+    pengedali_mutu: Optional[UserSummary] = None
+    pengendali_teknis: Optional[UserSummary] = None
+    ketua_tim: Optional[UserSummary] = None
+    anggota_tim: List[UserSummary] = []
+    pimpinan_inspektorat: Optional[UserSummary] = None
 
 class SuratTugasResponse(BaseModel):
     """Schema untuk response surat tugas."""
@@ -159,9 +170,7 @@ class SuratTugasResponse(BaseModel):
     tanggal_evaluasi_mulai: date
     tanggal_evaluasi_selesai: date
     no_surat: str
-    nama_pengedali_mutu: str
-    nama_pengendali_teknis: str
-    nama_ketua_tim: str
+    assignment_info: AssignmentInfo
     file_surat_tugas: str
 
     file_urls: Optional[FileUrls] = None
