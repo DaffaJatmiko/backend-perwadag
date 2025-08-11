@@ -271,7 +271,9 @@ async def check_password_reset_eligibility(
 @router.post("/request-password-reset", response_model=MessageResponse, summary="Request password reset")
 async def request_password_reset(
     reset_data: PasswordReset,
+    request: Request,
     background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_db),
     auth_service: AuthService = Depends(get_auth_service)
 ):
     """
@@ -283,6 +285,65 @@ async def request_password_reset(
     from datetime import datetime, timedelta
     
     logger = logging.getLogger(__name__)
+    
+    # 🔥 TAMBAH: Get IP address
+    def get_client_ip(request: Request) -> str:
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip()
+        real_ip = request.headers.get("X-Real-IP")
+        if real_ip:
+            return real_ip.strip()
+        return request.client.host if request.client else "unknown"
+    
+    ip_address = get_client_ip(request)
+    
+    # 🔒 CAPTCHA validation (if enabled and token provided)
+    if reset_data.captcha_token and captcha_service.is_configured():
+        captcha_result = await captcha_service.verify_token(
+            token=reset_data.captcha_token,
+            remote_ip=ip_address,
+            expected_action="forgot_password"
+        )
+        
+        if not captcha_result.is_human:
+            logger.warning(f"CAPTCHA verification failed for password reset {mask_email(reset_data.email)} from {ip_address}: {captcha_result.get_error_message()}")
+            
+            # Log failed CAPTCHA attempt
+            try:
+                from src.core.config import settings
+                base_url = settings.API_BASE_URL.rstrip('/')
+                full_url = f"{base_url}{request.url.path}"
+                
+                log_repo = LogActivityRepository(session)
+                log_data = LogActivityCreate(
+                    user_id=None,
+                    method="POST",
+                    url=full_url,
+                    activity="Failed CAPTCHA verification - Password Reset",
+                    date=datetime.utcnow(),
+                    user_name=f"Failed CAPTCHA: {mask_email(reset_data.email)}",
+                    ip_address=ip_address,
+                    response_status=400
+                )
+                await log_repo.create(log_data)
+                await session.commit()
+            except Exception as log_error:
+                logger.error(f"Failed to log CAPTCHA failure: {log_error}")
+            
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verifikasi keamanan gagal. Silakan coba lagi atau refresh halaman."
+            )
+        
+        logger.info(f"CAPTCHA verification successful for password reset {mask_email(reset_data.email)} (score: {captcha_result.score or 'N/A'})")
+    elif captcha_service.is_configured() and not reset_data.captcha_token:
+        # CAPTCHA is enabled but token not provided
+        logger.warning(f"Missing CAPTCHA token for password reset attempt from {ip_address}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token keamanan diperlukan untuk reset password."
+        )
     
     user = await auth_service.user_repo.get_by_email(reset_data.email)
     
@@ -355,7 +416,9 @@ async def request_password_reset(
 @router.post("/confirm-password-reset", response_model=MessageResponse, summary="Confirm password reset")
 async def confirm_password_reset(
     reset_data: PasswordResetConfirm,
-    background_tasks: BackgroundTasks,  # ⭐ TAMBAH PARAMETER INI
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_db),
     auth_service: AuthService = Depends(get_auth_service)
 ):
     """
@@ -370,8 +433,68 @@ async def confirm_password_reset(
     """
     import logging
     from src.utils.password import mask_email
+    from datetime import datetime
     
     logger = logging.getLogger(__name__)
+    
+    # 🔥 TAMBAH: Get IP address
+    def get_client_ip(request: Request) -> str:
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip()
+        real_ip = request.headers.get("X-Real-IP")
+        if real_ip:
+            return real_ip.strip()
+        return request.client.host if request.client else "unknown"
+    
+    ip_address = get_client_ip(request)
+    
+    # 🔒 CAPTCHA validation (if enabled and token provided)
+    if reset_data.captcha_token and captcha_service.is_configured():
+        captcha_result = await captcha_service.verify_token(
+            token=reset_data.captcha_token,
+            remote_ip=ip_address,
+            expected_action="reset_password"
+        )
+        
+        if not captcha_result.is_human:
+            logger.warning(f"CAPTCHA verification failed for password confirm reset from {ip_address}: {captcha_result.get_error_message()}")
+            
+            # Log failed CAPTCHA attempt
+            try:
+                from src.core.config import settings
+                base_url = settings.API_BASE_URL.rstrip('/')
+                full_url = f"{base_url}{request.url.path}"
+                
+                log_repo = LogActivityRepository(session)
+                log_data = LogActivityCreate(
+                    user_id=None,
+                    method="POST",
+                    url=full_url,
+                    activity="Failed CAPTCHA verification - Password Reset Confirm",
+                    date=datetime.utcnow(),
+                    user_name=f"Failed CAPTCHA: password reset confirm",
+                    ip_address=ip_address,
+                    response_status=400
+                )
+                await log_repo.create(log_data)
+                await session.commit()
+            except Exception as log_error:
+                logger.error(f"Failed to log CAPTCHA failure: {log_error}")
+            
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verifikasi keamanan gagal. Silakan coba lagi atau refresh halaman."
+            )
+        
+        logger.info(f"CAPTCHA verification successful for password reset confirm (score: {captcha_result.score or 'N/A'})")
+    elif captcha_service.is_configured() and not reset_data.captcha_token:
+        # CAPTCHA is enabled but token not provided
+        logger.warning(f"Missing CAPTCHA token for password reset confirm attempt from {ip_address}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token keamanan diperlukan untuk konfirmasi reset password."
+        )
     
     # Get and validate token
     reset_token = await auth_service.user_repo.get_password_reset_token(reset_data.token)

@@ -234,12 +234,14 @@ class TokenRefresh(BaseModel):
 class PasswordReset(BaseModel):
     """Schema for password reset request."""
     email: EmailStr = Field(..., description="Email must be set in profile first")
+    captcha_token: Optional[str] = Field(None, description="Optional CAPTCHA token for security")
 
 
 class PasswordResetConfirm(BaseModel):
     """Schema for password reset confirmation."""
     token: str = Field(..., min_length=1)
     new_password: str = Field(..., min_length=6, max_length=128)
+    captcha_token: Optional[str] = Field(None, description="Optional CAPTCHA token for security")
 
 
 # ===== COMMON RESPONSE SCHEMAS =====
