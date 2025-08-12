@@ -559,6 +559,7 @@ class MatriksService:
         file_metadata = None
         if file_dokumen_matriks:
             file_urls = FileUrls(
+                file_url=f"/api/matriks/{matriks_id}/file/view",
                 view_url=f"/api/matriks/{matriks_id}/file/view",
                 download_url=f"/api/matriks/{matriks_id}/file/download"
             )

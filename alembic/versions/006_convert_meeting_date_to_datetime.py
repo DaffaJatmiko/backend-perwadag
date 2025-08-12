@@ -11,7 +11,6 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 from sqlalchemy import text
 
-
 # revision identifiers
 revision: str = '006_meeting_datetime'
 down_revision: Union[str, None] = '005_add_matrix_status_flow'
