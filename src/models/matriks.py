@@ -3,7 +3,7 @@
 from typing import Optional, List, Dict, Any
 from sqlmodel import Field, SQLModel
 import uuid as uuid_lib
-from sqlalchemy import Column, Enum as SQLEnum
+from sqlalchemy import Column, Enum as SQLEnum  # ✅ ADD: Import Enum
 
 from src.models.base import BaseModel
 from src.models.evaluasi_enums import MatriksStatus, TindakLanjutStatus
@@ -48,6 +48,13 @@ class Matriks(BaseModel, SQLModel, table=True):
         sa_column=Column(SQLEnum(MatriksStatus, name='matriks_status'), nullable=False, default='DRAFTING'),
         description="Status flow evaluasi berjenjang"
     )
+
+    # ✅ FIX: Consistent SQLModel syntax untuk global tindak lanjut status
+    status_tindak_lanjut: Optional[TindakLanjutStatus] = Field(
+        default=None,
+        sa_column=Column(SQLEnum(TindakLanjutStatus, name='tindaklanjutstatus'), nullable=True),
+        description="Global tindak lanjut status for entire matrix"
+    )
     
     def is_completed(self) -> bool:
         """Check apakah matriks sudah completed."""
@@ -72,12 +79,12 @@ class Matriks(BaseModel, SQLModel, table=True):
             return file_path
         return None
 
-    def get_temuan_rekomendasi_items(self) -> List[Dict[str, str]]:
+    def get_temuan_rekomendasi_items(self) -> List[Dict[str, Any]]:
         """
         Parse JSON ke list of kondisi-kriteria-rekomendasi sets.
         
         Returns:
-            List of dicts with keys: id, kondisi, kriteria, rekomendasi
+            List of dicts with keys: id, kondisi, kriteria, rekomendasi, tindak_lanjut, etc.
         """
         if not self.temuan_rekomendasi:
             return []
@@ -126,7 +133,12 @@ class Matriks(BaseModel, SQLModel, table=True):
                     'id': i + 1,
                     'kondisi': kondisi,
                     'kriteria': kriteria,
-                    'rekomendasi': rekomendasi
+                    'rekomendasi': rekomendasi,
+                    # ✅ ADD: Tindak lanjut fields (empty by default)
+                    'tindak_lanjut': '',
+                    'dokumen_pendukung_tindak_lanjut': '',
+                    'catatan_evaluator': ''
+                    # ❌ NO individual status_tindak_lanjut
                 })
         
         self.temuan_rekomendasi = json.dumps({
@@ -156,58 +168,55 @@ class Matriks(BaseModel, SQLModel, table=True):
         items = self.get_temuan_rekomendasi_items()
         
         return {
-            'data': items  # Return all items dengan kondisi, kriteria, rekomendasi
+            'data': items  # Return all items dengan kondisi, kriteria, rekomendasi, tindak_lanjut
         }
-
 
     def clear_temuan_rekomendasi(self) -> None:
         """Clear all kondisi-kriteria-rekomendasi data."""
         self.temuan_rekomendasi = None
 
-    def update_tindak_lanjut_item(
-        self, 
-        item_id: int, 
-        tindak_lanjut: Optional[str] = None,
-        dokumen_pendukung: Optional[str] = None,
-        catatan_evaluator: Optional[str] = None,
-        status_tindak_lanjut: Optional[str] = None
-    ) -> bool:
-        """Update tindak lanjut untuk item tertentu."""
-        items = self.get_temuan_rekomendasi_items()
+    def update_tindak_lanjut_item(self, item_id: int, **kwargs) -> bool:
+        """
+        Update individual tindak lanjut item content ONLY (no status).
         
-        # Find item by ID
-        target_item = None
-        for item in items:
-            if item.get('id') == item_id:
-                target_item = item
-                break
-        
-        if not target_item:
+        Args:
+            item_id: ID of item to update
+            **kwargs: tindak_lanjut, dokumen_pendukung, catatan_evaluator
+            
+        Returns:
+            bool: True if item found and updated, False otherwise
+        """
+        if not self.temuan_rekomendasi:
             return False
         
-        # Update fields yang di-provide
-        if tindak_lanjut is not None:
-            target_item['tindak_lanjut'] = tindak_lanjut
-        if dokumen_pendukung is not None:
-            target_item['dokumen_pendukung_tindak_lanjut'] = dokumen_pendukung
-        if catatan_evaluator is not None:
-            target_item['catatan_evaluator'] = catatan_evaluator
-        if status_tindak_lanjut is not None:
-            target_item['status_tindak_lanjut'] = status_tindak_lanjut
-        
-        # Save back to JSON
-        import json
-        from datetime import datetime
-        
-        self.temuan_rekomendasi = json.dumps({
-            'items': items,
-            'total': len(items),
-            'last_updated': datetime.utcnow().isoformat(),
-            'structure_version': '3-field-with-followup'
-        }, ensure_ascii=False)
-        
-        self.temuan_version += 1
-        return True
+        try:
+            import json
+            data = json.loads(self.temuan_rekomendasi)
+            
+            if 'items' not in data:
+                return False
+            
+            # Find and update the specific item
+            for item in data['items']:
+                if item.get('id') == item_id:
+                    # Update content fields only
+                    if 'tindak_lanjut' in kwargs:
+                        item['tindak_lanjut'] = kwargs['tindak_lanjut'] or ''
+                    if 'dokumen_pendukung' in kwargs:
+                        item['dokumen_pendukung_tindak_lanjut'] = kwargs['dokumen_pendukung'] or ''
+                    if 'catatan_evaluator' in kwargs:
+                        item['catatan_evaluator'] = kwargs['catatan_evaluator'] or ''
+                    
+                    # ❌ REMOVED: status_tindak_lanjut logic (now global)
+                    
+                    # Save back to JSON
+                    self.temuan_rekomendasi = json.dumps(data, ensure_ascii=False)
+                    return True
+            
+            return False
+            
+        except (json.JSONDecodeError, TypeError):
+            return False
     
     def get_tindak_lanjut_item(self, item_id: int) -> Optional[Dict[str, Any]]:
         """Get tindak lanjut data untuk item tertentu."""
@@ -215,12 +224,30 @@ class Matriks(BaseModel, SQLModel, table=True):
         for item in items:
             if item.get('id') == item_id:
                 return {
-                    'tindak_lanjut': item.get('tindak_lanjut'),
-                    'dokumen_pendukung_tindak_lanjut': item.get('dokumen_pendukung_tindak_lanjut'),
-                    'catatan_evaluator': item.get('catatan_evaluator'),
-                    'status_tindak_lanjut': item.get('status_tindak_lanjut')
+                    'tindak_lanjut': item.get('tindak_lanjut', ''),
+                    'dokumen_pendukung_tindak_lanjut': item.get('dokumen_pendukung_tindak_lanjut', ''),
+                    'catatan_evaluator': item.get('catatan_evaluator', ''),
+                    # ❌ REMOVED: status_tindak_lanjut (now global)
                 }
         return None
-    
+
+    def get_or_set_default_tindak_lanjut_status(self) -> TindakLanjutStatus:
+        """
+        Get status_tindak_lanjut, auto-set DRAFTING if NULL and matrix is FINISHED.
+        
+        ✅ IMPORTANT: This method MODIFIES the object if auto-set happens.
+        Service layer should save to database after calling this.
+        """
+        if self.status_tindak_lanjut is None:
+            if self.status == MatriksStatus.FINISHED:
+                # ✅ AUTO-SET: NULL → DRAFTING when matrix is FINISHED
+                self.status_tindak_lanjut = TindakLanjutStatus.DRAFTING
+                print(f"🔄 Auto-set tindak lanjut status: NULL → DRAFTING for matrix {self.id}")
+            else:
+                # Matrix belum FINISHED, return default tapi jangan save
+                return TindakLanjutStatus.DRAFTING
+        
+        return self.status_tindak_lanjut
+
     def __repr__(self) -> str:
         return f"<Matriks(surat_tugas_id={self.surat_tugas_id}, completed={self.is_completed()})>"

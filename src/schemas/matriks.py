@@ -155,6 +155,7 @@ class MatriksResponse(BaseModel):
     completion_percentage: int = Field(ge=0, le=100)
 
     status: MatriksStatus
+    status_tindak_lanjut: Optional[TindakLanjutStatus] = Field(default=None, description="Global tindak lanjut status for entire matrix")
     is_editable: bool = Field(description="Apakah user bisa edit matriks ini")
     user_permissions: UserPermissions = Field(description="Detail permissions untuk user")
     

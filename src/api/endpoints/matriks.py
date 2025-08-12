@@ -217,34 +217,23 @@ async def update_tindak_lanjut(
     - **VALIDATING**: Tidak ada yang bisa edit konten
     - **FINISHED**: Hanya admin/pengedali mutu untuk emergency
     """
-    return await service.update_tindak_lanjut(matriks_id, item_id, tindak_lanjut_data, current_user)
+    return await service.update_tindak_lanjut_content(matriks_id, item_id, tindak_lanjut_data, current_user)
 
 
-@router.put("/{matriks_id}/tindak-lanjut/{item_id}/status", response_model=MatriksResponse)
-async def update_tindak_lanjut_status(
+@router.put("/{matriks_id}/tindak-lanjut/status", response_model=MatriksResponse)
+async def update_global_tindak_lanjut_status(
     matriks_id: str,
-    item_id: int,
     status_data: TindakLanjutStatusUpdate,
     current_user: dict = Depends(require_evaluasi_read_access()),
     service: MatriksService = Depends(get_matriks_service)
 ):
     """
-    Update status tindak lanjut untuk item temuan tertentu.
+    Update GLOBAL tindak lanjut status for entire matrix.
     
-    **Status Flow:**
-    - **DRAFTING** → **CHECKING**: Perwadag submit tindak lanjut
-    - **CHECKING** → **VALIDATING**: Ketua tim approve  
-    - **CHECKING** → **DRAFTING**: Ketua tim reject untuk revisi
-    - **VALIDATING** → **FINISHED**: Pengendali teknis final approve
-    - **VALIDATING** → **DRAFTING**: Pengendali teknis reject untuk revisi
-    
-    **Permissions:**
-    - **DRAFTING**: Perwadag bisa ubah ke CHECKING
-    - **CHECKING**: Ketua tim bisa ubah ke DRAFTING/VALIDATING
-    - **VALIDATING**: Pengendali teknis bisa ubah ke DRAFTING/FINISHED
-    - **FINISHED**: Hanya admin/pengedali mutu untuk emergency
+    **Single Button**: One status change affects all items.
+    **Workflow**: DRAFTING → CHECKING → VALIDATING → FINISHED
     """
-    return await service.update_tindak_lanjut_status(matriks_id, item_id, status_data, current_user)
+    return await service.update_global_tindak_lanjut_status(matriks_id, status_data, current_user)
 
 @router.post("/{matriks_id}/upload-file", response_model=MatriksFileUploadResponse)
 async def upload_matriks_file(

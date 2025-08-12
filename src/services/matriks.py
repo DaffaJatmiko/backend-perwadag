@@ -277,69 +277,69 @@ class MatriksService:
         
         return await self.get_matriks_or_404(matrix_id, current_user)
     
-    async def update_tindak_lanjut_status(
-        self,
-        matrix_id: str,
-        item_id: int,
-        status_data: TindakLanjutStatusUpdate,
-        current_user: dict
-    ) -> MatriksResponse:
-        """Update status tindak lanjut untuk item tertentu."""
+    # async def update_tindak_lanjut_status(
+    #     self,
+    #     matrix_id: str,
+    #     item_id: int,
+    #     status_data: TindakLanjutStatusUpdate,
+    #     current_user: dict
+    # ) -> MatriksResponse:
+    #     """Update status tindak lanjut untuk item tertentu."""
         
-        # Get matrix dan surat tugas data
-        matrix = await self.matriks_repo.get_by_id(matrix_id)
-        if not matrix:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Matriks tidak ditemukan"
-            )
+    #     # Get matrix dan surat tugas data
+    #     matrix = await self.matriks_repo.get_by_id(matrix_id)
+    #     if not matrix:
+    #         raise HTTPException(
+    #             status_code=status.HTTP_404_NOT_FOUND,
+    #             detail="Matriks tidak ditemukan"
+    #         )
         
-        surat_tugas_data = await self._get_surat_tugas_basic_info(matrix.surat_tugas_id)
-        if not surat_tugas_data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Surat tugas tidak ditemukan"
-            )
+    #     surat_tugas_data = await self._get_surat_tugas_basic_info(matrix.surat_tugas_id)
+    #     if not surat_tugas_data:
+    #         raise HTTPException(
+    #             status_code=status.HTTP_404_NOT_FOUND,
+    #             detail="Surat tugas tidak ditemukan"
+    #         )
         
-        # Get current tindak lanjut data
-        current_tindak_lanjut = matrix.get_tindak_lanjut_item(item_id)
-        current_status = None
-        if current_tindak_lanjut:
-            current_status = current_tindak_lanjut.get('status_tindak_lanjut')
+    #     # Get current tindak lanjut data
+    #     current_tindak_lanjut = matrix.get_tindak_lanjut_item(item_id)
+    #     current_status = None
+    #     if current_tindak_lanjut:
+    #         current_status = current_tindak_lanjut.get('status_tindak_lanjut')
         
-        # Check permissions
-        permissions = get_tindak_lanjut_permissions(
-            current_status, surat_tugas_data, current_user, matrix.status
-        )
-        if not permissions.can_change_tindak_lanjut_status:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Anda tidak memiliki akses untuk mengubah status tindak lanjut"
-            )
+    #     # Check permissions
+    #     permissions = get_tindak_lanjut_permissions(
+    #         current_status, surat_tugas_data, current_user, matrix.status
+    #     )
+    #     if not permissions.can_change_tindak_lanjut_status:
+    #         raise HTTPException(
+    #             status_code=status.HTTP_403_FORBIDDEN,
+    #             detail="Anda tidak memiliki akses untuk mengubah status tindak lanjut"
+    #         )
         
-        # Validate status transition
-        if status_data.status_tindak_lanjut not in permissions.allowed_tindak_lanjut_status_changes:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Tidak dapat mengubah status tindak lanjut ke {status_data.status_tindak_lanjut}"
-            )
+    #     # Validate status transition
+    #     if status_data.status_tindak_lanjut not in permissions.allowed_tindak_lanjut_status_changes:
+    #         raise HTTPException(
+    #             status_code=status.HTTP_400_BAD_REQUEST,
+    #             detail=f"Tidak dapat mengubah status tindak lanjut ke {status_data.status_tindak_lanjut}"
+    #         )
         
-        # Update status
-        success = matrix.update_tindak_lanjut_item(
-            item_id=item_id,
-            status_tindak_lanjut=status_data.status_tindak_lanjut
-        )
+    #     # Update status
+    #     success = matrix.update_tindak_lanjut_item(
+    #         item_id=item_id,
+    #         status_tindak_lanjut=status_data.status_tindak_lanjut
+    #     )
         
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Item dengan ID {item_id} tidak ditemukan"
-            )
+    #     if not success:
+    #         raise HTTPException(
+    #             status_code=status.HTTP_404_NOT_FOUND,
+    #             detail=f"Item dengan ID {item_id} tidak ditemukan"
+    #         )
         
-        matrix.updated_by = current_user['id']
-        await self.matriks_repo.session.commit()
+    #     matrix.updated_by = current_user['id']
+    #     await self.matriks_repo.session.commit()
         
-        return await self.get_matriks_or_404(matrix_id, current_user)
+    #     return await self.get_matriks_or_404(matrix_id, current_user)
     
     async def upload_file(
         self, 
@@ -516,6 +516,77 @@ class MatriksService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Gagal menghapus file: {str(e)}"
             )
+
+    async def update_global_tindak_lanjut_status(
+        self,
+        matrix_id: str,
+        status_data: TindakLanjutStatusUpdate,
+        current_user: dict
+    ) -> MatriksResponse:
+        """Update GLOBAL tindak lanjut status for entire matrix."""
+        
+        matrix = await self.matriks_repo.get_by_id(matrix_id)
+        if not matrix:
+            raise HTTPException(status_code=404, detail="Matriks tidak ditemukan")
+        
+        surat_tugas_data = await self._get_surat_tugas_basic_info(matrix.surat_tugas_id)
+        
+        # Get current global status
+        current_status = matrix.get_or_set_default_tindak_lanjut_status()
+        
+        # Check permissions
+        permissions = get_tindak_lanjut_permissions(
+            current_status, surat_tugas_data, current_user, matrix.status
+        )
+        if not permissions.can_change_tindak_lanjut_status:
+            raise HTTPException(status_code=403, detail="No permission")
+        
+        # Update global status
+        matrix.status_tindak_lanjut = status_data.status_tindak_lanjut
+        matrix.updated_by = current_user['id']
+        
+        await self.matriks_repo.session.commit()
+        return await self.get_matriks_or_404(matrix_id, current_user)
+
+    async def update_tindak_lanjut_content(
+        self,
+        matrix_id: str,
+        item_id: int,
+        tindak_lanjut_data: TindakLanjutUpdate,
+        current_user: dict
+    ) -> MatriksResponse:
+        """Update individual item content ONLY (no status change)."""
+        
+        matrix = await self.matriks_repo.get_by_id(matrix_id)
+        if not matrix:
+            raise HTTPException(status_code=404, detail="Matriks tidak ditemukan")
+        
+        surat_tugas_data = await self._get_surat_tugas_basic_info(matrix.surat_tugas_id)
+        
+        # Get global status for permission check
+        global_status = matrix.get_or_set_default_tindak_lanjut_status()
+        
+        permissions = get_tindak_lanjut_permissions(
+            global_status, surat_tugas_data, current_user, matrix.status
+        )
+        if not permissions.can_edit_tindak_lanjut:
+            raise HTTPException(status_code=403, detail="No permission")
+        
+        # Update content only
+        success = matrix.update_tindak_lanjut_item(
+            item_id=item_id,
+            tindak_lanjut=tindak_lanjut_data.tindak_lanjut,
+            dokumen_pendukung=tindak_lanjut_data.dokumen_pendukung_tindak_lanjut,
+            catatan_evaluator=tindak_lanjut_data.catatan_evaluator
+        )
+        
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Item {item_id} not found")
+        
+        matrix.updated_by = current_user['id']
+        await self.matriks_repo.session.commit()
+        
+        return await self.get_matriks_or_404(matrix_id, current_user)
     
     async def _build_enriched_response(
         self, 
@@ -535,12 +606,14 @@ class MatriksService:
             created_by = matriks.get('created_by')
             updated_by = matriks.get('updated_by')
             matrix_status = matriks.get('status', MatriksStatus.DRAFTING)
+            status_tindak_lanjut = matriks.get('status_tindak_lanjut')  # ✅ ADD: Extract tindak lanjut status
             
             # Create temporary object untuk method calls
             from src.models.matriks import Matriks
             temp_matriks = Matriks()
             temp_matriks.temuan_rekomendasi = matriks.get('temuan_rekomendasi')
             temp_matriks.status = matrix_status
+            temp_matriks.status_tindak_lanjut = status_tindak_lanjut  # ✅ ADD: Set tindak lanjut status
             temp_matriks.temuan_version = matriks.get('temuan_version', 0)
             matriks_obj = temp_matriks
         else:
@@ -552,6 +625,7 @@ class MatriksService:
             created_by = matriks.created_by
             updated_by = matriks.updated_by
             matrix_status = matriks.status
+            status_tindak_lanjut = matriks.status_tindak_lanjut  # ✅ ADD: Extract tindak lanjut status
             matriks_obj = matriks
         
         # Build file URLs dan metadata
@@ -597,30 +671,48 @@ class MatriksService:
         tindak_lanjut_permissions = UserPermissions()
         is_editable = False
         
+        # ✅ FIX: Handle auto-logic dan save to database
+        global_tl_status = status_tindak_lanjut
+        
         if current_user:
             print(f"🔍 DEBUG _build_enriched_response:")
             print(f"   current_user: {current_user}")
-            print(f"   surat_tugas_data keys: {list(surat_tugas_data.keys())}")
-            print(f"   surat_tugas_data: {surat_tugas_data}")
+            print(f"   matrix_status: {matrix_status}")
+            print(f"   status_tindak_lanjut: {status_tindak_lanjut}")
             
             matrix_permissions = get_matrix_permissions(matrix_status, surat_tugas_data, current_user)
             print(f"   matrix_permissions: {matrix_permissions}")
             
-            # Get tindak lanjut permissions (sample dari item pertama)
-            items = matriks_obj.get_temuan_rekomendasi_items() if matriks_obj else []
-            if items:
-                first_item = items[0]
-                tl_status = first_item.get('status_tindak_lanjut')
+            # ✅ FIX: Auto-logic untuk tindak lanjut status
+            if matriks_obj:
+                # Call auto-logic method
+                auto_status = matriks_obj.get_or_set_default_tindak_lanjut_status()
+                
+                # ✅ IMPORTANT: Save to database if changed from NULL → DRAFTING
+                if status_tindak_lanjut != auto_status:
+                    print(f"🔄 Auto-setting tindak lanjut: {status_tindak_lanjut} → {auto_status}")
+                    
+                    # Update real object jika bukan temporary
+                    if not isinstance(matriks, dict):
+                        matriks.status_tindak_lanjut = auto_status
+                        await self.matriks_repo.session.commit()
+                        print(f"✅ Saved to database: {auto_status}")
+                    
+                    global_tl_status = auto_status
+                
+                # Get tindak lanjut permissions dengan actual status
                 tindak_lanjut_permissions = get_tindak_lanjut_permissions(
-                    tl_status, surat_tugas_data, current_user, matrix_status
+                    global_tl_status, surat_tugas_data, current_user, matrix_status
                 )
+                print(f"   global_tl_status: {global_tl_status}")
+                print(f"   tindak_lanjut_permissions: {tindak_lanjut_permissions}")
             else:
-                # Jika tidak ada items, tetap panggil dengan None
+                # Jika tidak ada object, panggil dengan None
                 tindak_lanjut_permissions = get_tindak_lanjut_permissions(
                     None, surat_tugas_data, current_user, matrix_status
                 )
             
-            # ✅ SEKARANG hitung is_editable SETELAH semua permissions didapat
+            # ✅ Hitung is_editable SETELAH semua permissions didapat
             is_editable = (
                 matrix_permissions.can_edit_temuan or 
                 matrix_permissions.can_change_matrix_status or
@@ -666,15 +758,15 @@ class MatriksService:
         elif has_file or has_temuan_rekomendasi:
             completion_percentage = 50
         
-
         return MatriksResponse(
             id=matriks_id,
             surat_tugas_id=surat_tugas_id,
             surat_tugas_info=surat_tugas_info,
-            file_dokumen=file_dokumen_matriks,  # ← GANTI dari file_dokumen_matriks
+            file_dokumen=file_dokumen_matriks,
             file_urls=file_urls,
             file_metadata=file_metadata,
             status=matrix_status,
+            status_tindak_lanjut=global_tl_status,  # ✅ ADD: Include tindak lanjut status
             is_editable=is_editable,
             user_permissions=combined_permissions,
             has_file=has_file,
@@ -684,7 +776,7 @@ class MatriksService:
             is_completed=(completion_percentage == 100),
             temuan_version=getattr(matriks_obj, 'temuan_version', 0),
             
-            # ← TAMBAH FIELD-FIELD FLATTENED INI:
+            # Flattened fields
             nama_perwadag=surat_tugas_data['nama_perwadag'],
             inspektorat=surat_tugas_data['inspektorat'],
             tanggal_evaluasi_mulai=surat_tugas_data['tanggal_evaluasi_mulai'],
