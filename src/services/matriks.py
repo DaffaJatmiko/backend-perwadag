@@ -541,6 +541,7 @@ class MatriksService:
             temp_matriks = Matriks()
             temp_matriks.temuan_rekomendasi = matriks.get('temuan_rekomendasi')
             temp_matriks.status = matrix_status
+            temp_matriks.temuan_version = matriks.get('temuan_version', 0)
             matriks_obj = temp_matriks
         else:
             matriks_id = matriks.id
