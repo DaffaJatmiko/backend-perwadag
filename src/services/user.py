@@ -40,6 +40,21 @@ class UserService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Inspektorat diperlukan untuk role perwadag"
                 )
+
+        # VALIDASI: 1 PIMPINAN per INSPEKTORAT
+        if user_data.role == UserRole.PIMPINAN:
+            if not user_data.inspektorat:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Inspektorat diperlukan untuk role pimpinan"
+                )
+            
+            existing_pimpinan_count = await self.user_repo.count_pimpinan_in_inspektorat(user_data.inspektorat)
+            if existing_pimpinan_count > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Sudah ada pimpinan di {user_data.inspektorat}. Hanya boleh 1 pimpinan per inspektorat."
+                )
         
         # 2. Validate email uniqueness
         if user_data.email and await self.user_repo.email_exists(user_data.email):
@@ -112,6 +127,35 @@ class UserService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User tidak ditemukan"
             )
+        
+        if existing_user.role == UserRole.PERWADAG and user_data.role and user_data.role != UserRole.PERWADAG:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Role PERWADAG tidak dapat diubah ke role lain"
+            )
+
+        # VALIDASI: 1 PIMPINAN per INSPEKTORAT
+        if user_data.role == UserRole.PIMPINAN:
+            # Tentukan inspektorat yang akan digunakan
+            target_inspektorat = user_data.inspektorat if user_data.inspektorat is not None else existing_user.inspektorat
+            
+            if not target_inspektorat:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Inspektorat diperlukan untuk role pimpinan"
+                )
+            
+            # Cek apakah sudah ada pimpinan lain di inspektorat yang sama
+            existing_pimpinan_count = await self.user_repo.count_pimpinan_in_inspektorat(
+                target_inspektorat, 
+                exclude_user_id=user_id  # Exclude user yang sedang diupdate
+            )
+            
+            if existing_pimpinan_count > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Sudah ada pimpinan di {target_inspektorat}. Hanya boleh 1 pimpinan per inspektorat."
+                )
         
         # 2. Validate email uniqueness if being updated
         if user_data.email and await self.user_repo.email_exists(user_data.email, exclude_user_id=user_id):
@@ -440,7 +484,11 @@ class UserService:
     def _generate_username_by_role(self, nama: str, role: UserRole, inspektorat: Optional[str] = None) -> str:
         """Generate username berdasarkan role."""
         
-        if role in [UserRole.ADMIN, UserRole.INSPEKTORAT, UserRole.PIMPINAN]:  # TAMBAH PIMPINAN
+        if role == UserRole.ADMIN:
+            # ADMIN tidak perlu inspektorat, generate dari nama aja
+            return self._generate_admin_username(nama)
+        
+        elif role in [UserRole.INSPEKTORAT, UserRole.PIMPINAN]:
             if not inspektorat:
                 raise ValueError(f"Inspektorat required untuk role {role.value}")
             

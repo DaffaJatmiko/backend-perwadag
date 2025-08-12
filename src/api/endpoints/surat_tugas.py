@@ -67,9 +67,7 @@ async def create_surat_tugas(
     pengedali_mutu_id: Optional[str] = Form(None, description="ID pengedali mutu"),
     pengendali_teknis_id: Optional[str] = Form(None, description="ID pengendali teknis"),
     ketua_tim_id: Optional[str] = Form(None, description="ID ketua tim"),
-    anggota_tim_ids: Optional[str] = Form(None, description="Comma-separated anggota tim IDs"),
-    pimpinan_inspektorat_id: Optional[str] = Form(None, description="ID pimpinan inspektorat"),
-    
+    anggota_tim_ids: Optional[str] = Form(None, description="Comma-separated anggota tim IDs"),    
     file: UploadFile = File(..., description="File surat tugas"),
     current_user: dict = Depends(require_surat_tugas_create_access()),
     surat_tugas_service: SuratTugasService = Depends(get_surat_tugas_service)
@@ -100,8 +98,7 @@ async def create_surat_tugas(
         pengedali_mutu_id=pengedali_mutu_id,
         pengendali_teknis_id=pengendali_teknis_id,
         ketua_tim_id=ketua_tim_id,
-        anggota_tim_ids=anggota_tim_list,
-        pimpinan_inspektorat_id=pimpinan_inspektorat_id
+        anggota_tim_ids=anggota_tim_list
     )
     
     return await surat_tugas_service.create_surat_tugas(

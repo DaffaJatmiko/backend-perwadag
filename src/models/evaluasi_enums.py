@@ -196,3 +196,94 @@ class FileCategory(str, Enum):
             ]
         }
         return mime_map.get(category, [])
+
+class MatriksStatus(str, Enum):
+    """Status flow untuk matriks evaluasi berjenjang."""
+    DRAFTING = "DRAFTING"
+    CHECKING = "CHECKING" 
+    VALIDATING = "VALIDATING"
+    FINISHED = "FINISHED"
+    
+    @classmethod
+    def get_all_values(cls):
+        """Get all status values as list."""
+        return [status.value for status in cls]
+    
+    @classmethod
+    def get_allowed_transitions(cls, current_status: str) -> list:
+        """Get allowed status transitions dari status saat ini."""
+        transitions = {
+            cls.DRAFTING.value: [cls.CHECKING.value],
+            cls.CHECKING.value: [cls.DRAFTING.value, cls.VALIDATING.value],
+            cls.VALIDATING.value: [cls.DRAFTING.value, cls.FINISHED.value],
+            cls.FINISHED.value: []  # No more transitions
+        }
+        return transitions.get(current_status, [])
+    
+    @classmethod
+    def get_display_name(cls, status: str) -> str:
+        """Get display name untuk status."""
+        display_map = {
+            cls.DRAFTING.value: "Penyusunan Temuan",
+            cls.CHECKING.value: "Pemeriksaan Ketua Tim",
+            cls.VALIDATING.value: "Validasi Pengendali Teknis",
+            cls.FINISHED.value: "Selesai"
+        }
+        return display_map.get(status, status)
+    
+    @classmethod
+    def get_description(cls, status: str) -> str:
+        """Get description untuk status."""
+        description_map = {
+            cls.DRAFTING.value: "Anggota tim sedang menyusun temuan dan rekomendasi",
+            cls.CHECKING.value: "Ketua tim sedang memeriksa hasil temuan",
+            cls.VALIDATING.value: "Pengendali teknis sedang memvalidasi hasil",
+            cls.FINISHED.value: "Matriks telah selesai dan siap untuk tindak lanjut"
+        }
+        return description_map.get(status, status)
+
+
+class TindakLanjutStatus(str, Enum):
+    """Status untuk tindak lanjut matriks setelah matriks FINISHED."""
+    DRAFTING = "DRAFTING"
+    CHECKING = "CHECKING"
+    VALIDATING = "VALIDATING" 
+    FINISHED = "FINISHED"
+    
+    @classmethod
+    def get_all_values(cls):
+        """Get all status values as list."""
+        return [status.value for status in cls]
+    
+    @classmethod
+    def get_allowed_transitions(cls, current_status: str) -> list:
+        """Get allowed status transitions dari status saat ini."""
+        transitions = {
+            cls.DRAFTING.value: [cls.CHECKING.value],
+            cls.CHECKING.value: [cls.DRAFTING.value, cls.VALIDATING.value],
+            cls.VALIDATING.value: [cls.DRAFTING.value, cls.FINISHED.value],
+            cls.FINISHED.value: []  # No more transitions
+        }
+        return transitions.get(current_status, [])
+    
+    @classmethod
+    def get_display_name(cls, status: str) -> str:
+        """Get display name untuk status."""
+        display_map = {
+            cls.DRAFTING.value: "Penyusunan Tindak Lanjut",
+            cls.CHECKING.value: "Pemeriksaan Ketua Tim", 
+            cls.VALIDATING.value: "Validasi Pengendali Teknis",
+            cls.FINISHED.value: "Tindak Lanjut Selesai"
+        }
+        return display_map.get(status, status)
+    
+    @classmethod
+    def get_description(cls, status: str) -> str:
+        """Get description untuk status tindak lanjut."""
+        description_map = {
+            cls.DRAFTING.value: "Perwadag sedang menyusun tindak lanjut",
+            cls.CHECKING.value: "Ketua tim sedang memeriksa tindak lanjut",
+            cls.VALIDATING.value: "Pengendali teknis sedang memvalidasi tindak lanjut",
+            cls.FINISHED.value: "Tindak lanjut telah selesai dan final"
+        }
+        return description_map.get(status, status)

@@ -1,13 +1,14 @@
 """Model untuk meetings dalam proses evaluasi."""
 
 from typing import Optional, List, Dict, Any
-from datetime import date
+from datetime import date, datetime, timezone
 from sqlmodel import Field, SQLModel, Column, JSON
 from sqlalchemy import Enum as SQLEnum, UniqueConstraint
 import uuid as uuid_lib
 
 from src.models.base import BaseModel
 from src.models.evaluasi_enums import MeetingType
+from sqlalchemy.dialects import postgresql
 
 
 class Meeting(BaseModel, SQLModel, table=True):
@@ -33,9 +34,10 @@ class Meeting(BaseModel, SQLModel, table=True):
         description="Jenis meeting: entry, konfirmasi, atau exit"
     )
     
-    tanggal_meeting: Optional[date] = Field(
+    tanggal_meeting: Optional[datetime] = Field(
         default=None,
-        description="Tanggal pelaksanaan meeting"
+        sa_column=Column(postgresql.TIMESTAMP(timezone=True), nullable=True),
+        description="Meeting datetime (stored as UTC)"
     )
     
     link_zoom: Optional[str] = Field(
@@ -71,6 +73,31 @@ class Meeting(BaseModel, SQLModel, table=True):
         """Get total jumlah file yang diupload."""
         return len(self.file_bukti_hadir) if self.file_bukti_hadir else 0
     
+    @property
+    def tanggal_meeting_jakarta(self) -> Optional[datetime]:
+        """Get meeting time in Jakarta timezone."""
+        if not self.tanggal_meeting:
+            return None
+        
+        import pytz
+        utc_time = self.tanggal_meeting.replace(tzinfo=pytz.UTC)
+        jakarta_tz = pytz.timezone('Asia/Jakarta')
+        return utc_time.astimezone(jakarta_tz)
+
+    @property
+    def tanggal_meeting_utc_iso(self) -> Optional[str]:
+        """Get meeting datetime as UTC ISO string for frontend."""
+        if not self.tanggal_meeting:
+            return None
+        
+        # Ensure UTC timezone for ISO format
+        if self.tanggal_meeting.tzinfo is None:
+            utc_dt = self.tanggal_meeting.replace(tzinfo=timezone.utc)
+        else:
+            utc_dt = self.tanggal_meeting.astimezone(timezone.utc)
+        
+        return utc_dt.isoformat()
+
     def is_completed(self) -> bool:
         """Check apakah meeting sudah completed (minimal ada tanggal)."""
         return self.tanggal_meeting is not None

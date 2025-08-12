@@ -191,7 +191,7 @@ def require_roles(required_roles: List[str]):
 admin_required = require_roles(["ADMIN"])
 inspektorat_required = require_roles(["INSPEKTORAT"]) 
 perwadag_required = require_roles(["PERWADAG"])
-admin_or_inspektorat_required = require_roles(["ADMIN", "INSPEKTORAT"])
+admin_or_inspektorat_required = require_roles(["ADMIN", "INSPEKTORAT", "PIMPINAN"])  
 
 
 # Utility functions for role checking - FIXED FOR SINGLE ROLE

@@ -21,9 +21,13 @@ from src.schemas.filters import MatriksFilterParams
 from src.models.surat_tugas import SuratTugas
 from src.models.user import User
 from src.utils.evaluation_date_validator import validate_matriks_date_access
-from src.schemas.matriks import TemuanRekomendasiSummary
+from src.schemas.matriks import TemuanRekomendasiSummary, MatriksStatusUpdate, TindakLanjutUpdate, TindakLanjutStatusUpdate, UserPermissions
 from src.schemas.shared import FileDeleteResponse
-from src.schemas.shared import FileDeleteResponse
+from src.models.evaluasi_enums import MatriksStatus, TindakLanjutStatus
+from src.services.matriks_permissions import (
+    get_matrix_permissions, get_tindak_lanjut_permissions, 
+    should_hide_temuan_for_perwadag, get_user_assignment_role
+)
 
 
 class MatriksService:
@@ -37,7 +41,8 @@ class MatriksService:
         filters: MatriksFilterParams,
         user_role: str,
         user_inspektorat: Optional[str] = None,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        current_user: Optional[dict] = None
     ) -> MatriksListResponse:
         """Get all matriks dengan enriched data."""
         
@@ -51,7 +56,8 @@ class MatriksService:
         for result in enriched_results:
             response = await self._build_enriched_response(
                 result['matriks'], 
-                result['surat_tugas_data']
+                result['surat_tugas_data'],
+                current_user
             )
             matriks_responses.append(response)
         
@@ -86,8 +92,9 @@ class MatriksService:
 
         return response
     
-    async def get_matriks_or_404(self, matriks_id: str) -> MatriksResponse:
-        """Get matriks by ID dengan enriched data."""
+    async def get_matriks_or_404(self, matriks_id: str, current_user: Optional[dict] = None) -> MatriksResponse:
+        """Get matriks by ID dengan enriched data dan permission checking."""
+        
         matriks = await self.matriks_repo.get_by_id(matriks_id)
         if not matriks:
             raise HTTPException(
@@ -95,34 +102,36 @@ class MatriksService:
                 detail="Matriks tidak ditemukan"
             )
         
-        # Get surat tugas data untuk enrichment
         surat_tugas_data = await self._get_surat_tugas_basic_info(matriks.surat_tugas_id)
         if not surat_tugas_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Surat tugas terkait tidak ditemukan"
+                detail="Surat tugas tidak ditemukan"
             )
         
-        return await self._build_enriched_response(matriks, surat_tugas_data)
+        # Pass current_user ke _build_enriched_response
+        return await self._build_enriched_response(matriks, surat_tugas_data, current_user)
     
-    async def get_by_surat_tugas_id(self, surat_tugas_id: str) -> Optional[MatriksResponse]:
+    async def get_by_surat_tugas_id(self, surat_tugas_id: str, current_user: Optional[dict] = None) -> Optional[MatriksResponse]:
         """Get matriks by surat tugas ID."""
+        
         matriks = await self.matriks_repo.get_by_surat_tugas_id(surat_tugas_id)
         if not matriks:
             return None
         
-        # 🔥 FIX: Use instance method instead of standalone function
         surat_tugas_data = await self._get_surat_tugas_basic_info(surat_tugas_id)
         if not surat_tugas_data:
             return None
         
-        return await self._build_enriched_response(matriks, surat_tugas_data)
+        # Pass current_user ke _build_enriched_response
+        return await self._build_enriched_response(matriks, surat_tugas_data, current_user)
     
     async def update_matriks(
         self, 
         matriks_id: str, 
         update_data: MatriksUpdate, 
-        updated_by: str
+        updated_by: str,
+        current_user: Optional[dict] = None
     ) -> MatriksResponse:
         """Update matriks dengan kondisi-kriteria-rekomendasi support."""
         
@@ -161,7 +170,176 @@ class MatriksService:
         updated_matriks.updated_by = updated_by
         await self.matriks_repo.session.commit()
         
-        return await self.get_matriks_or_404(matriks_id)
+        return await self.get_matriks_or_404(matriks_id, current_user)
+
+    async def update_matrix_status(
+        self,
+        matrix_id: str,
+        status_data: MatriksStatusUpdate,
+        current_user: dict
+    ) -> MatriksResponse:
+        """Update status matriks dengan validasi permission."""
+        
+        # Get matrix dan surat tugas data
+        matrix = await self.matriks_repo.get_by_id(matrix_id)
+        if not matrix:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Matriks tidak ditemukan"
+            )
+        
+        surat_tugas_data = await self._get_surat_tugas_basic_info(matrix.surat_tugas_id)
+        if not surat_tugas_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Surat tugas tidak ditemukan"
+            )
+        
+        # Check permissions
+        permissions = get_matrix_permissions(matrix.status, surat_tugas_data, current_user)
+        if not permissions.can_change_matrix_status:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Anda tidak memiliki akses untuk mengubah status matriks"
+            )
+        
+        # Validate status transition
+        if status_data.status not in permissions.allowed_matrix_status_changes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Tidak dapat mengubah status dari {matrix.status} ke {status_data.status}"
+            )
+        
+        # Update status
+        matrix.status = status_data.status
+        matrix.updated_by = current_user['id']
+        
+        await self.matriks_repo.session.commit()
+        
+        return await self.get_matriks_or_404(matrix_id, current_user)
+    
+    async def update_tindak_lanjut(
+        self,
+        matrix_id: str,
+        item_id: int,
+        tindak_lanjut_data: TindakLanjutUpdate,
+        current_user: dict
+    ) -> MatriksResponse:
+        """Update tindak lanjut untuk item tertentu."""
+        
+        # Get matrix dan surat tugas data
+        matrix = await self.matriks_repo.get_by_id(matrix_id)
+        if not matrix:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Matriks tidak ditemukan"
+            )
+        
+        surat_tugas_data = await self._get_surat_tugas_basic_info(matrix.surat_tugas_id)
+        if not surat_tugas_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Surat tugas tidak ditemukan"
+            )
+        
+        # Get current tindak lanjut data untuk item ini
+        current_tindak_lanjut = matrix.get_tindak_lanjut_item(item_id)
+        current_status = None
+        if current_tindak_lanjut:
+            current_status = current_tindak_lanjut.get('status_tindak_lanjut')
+        
+        # Check permissions
+        permissions = get_tindak_lanjut_permissions(
+            current_status, surat_tugas_data, current_user, matrix.status
+        )
+        if not permissions.can_edit_tindak_lanjut:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Anda tidak memiliki akses untuk mengubah tindak lanjut"
+            )
+        
+        # Update item
+        success = matrix.update_tindak_lanjut_item(
+            item_id=item_id,
+            tindak_lanjut=tindak_lanjut_data.tindak_lanjut,
+            dokumen_pendukung=tindak_lanjut_data.dokumen_pendukung_tindak_lanjut,
+            catatan_evaluator=tindak_lanjut_data.catatan_evaluator
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Item dengan ID {item_id} tidak ditemukan"
+            )
+        
+        matrix.updated_by = current_user['id']
+        await self.matriks_repo.session.commit()
+        
+        return await self.get_matriks_or_404(matrix_id, current_user)
+    
+    async def update_tindak_lanjut_status(
+        self,
+        matrix_id: str,
+        item_id: int,
+        status_data: TindakLanjutStatusUpdate,
+        current_user: dict
+    ) -> MatriksResponse:
+        """Update status tindak lanjut untuk item tertentu."""
+        
+        # Get matrix dan surat tugas data
+        matrix = await self.matriks_repo.get_by_id(matrix_id)
+        if not matrix:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Matriks tidak ditemukan"
+            )
+        
+        surat_tugas_data = await self._get_surat_tugas_basic_info(matrix.surat_tugas_id)
+        if not surat_tugas_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Surat tugas tidak ditemukan"
+            )
+        
+        # Get current tindak lanjut data
+        current_tindak_lanjut = matrix.get_tindak_lanjut_item(item_id)
+        current_status = None
+        if current_tindak_lanjut:
+            current_status = current_tindak_lanjut.get('status_tindak_lanjut')
+        
+        # Check permissions
+        permissions = get_tindak_lanjut_permissions(
+            current_status, surat_tugas_data, current_user, matrix.status
+        )
+        if not permissions.can_change_tindak_lanjut_status:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Anda tidak memiliki akses untuk mengubah status tindak lanjut"
+            )
+        
+        # Validate status transition
+        if status_data.status_tindak_lanjut not in permissions.allowed_tindak_lanjut_status_changes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Tidak dapat mengubah status tindak lanjut ke {status_data.status_tindak_lanjut}"
+            )
+        
+        # Update status
+        success = matrix.update_tindak_lanjut_item(
+            item_id=item_id,
+            status_tindak_lanjut=status_data.status_tindak_lanjut
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Item dengan ID {item_id} tidak ditemukan"
+            )
+        
+        matrix.updated_by = current_user['id']
+        await self.matriks_repo.session.commit()
+        
+        return await self.get_matriks_or_404(matrix_id, current_user)
     
     async def upload_file(
         self, 
@@ -342,52 +520,48 @@ class MatriksService:
     async def _build_enriched_response(
         self, 
         matriks, 
-        surat_tugas_data: Dict[str, Any]
+        surat_tugas_data: Dict[str, Any],
+        current_user: Optional[Dict[str, Any]] = None
     ) -> MatriksResponse:
-        """Build enriched response dengan file URLs dan surat tugas data - FIXED."""
+        """Build enriched response dengan permission checking dan conditional data."""
         
-        # Handle dict vs object dan field name yang benar
+        # Extract data dari matriks (bisa dict atau object)
         if isinstance(matriks, dict):
-            # Repository return dict
-            matriks_id = matriks.get('id')
-            surat_tugas_id = matriks.get('surat_tugas_id')
+            matriks_id = matriks['id']
+            surat_tugas_id = matriks['surat_tugas_id']
             file_dokumen_matriks = matriks.get('file_dokumen_matriks')
-            temuan_rekomendasi = matriks.get('temuan_rekomendasi') 
-            created_at = matriks.get('created_at')
+            created_at = matriks['created_at']
             updated_at = matriks.get('updated_at')
             created_by = matriks.get('created_by')
             updated_by = matriks.get('updated_by')
-            temuan_version = matriks.get('temuan_version', 0)
-
-            temp_matriks = None
-            if temuan_rekomendasi:
-                from src.models.matriks import Matriks
-                temp_matriks = Matriks()
-                temp_matriks.temuan_rekomendasi = temuan_rekomendasi
+            matrix_status = matriks.get('status', MatriksStatus.DRAFTING)
+            
+            # Create temporary object untuk method calls
+            from src.models.matriks import Matriks
+            temp_matriks = Matriks()
+            temp_matriks.temuan_rekomendasi = matriks.get('temuan_rekomendasi')
+            temp_matriks.status = matrix_status
+            matriks_obj = temp_matriks
         else:
-            # Repository return object
             matriks_id = matriks.id
             surat_tugas_id = matriks.surat_tugas_id
-            file_dokumen_matriks = getattr(matriks, 'file_dokumen_matriks', None)
-            temuan_rekomendasi = getattr(matriks, 'temuan_rekomendasi', None)
+            file_dokumen_matriks = matriks.file_dokumen_matriks
             created_at = matriks.created_at
             updated_at = matriks.updated_at
             created_by = matriks.created_by
             updated_by = matriks.updated_by
-            temuan_version = getattr(matriks, 'temuan_version', 0)
-
-        # Build file information - FIXED: Remove await
+            matrix_status = matriks.status
+            matriks_obj = matriks
+        
+        # Build file URLs dan metadata
         file_urls = None
         file_metadata = None
-        
         if file_dokumen_matriks:
             file_urls = FileUrls(
-                file_url=evaluasi_file_manager.get_file_url(file_dokumen_matriks),
-                download_url=f"/api/v1/matriks/{matriks_id}/download",
-                view_url=f"/api/v1/matriks/{matriks_id}/view"
+                view_url=f"/api/matriks/{matriks_id}/file/view",
+                download_url=f"/api/matriks/{matriks_id}/file/download"
             )
             
-            # 🔥 FIX: Remove await - get_file_info is NOT async
             file_info = evaluasi_file_manager.get_file_info(file_dokumen_matriks)
             if file_info:
                 file_metadata = FileMetadata(
@@ -416,51 +590,106 @@ class MatriksService:
             is_evaluation_active=True
         )
         
-        # Calculate completion - model only has file, no nomor_matriks field
+        # Get permissions untuk current user
+        matrix_permissions = UserPermissions()
+        tindak_lanjut_permissions = UserPermissions()
+        is_editable = False
+        
+        if current_user:
+            print(f"🔍 DEBUG _build_enriched_response:")
+            print(f"   current_user: {current_user}")
+            print(f"   surat_tugas_data keys: {list(surat_tugas_data.keys())}")
+            print(f"   surat_tugas_data: {surat_tugas_data}")
+            
+            matrix_permissions = get_matrix_permissions(matrix_status, surat_tugas_data, current_user)
+            print(f"   matrix_permissions: {matrix_permissions}")
+            
+            # Get tindak lanjut permissions (sample dari item pertama)
+            items = matriks_obj.get_temuan_rekomendasi_items() if matriks_obj else []
+            if items:
+                first_item = items[0]
+                tl_status = first_item.get('status_tindak_lanjut')
+                tindak_lanjut_permissions = get_tindak_lanjut_permissions(
+                    tl_status, surat_tugas_data, current_user, matrix_status
+                )
+            else:
+                # Jika tidak ada items, tetap panggil dengan None
+                tindak_lanjut_permissions = get_tindak_lanjut_permissions(
+                    None, surat_tugas_data, current_user, matrix_status
+                )
+            
+            # ✅ SEKARANG hitung is_editable SETELAH semua permissions didapat
+            is_editable = (
+                matrix_permissions.can_edit_temuan or 
+                matrix_permissions.can_change_matrix_status or
+                tindak_lanjut_permissions.can_edit_tindak_lanjut or
+                tindak_lanjut_permissions.can_change_tindak_lanjut_status
+            )
+            
+            print(f"   🔍 Final is_editable: {is_editable}")
+        
+        # Combine permissions
+        combined_permissions = UserPermissions(
+            can_edit_temuan=matrix_permissions.can_edit_temuan,
+            can_change_matrix_status=matrix_permissions.can_change_matrix_status,
+            can_edit_tindak_lanjut=tindak_lanjut_permissions.can_edit_tindak_lanjut,
+            can_change_tindak_lanjut_status=tindak_lanjut_permissions.can_change_tindak_lanjut_status,
+            allowed_matrix_status_changes=matrix_permissions.allowed_matrix_status_changes,
+            allowed_tindak_lanjut_status_changes=tindak_lanjut_permissions.allowed_tindak_lanjut_status_changes
+        )
+        
+        # Calculate completion
         has_file = bool(file_dokumen_matriks)
         has_temuan_rekomendasi = False
         temuan_rekomendasi_summary = None
-
-        matriks_obj = temp_matriks if isinstance(matriks, dict) else matriks
-
+        
+        # Handle temuan data berdasarkan user permission
         if matriks_obj and hasattr(matriks_obj, 'get_temuan_rekomendasi_summary'):
-            summary_data = matriks_obj.get_temuan_rekomendasi_summary()
-            has_temuan_rekomendasi = len(summary_data.get('data', [])) > 0  # 3-field structure
-            temuan_rekomendasi_summary = TemuanRekomendasiSummary(**summary_data)
-
-        is_completed = has_file  # Completion = has file only
-        
-        completion_percentage = 100 if has_file else 0
-        
-        return MatriksResponse(
-            # Basic fields
-            id=str(matriks_id),
-            surat_tugas_id=str(surat_tugas_id),
-            nomor_matriks=None,  # Model doesn't have this field
-            file_dokumen=file_dokumen_matriks,  # Map to expected response field name
-            temuan_rekomendasi_summary=temuan_rekomendasi_summary,
-            temuan_version=temuan_version,
+            # Check apakah harus hide untuk perwadag
+            should_hide = False
+            if current_user:
+                should_hide = should_hide_temuan_for_perwadag(
+                    matrix_status, current_user, surat_tugas_data
+                )
             
-            # Enhanced file information
+            if not should_hide:
+                summary_data = matriks_obj.get_temuan_rekomendasi_summary()
+                if summary_data and summary_data.get('data'):
+                    has_temuan_rekomendasi = True
+                    temuan_rekomendasi_summary = TemuanRekomendasiSummary(data=summary_data['data'])
+        
+        completion_percentage = 0
+        if has_file and has_temuan_rekomendasi:
+            completion_percentage = 100
+        elif has_file or has_temuan_rekomendasi:
+            completion_percentage = 50
+        
+
+        return MatriksResponse(
+            id=matriks_id,
+            surat_tugas_id=surat_tugas_id,
+            surat_tugas_info=surat_tugas_info,
+            file_dokumen=file_dokumen_matriks,  # ← GANTI dari file_dokumen_matriks
             file_urls=file_urls,
             file_metadata=file_metadata,
-            
-            # Status information
-            is_completed=is_completed,
+            status=matrix_status,
+            is_editable=is_editable,
+            user_permissions=combined_permissions,
             has_file=has_file,
             has_temuan_rekomendasi=has_temuan_rekomendasi,
+            temuan_rekomendasi_summary=temuan_rekomendasi_summary,
             completion_percentage=completion_percentage,
+            is_completed=(completion_percentage == 100),
+            temuan_version=getattr(matriks_obj, 'temuan_version', 0),
             
-            # Enriched surat tugas data
-            surat_tugas_info=surat_tugas_info,
-            nama_perwadag=surat_tugas_data['perwadag_nama'],
+            # ← TAMBAH FIELD-FIELD FLATTENED INI:
+            nama_perwadag=surat_tugas_data['nama_perwadag'],
             inspektorat=surat_tugas_data['inspektorat'],
             tanggal_evaluasi_mulai=surat_tugas_data['tanggal_evaluasi_mulai'],
             tanggal_evaluasi_selesai=surat_tugas_data['tanggal_evaluasi_selesai'],
             tahun_evaluasi=surat_tugas_data['tahun_evaluasi'],
             evaluation_status=surat_tugas_data.get('evaluation_status', 'active'),
             
-            # Audit information
             created_at=created_at,
             updated_at=updated_at,
             created_by=created_by,
@@ -468,47 +697,105 @@ class MatriksService:
         )
 
     async def _get_surat_tugas_basic_info(self, surat_tugas_id: str) -> Optional[Dict[str, Any]]:
-        """Get basic surat tugas information - FIXED SQL query."""
-        
-        # 🔥 FIX: Remove tahun_evaluasi from select since it's a property
-        query = (
-            select(
-                SuratTugas.no_surat,
-                SuratTugas.nama_perwadag,
-                SuratTugas.inspektorat,
-                SuratTugas.tanggal_evaluasi_mulai,
-                SuratTugas.tanggal_evaluasi_selesai,
-                # SuratTugas.tahun_evaluasi,  # 🔥 REMOVED - this is a property
-                User.nama.label('perwadag_nama')
-            )
-            .join(User, SuratTugas.user_perwadag_id == User.id)
-            .where(
-                and_(
-                    SuratTugas.id == surat_tugas_id,
-                    SuratTugas.deleted_at.is_(None)
+            """Get surat tugas basic info dengan field yang lengkap."""
+            
+            # Query langsung ke database untuk memastikan semua field ada
+            from sqlalchemy import select, and_
+            from src.models.surat_tugas import SuratTugas
+            from src.models.user import User
+            
+            query = (
+                select(
+                    SuratTugas.no_surat,
+                    SuratTugas.nama_perwadag,
+                    SuratTugas.inspektorat,
+                    SuratTugas.tanggal_evaluasi_mulai,
+                    SuratTugas.tanggal_evaluasi_selesai,
+                    SuratTugas.user_perwadag_id,
+                    SuratTugas.ketua_tim_id,
+                    SuratTugas.pengendali_teknis_id,
+                    SuratTugas.pengedali_mutu_id,
+                    SuratTugas.pimpinan_inspektorat_id,
+                    SuratTugas.anggota_tim_ids,
+                    User.nama.label('perwadag_nama')
+                )
+                .join(User, SuratTugas.user_perwadag_id == User.id)
+                .where(
+                    and_(
+                        SuratTugas.id == surat_tugas_id,
+                        SuratTugas.deleted_at.is_(None)
+                    )
                 )
             )
-        )
+            
+            result = await self.matriks_repo.session.execute(query)
+            row = result.fetchone()
+            
+            if not row:
+                return None
+            
+            # Calculate tahun_evaluasi dari tanggal_evaluasi_mulai
+            tahun_evaluasi = row[3].year if row[3] else None  # row[3] = tanggal_evaluasi_mulai
+            
+            return {
+                'no_surat': row[0],
+                'nama_perwadag': row[1], 
+                'inspektorat': row[2],
+                'tanggal_evaluasi_mulai': row[3],
+                'tanggal_evaluasi_selesai': row[4],
+                'user_perwadag_id': row[5],
+                'ketua_tim_id': row[6],
+                'pengendali_teknis_id': row[7],
+                'pengedali_mutu_id': row[8],
+                'pimpinan_inspektorat_id': row[9],
+                'anggota_tim_ids': row[10],
+                'tahun_evaluasi': tahun_evaluasi,
+                'perwadag_nama': row[11],
+                'evaluation_status': 'active'
+            }
+
+    # async def _get_surat_tugas_basic_info(self, surat_tugas_id: str) -> Optional[Dict[str, Any]]:
+    #     """Get basic surat tugas information - FIXED SQL query."""
         
-        result = await self.matriks_repo.session.execute(query)
-        row = result.fetchone()
+    #     # 🔥 FIX: Remove tahun_evaluasi from select since it's a property
+    #     query = (
+    #         select(
+    #             SuratTugas.no_surat,
+    #             SuratTugas.nama_perwadag,
+    #             SuratTugas.inspektorat,
+    #             SuratTugas.tanggal_evaluasi_mulai,
+    #             SuratTugas.tanggal_evaluasi_selesai,
+    #             # SuratTugas.tahun_evaluasi,  # 🔥 REMOVED - this is a property
+    #             User.nama.label('perwadag_nama')
+    #         )
+    #         .join(User, SuratTugas.user_perwadag_id == User.id)
+    #         .where(
+    #             and_(
+    #                 SuratTugas.id == surat_tugas_id,
+    #                 SuratTugas.deleted_at.is_(None)
+    #             )
+    #         )
+    #     )
         
-        if not row:
-            return None
+    #     result = await self.matriks_repo.session.execute(query)
+    #     row = result.fetchone()
         
-        # Calculate tahun_evaluasi from tanggal_evaluasi_mulai
-        tahun_evaluasi = row[3].year if row[3] else None  # row[3] = tanggal_evaluasi_mulai
+    #     if not row:
+    #         return None
         
-        return {
-            'no_surat': row[0],
-            'nama_perwadag': row[1],
-            'inspektorat': row[2],
-            'tanggal_evaluasi_mulai': row[3],
-            'tanggal_evaluasi_selesai': row[4],
-            'tahun_evaluasi': tahun_evaluasi,  # Calculated value
-            'perwadag_nama': row[5],  # Adjusted index
-            'evaluation_status': 'active'
-        }
+    #     # Calculate tahun_evaluasi from tanggal_evaluasi_mulai
+    #     tahun_evaluasi = row[3].year if row[3] else None  # row[3] = tanggal_evaluasi_mulai
+        
+    #     return {
+    #         'no_surat': row[0],
+    #         'nama_perwadag': row[1],
+    #         'inspektorat': row[2],
+    #         'tanggal_evaluasi_mulai': row[3],
+    #         'tanggal_evaluasi_selesai': row[4],
+    #         'tahun_evaluasi': tahun_evaluasi,  # Calculated value
+    #         'perwadag_nama': row[5],  # Adjusted index
+    #         'evaluation_status': 'active'
+    #     }
 
     async def get_statistics(
         self,

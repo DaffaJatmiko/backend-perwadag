@@ -89,14 +89,14 @@ class MeetingRepository:
             )
         )
         
-        # Role-based filtering
+        # Role-based filtering - PERBAIKI NAMA VARIABEL
         if user_role == "PERWADAG" and user_id:
-            meeting_query = meeting_query.where(SuratTugas.user_perwadag_id == user_id)
+            meetings_query = meetings_query.where(SuratTugas.user_perwadag_id == user_id)  # ← GUNAKAN meetings_query
         elif user_role == "PIMPINAN" and user_inspektorat:
-            meeting_query = meeting_query.where(SuratTugas.inspektorat == user_inspektorat)
+            meetings_query = meetings_query.where(SuratTugas.inspektorat == user_inspektorat)  # ← GUNAKAN meetings_query
         elif user_role == "INSPEKTORAT" and user_id:
             # Assignment-based filtering
-            meeting_query = meeting_query.where(
+            meetings_query = meetings_query.where(  # ← GUNAKAN meetings_query
                 or_(
                     SuratTugas.pengedali_mutu_id == user_id,
                     SuratTugas.pengendali_teknis_id == user_id,
@@ -105,10 +105,10 @@ class MeetingRepository:
                 )
             )
         
-        # Apply filters
+        # Apply filters y
         if filters.search:
             search_term = f"%{filters.search}%"
-            meetings_query = meetings_query.where(
+            meetings_query = meetings_query.where(  
                 or_(
                     SuratTugas.no_surat.ilike(search_term),
                     SuratTugas.nama_perwadag.ilike(search_term),
@@ -117,19 +117,19 @@ class MeetingRepository:
             )
         
         if filters.meeting_type:
-            meetings_query = meetings_query.where(Meeting.meeting_type == filters.meeting_type)
+            meetings_query = meetings_query.where(Meeting.meeting_type == filters.meeting_type)  
         
         if filters.surat_tugas_id:
-            meetings_query = meetings_query.where(Meeting.surat_tugas_id == filters.surat_tugas_id)
+            meetings_query = meetings_query.where(Meeting.surat_tugas_id == filters.surat_tugas_id)  
         
         if filters.inspektorat:
-            meetings_query = meetings_query.where(SuratTugas.inspektorat.ilike(f"%{filters.inspektorat}%"))
+            meetings_query = meetings_query.where(SuratTugas.inspektorat.ilike(f"%{filters.inspektorat}%"))  
         
         if filters.user_perwadag_id:
-            meetings_query = meetings_query.where(SuratTugas.user_perwadag_id == filters.user_perwadag_id)
+            meetings_query = meetings_query.where(SuratTugas.user_perwadag_id == filters.user_perwadag_id)  
         
         if filters.tahun_evaluasi:
-            meetings_query = meetings_query.where(func.extract('year', SuratTugas.tanggal_evaluasi_mulai) == filters.tahun_evaluasi)
+            meetings_query = meetings_query.where(func.extract('year', SuratTugas.tanggal_evaluasi_mulai) == filters.tahun_evaluasi)  
         
         # 🔥 STEP 2: Count total (SAFE - menggunakan subquery)
         count_query = select(func.count()).select_from(meetings_query.subquery())

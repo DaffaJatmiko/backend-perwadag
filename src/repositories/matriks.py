@@ -108,7 +108,11 @@ class MatriksRepository:
         if filters.tahun_evaluasi:
             matriks_query = matriks_query.where(
                 func.extract('year', SuratTugas.tanggal_evaluasi_mulai) == filters.tahun_evaluasi
-            )        
+            )       
+
+        if filters.status:
+            matriks_query = matriks_query.where(Matriks.status == filters.status) 
+
         # Add surat_tugas_id filter if available
         if hasattr(filters, 'surat_tugas_id') and filters.surat_tugas_id:
             matriks_query = matriks_query.where(Matriks.surat_tugas_id == filters.surat_tugas_id)
@@ -188,6 +192,7 @@ class MatriksRepository:
                 'surat_tugas_id': matriks.surat_tugas_id,
                 'file_dokumen_matriks': matriks.file_dokumen_matriks,
                 'temuan_rekomendasi': getattr(matriks, 'temuan_rekomendasi', None), 
+                'status': getattr(matriks, 'status', 'DRAFTING'),                
                 'created_at': matriks.created_at,
                 'updated_at': matriks.updated_at,
                 'created_by': matriks.created_by,
@@ -203,7 +208,13 @@ class MatriksRepository:
                 'tanggal_evaluasi_mulai': surat_tugas.tanggal_evaluasi_mulai,
                 'tanggal_evaluasi_selesai': surat_tugas.tanggal_evaluasi_selesai,
                 'tahun_evaluasi': surat_tugas.tahun_evaluasi,
-                'perwadag_nama': user.nama
+                'perwadag_nama': user.nama,
+                'user_perwadag_id': surat_tugas.user_perwadag_id,
+                'ketua_tim_id': surat_tugas.ketua_tim_id,
+                'pengendali_teknis_id': surat_tugas.pengendali_teknis_id,
+                'pengedali_mutu_id': surat_tugas.pengedali_mutu_id,
+                'pimpinan_inspektorat_id': surat_tugas.pimpinan_inspektorat_id,
+                'anggota_tim_ids': surat_tugas.anggota_tim_ids
             }
             
             enriched_results.append({
@@ -345,6 +356,51 @@ class MatriksRepository:
         
         matriks.file_dokumen_matriks = None
         matriks.updated_at = datetime.utcnow()
+        await self.session.commit()
+        await self.session.refresh(matriks)
+        return matriks
+
+    async def get_surat_tugas_assignment_info(self, surat_tugas_id: str) -> Optional[Dict[str, Any]]:
+        """Get assignment info dari surat tugas untuk permission checking."""
+        
+        query = select(SuratTugas).where(
+            and_(
+                SuratTugas.id == surat_tugas_id,
+                SuratTugas.deleted_at.is_(None)
+            )
+        )
+        
+        result = await self.session.execute(query)
+        surat_tugas = result.scalar_one_or_none()
+        
+        if not surat_tugas:
+            return None
+        
+        return {
+            'user_perwadag_id': surat_tugas.user_perwadag_id,
+            'ketua_tim_id': surat_tugas.ketua_tim_id,
+            'pengendali_teknis_id': surat_tugas.pengendali_teknis_id,
+            'pengedali_mutu_id': surat_tugas.pengedali_mutu_id,
+            'pimpinan_inspektorat_id': surat_tugas.pimpinan_inspektorat_id,
+            'anggota_tim_ids': surat_tugas.anggota_tim_ids,
+            'nama_perwadag': surat_tugas.nama_perwadag,
+            'inspektorat': surat_tugas.inspektorat,
+            'tanggal_evaluasi_mulai': surat_tugas.tanggal_evaluasi_mulai,
+            'tanggal_evaluasi_selesai': surat_tugas.tanggal_evaluasi_selesai,
+            'tahun_evaluasi': surat_tugas.tahun_evaluasi
+        }
+    
+    async def update_status(self, matriks_id: str, new_status: str, updated_by: str) -> Optional[Matriks]:
+        """Update status matriks."""
+        
+        matriks = await self.get_by_id(matriks_id)
+        if not matriks:
+            return None
+        
+        matriks.status = new_status
+        matriks.updated_by = updated_by
+        matriks.updated_at = datetime.utcnow()
+        
         await self.session.commit()
         await self.session.refresh(matriks)
         return matriks

@@ -11,6 +11,7 @@ from src.schemas.shared import (
     PaginationInfo, ModuleStatistics, BaseListResponse
 )
 
+from src.models.evaluasi_enums import MatriksStatus, TindakLanjutStatus
 
 # ===== REQUEST SCHEMAS =====
 
@@ -21,12 +22,7 @@ class MatriksCreate(BaseModel):
 
 class TemuanRekomendasiItem(BaseModel):
     """
-    Schema untuk 1 set kondisi-kriteria-rekomendasi.
-    
-    3-field structure untuk evaluasi:
-    1. Kondisi: Situasi/keadaan yang ditemukan saat evaluasi
-    2. Kriteria: Standar/aturan/ketentuan yang harus dipenuhi  
-    3. Rekomendasi: Saran perbaikan untuk memenuhi kriteria
+    Schema untuk 1 set kondisi-kriteria-rekomendasi berserta tindak lanjut
     """
     
     kondisi: str = Field(
@@ -48,6 +44,29 @@ class TemuanRekomendasiItem(BaseModel):
         min_length=1, 
         max_length=1000, 
         description="Saran perbaikan untuk memenuhi kriteria"
+    )
+
+    tindak_lanjut: Optional[str] = Field(
+        None, 
+        max_length=1000, 
+        description="Tindak lanjut yang dilakukan oleh perwadag"
+    )
+
+    dokumen_pendukung_tindak_lanjut: Optional[str] = Field(
+        None, 
+        max_length=500, 
+        description="Link dokumen pendukung tindak lanjut"
+    )
+
+    catatan_evaluator: Optional[str] = Field(
+        None, 
+        max_length=1000, 
+        description="Catatan dari ketua tim terkait tindak lanjut"
+    )
+
+    status_tindak_lanjut: Optional[TindakLanjutStatus] = Field(
+        None, 
+        description="Status tindak lanjut"
     )
     
     @field_validator('kondisi', 'kriteria', 'rekomendasi')
@@ -87,6 +106,29 @@ class MatriksUpdate(BaseModel):
         description="Expected version untuk conflict detection"
     )
 
+class MatriksStatusUpdate(BaseModel):
+    """Schema untuk update status matriks."""
+    status: MatriksStatus = Field(..., description="Status baru untuk matriks")
+
+class TindakLanjutUpdate(BaseModel):
+    """Schema untuk update tindak lanjut."""
+    tindak_lanjut: Optional[str] = Field(None, max_length=1000, description="Narasi tindak lanjut")
+    dokumen_pendukung_tindak_lanjut: Optional[str] = Field(None, max_length=500, description="Link dokumen pendukung")
+    catatan_evaluator: Optional[str] = Field(None, max_length=1000, description="Catatan evaluator")
+
+class TindakLanjutStatusUpdate(BaseModel):
+    """Schema untuk update status tindak lanjut."""
+    status_tindak_lanjut: TindakLanjutStatus = Field(..., description="Status tindak lanjut baru")
+
+class UserPermissions(BaseModel):
+    """Schema untuk user permissions."""
+    can_edit_temuan: bool = False
+    can_change_matrix_status: bool = False
+    can_edit_tindak_lanjut: bool = False
+    can_change_tindak_lanjut_status: bool = False
+    allowed_matrix_status_changes: List[MatriksStatus] = []
+    allowed_tindak_lanjut_status_changes: List[TindakLanjutStatus] = []
+
 
 # ===== RESPONSE SCHEMAS =====
 
@@ -111,6 +153,10 @@ class MatriksResponse(BaseModel):
     has_file: bool
     has_temuan_rekomendasi: bool = Field(default=False)
     completion_percentage: int = Field(ge=0, le=100)
+
+    status: MatriksStatus
+    is_editable: bool = Field(description="Apakah user bisa edit matriks ini")
+    user_permissions: UserPermissions = Field(description="Detail permissions untuk user")
     
     # Enriched surat tugas data
     surat_tugas_info: SuratTugasBasicInfo

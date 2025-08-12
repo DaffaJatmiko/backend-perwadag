@@ -1,6 +1,6 @@
 """Repository untuk surat tugas."""
 
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple, Dict, Any, Union
 from datetime import datetime, date
 from sqlalchemy import select, and_, or_, func, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,34 +19,49 @@ class SuratTugasRepository:
     
     # ===== CREATE OPERATIONS =====
     
-    async def create(self, surat_tugas_data: SuratTugasCreate, file_path: str) -> SuratTugas:
-        """Create surat tugas baru dengan assignment fields."""
+    async def create(self, surat_tugas_data: Union[SuratTugasCreate, dict], file_path: str) -> SuratTugas:
+        """
+        Create surat tugas baru dengan assignment fields.
+        
+        Args:
+            surat_tugas_data: SuratTugasCreate object atau dict (yang sudah include pimpinan_inspektorat_id)
+            file_path: Path file surat tugas
+        """
+        
+        # Convert to dict if it's SuratTugasCreate object
+        if isinstance(surat_tugas_data, SuratTugasCreate):
+            data_dict = surat_tugas_data.dict()
+        else:
+            data_dict = surat_tugas_data
         
         # Get perwadag info
-        perwadag = await self.get_perwadag_by_id(surat_tugas_data.user_perwadag_id)
+        perwadag = await self.get_perwadag_by_id(data_dict['user_perwadag_id'])
         if not perwadag:
             raise ValueError("Perwadag not found")
         
         # Convert anggota_tim_ids list to string
         anggota_tim_ids_str = None
-        if surat_tugas_data.anggota_tim_ids:
-            anggota_tim_ids_str = ','.join(surat_tugas_data.anggota_tim_ids)
+        if data_dict.get('anggota_tim_ids'):
+            if isinstance(data_dict['anggota_tim_ids'], list):
+                anggota_tim_ids_str = ','.join(data_dict['anggota_tim_ids'])
+            else:
+                anggota_tim_ids_str = data_dict['anggota_tim_ids']
         
         # Create surat tugas instance dengan field baru
         surat_tugas = SuratTugas(
-            user_perwadag_id=surat_tugas_data.user_perwadag_id,
+            user_perwadag_id=data_dict['user_perwadag_id'],
             nama_perwadag=perwadag.nama,
             inspektorat=perwadag.inspektorat,
-            tanggal_evaluasi_mulai=surat_tugas_data.tanggal_evaluasi_mulai,
-            tanggal_evaluasi_selesai=surat_tugas_data.tanggal_evaluasi_selesai,
-            no_surat=surat_tugas_data.no_surat,
+            tanggal_evaluasi_mulai=data_dict['tanggal_evaluasi_mulai'],
+            tanggal_evaluasi_selesai=data_dict['tanggal_evaluasi_selesai'],
+            no_surat=data_dict['no_surat'],
             
             # GUNAKAN field ID baru:
-            pengedali_mutu_id=surat_tugas_data.pengedali_mutu_id,
-            pengendali_teknis_id=surat_tugas_data.pengendali_teknis_id,
-            ketua_tim_id=surat_tugas_data.ketua_tim_id,
+            pengedali_mutu_id=data_dict['pengedali_mutu_id'],
+            pengendali_teknis_id=data_dict['pengendali_teknis_id'],
+            ketua_tim_id=data_dict['ketua_tim_id'],
             anggota_tim_ids=anggota_tim_ids_str,
-            pimpinan_inspektorat_id=surat_tugas_data.pimpinan_inspektorat_id,
+            pimpinan_inspektorat_id=data_dict['pimpinan_inspektorat_id'],  # Ini sekarang ada dari service
             
             file_surat_tugas=file_path
         )
@@ -214,13 +229,25 @@ class SuratTugasRepository:
     # ===== UPDATE OPERATIONS =====
     
     async def update(self, surat_tugas_id: str, surat_tugas_data: SuratTugasUpdate) -> Optional[SuratTugas]:
-        """Update surat tugas."""
+        """Update surat tugas - FIXED to match create method."""
         surat_tugas = await self.get_by_id(surat_tugas_id)
         if not surat_tugas:
             return None
         
         # Update fields
         update_data = surat_tugas_data.model_dump(exclude_unset=True)
+        
+        # 🔥 TAMBAHAN: Convert anggota_tim_ids SAMA SEPERTI CREATE METHOD
+        if 'anggota_tim_ids' in update_data:
+            anggota_tim_list = update_data['anggota_tim_ids']
+            if anggota_tim_list is not None:
+                if anggota_tim_list:  # Non-empty list
+                    # SAMA seperti create: ','.join(surat_tugas_data.anggota_tim_ids)
+                    update_data['anggota_tim_ids'] = ','.join(anggota_tim_list)
+                else:  # Empty list
+                    update_data['anggota_tim_ids'] = None
+        
+        # Apply updates
         for key, value in update_data.items():
             setattr(surat_tugas, key, value)
         
@@ -286,7 +313,7 @@ class SuratTugasRepository:
         query = select(User).where(
             and_(
                 User.id == user_id,
-                User.role == UserRole.PERWADAG,
+                # User.role == UserRole.PERWADAG,
                 User.is_active == True,
                 User.deleted_at.is_(None)
             )

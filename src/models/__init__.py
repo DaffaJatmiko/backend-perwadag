@@ -11,7 +11,7 @@ from .user import User, PasswordResetToken
 # Enums
 from .evaluasi_enums import (
     MeetingType, StatusEvaluasi, FileType, 
-    EvaluasiStage, FileCategory
+    EvaluasiStage, FileCategory, MatriksStatus, TindakLanjutStatus
 )
 
 # Core evaluasi models
@@ -57,6 +57,8 @@ __all__ = [
     "FileType",
     "EvaluasiStage", 
     "FileCategory",
+    "MatriksStatus",
+    "TindakLanjutStatus",
     
     # Existing evaluasi models
     "SuratTugas",

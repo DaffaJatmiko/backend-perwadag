@@ -1,6 +1,6 @@
 """Schemas untuk surat tugas."""
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime, date
 
@@ -37,7 +37,6 @@ class SuratTugasCreate(BaseModel):
     pengendali_teknis_id: Optional[str] = Field(None, description="ID user pengendali teknis")
     ketua_tim_id: Optional[str] = Field(None, description="ID user ketua tim")
     anggota_tim_ids: Optional[List[str]] = Field(None, description="List ID anggota tim")
-    pimpinan_inspektorat_id: Optional[str] = Field(None, description="ID pimpinan inspektorat")
     
     @field_validator('tanggal_evaluasi_selesai')
     @classmethod

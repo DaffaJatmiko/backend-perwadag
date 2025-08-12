@@ -2,8 +2,8 @@
 """Enhanced schemas untuk meetings dalam proses evaluasi."""
 
 from typing import List, Optional, Dict, Any, Union
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-from datetime import datetime, date
+from pydantic import BaseModel, Field, field_validator, ConfigDict, field_serializer
+from datetime import datetime, date, timezone
 
 from src.models.evaluasi_enums import MeetingType
 from src.schemas.common import SuccessResponse
@@ -25,7 +25,7 @@ class MeetingCreate(BaseModel):
 class MeetingUpdate(BaseModel):
     """Schema untuk update meeting."""
     
-    tanggal_meeting: Optional[date] = None
+    tanggal_meeting: Optional[datetime] = None
     link_zoom: Optional[str] = Field(None, max_length=500)
     link_daftar_hadir: Optional[str] = Field(None, max_length=500)
     
@@ -38,6 +38,23 @@ class MeetingUpdate(BaseModel):
             if link_zoom and not link_zoom.startswith(('http://', 'https://')):
                 raise ValueError("Zoom link must be a valid URL")
         return link_zoom
+
+    @field_validator('tanggal_meeting')
+    @classmethod
+    def convert_to_utc(cls, dt: Optional[datetime]) -> Optional[datetime]:
+        """Convert timezone-aware datetime to UTC for database storage."""
+        if dt is None:
+            return None
+        
+        # If datetime has timezone info, convert to UTC
+        if dt.tzinfo is not None:
+            # Convert to UTC and return as naive datetime (for DB storage)
+            return dt.astimezone(timezone.utc).replace(tzinfo=None)
+        
+        # If no timezone info, assume it's already UTC
+        return dt
+
+
     
     @field_validator('link_daftar_hadir')
     @classmethod
@@ -116,7 +133,7 @@ class MeetingResponse(BaseModel):
     id: str
     surat_tugas_id: str
     meeting_type: MeetingType
-    tanggal_meeting: Optional[date] = None
+    tanggal_meeting: Optional[datetime] = None
     link_zoom: Optional[str] = None
     link_daftar_hadir: Optional[str] = None
     
@@ -148,6 +165,20 @@ class MeetingResponse(BaseModel):
     updated_at: Optional[datetime] = None
     created_by: Optional[str] = None
     updated_by: Optional[str] = None
+
+    @field_serializer('tanggal_meeting')
+    def serialize_datetime_as_utc(self, dt: Optional[datetime]) -> Optional[str]:
+        """Ensure datetime is returned as UTC ISO string."""
+        if dt is None:
+            return None
+        
+        # Ensure UTC timezone
+        if dt.tzinfo is None:
+            utc_dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            utc_dt = dt.astimezone(timezone.utc)
+        
+        return utc_dt.isoformat()
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -171,3 +202,4 @@ class MeetingFileDeleteResponse(SuccessResponse):
     meeting_id: str
     deleted_file: str
     remaining_files: int
+

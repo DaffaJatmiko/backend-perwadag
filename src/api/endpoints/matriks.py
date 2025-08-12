@@ -10,7 +10,7 @@ from src.repositories.matriks import MatriksRepository
 from src.services.matriks import MatriksService
 from src.schemas.matriks import (
     MatriksUpdate, MatriksResponse,
-    MatriksFileUploadResponse, MatriksListResponse
+    MatriksFileUploadResponse, MatriksListResponse, MatriksStatusUpdate, TindakLanjutStatus, TindakLanjutStatusUpdate, TindakLanjutUpdate
 )
 from src.schemas.filters import MatriksFilterParams
 from src.auth.evaluasi_permissions import (
@@ -59,7 +59,8 @@ async def get_all_matriks(
         filters=filters,
         user_role=filter_scope["user_role"],
         user_inspektorat=filter_scope.get("user_inspektorat"),
-        user_id=filter_scope.get("user_id")
+        user_id=filter_scope.get("user_id"),
+        current_user=current_user
     )
 
 
@@ -70,7 +71,7 @@ async def get_matriks(
     service: MatriksService = Depends(get_matriks_service)
 ):
     """Get matriks by ID dengan enriched data."""
-    return await service.get_matriks_or_404(matriks_id)
+    return await service.get_matriks_or_404(matriks_id, current_user)
 
 
 @router.get("/surat-tugas/{surat_tugas_id}", response_model=MatriksResponse)
@@ -80,7 +81,7 @@ async def get_matriks_by_surat_tugas(
     service: MatriksService = Depends(get_matriks_service)
 ):
     """Get matriks by surat tugas ID."""
-    result = await service.get_by_surat_tugas_id(surat_tugas_id)
+    result = await service.get_by_surat_tugas_id(surat_tugas_id, current_user)
     if not result:
         raise HTTPException(status_code=404, detail="Matriks not found")
     return result
@@ -157,8 +158,93 @@ async def update_matriks(
     4. User B: PUT dengan `expected_temuan_version: 0` → **Error 409** (version sudah 1)
     5. User B: GET ulang → dapat `temuan_version: 1` → PUT dengan version 1 → **Success**
     """
-    return await service.update_matriks(matriks_id, update_data, current_user["id"])
+    return await service.update_matriks(
+        matriks_id, 
+        update_data, 
+        current_user['id'],
+        current_user  
+    )
 
+@router.put("/{matriks_id}/status", response_model=MatriksResponse)
+async def update_matrix_status(
+    matriks_id: str,
+    status_data: MatriksStatusUpdate,
+    current_user: dict = Depends(require_evaluasi_read_access()),
+    service: MatriksService = Depends(get_matriks_service)
+):
+    """
+    Update status flow matriks evaluasi.
+    
+    **Status Flow:**
+    - **DRAFTING** → **CHECKING**: Anggota tim selesai input temuan
+    - **CHECKING** → **VALIDATING**: Ketua tim approve
+    - **CHECKING** → **DRAFTING**: Ketua tim reject untuk revisi
+    - **VALIDATING** → **FINISHED**: Pengendali teknis final approve  
+    - **VALIDATING** → **DRAFTING**: Pengendali teknis reject untuk revisi
+    
+    **Permissions:**
+    - **DRAFTING**: Ketua tim bisa ubah ke CHECKING
+    - **CHECKING**: Ketua tim bisa ubah ke DRAFTING/VALIDATING
+    - **VALIDATING**: Pengendali teknis bisa ubah ke DRAFTING/FINISHED
+    - **FINISHED**: Hanya admin/pengedali mutu untuk emergency
+    """
+    return await service.update_matrix_status(matriks_id, status_data, current_user)
+
+
+@router.put("/{matriks_id}/tindak-lanjut/{item_id}", response_model=MatriksResponse) 
+async def update_tindak_lanjut(
+    matriks_id: str,
+    item_id: int,
+    tindak_lanjut_data: TindakLanjutUpdate,
+    current_user: dict = Depends(require_evaluasi_read_access()),
+    service: MatriksService = Depends(get_matriks_service)
+):
+    """
+    Update konten tindak lanjut untuk item temuan tertentu.
+    
+    **Requirements:**
+    - Matriks harus status FINISHED
+    - User sesuai dengan permission berdasarkan status tindak lanjut
+    
+    **Fields yang bisa diupdate:**
+    - **tindak_lanjut**: Narasi tindak lanjut (oleh Perwadag)
+    - **dokumen_pendukung_tindak_lanjut**: Link dokumen (oleh Perwadag)  
+    - **catatan_evaluator**: Catatan ketua tim (oleh Ketua Tim)
+    
+    **Permissions berdasarkan status:**
+    - **DRAFTING**: Hanya Perwadag yang bisa edit
+    - **CHECKING**: Hanya Ketua Tim yang bisa edit catatan_evaluator
+    - **VALIDATING**: Tidak ada yang bisa edit konten
+    - **FINISHED**: Hanya admin/pengedali mutu untuk emergency
+    """
+    return await service.update_tindak_lanjut(matriks_id, item_id, tindak_lanjut_data, current_user)
+
+
+@router.put("/{matriks_id}/tindak-lanjut/{item_id}/status", response_model=MatriksResponse)
+async def update_tindak_lanjut_status(
+    matriks_id: str,
+    item_id: int,
+    status_data: TindakLanjutStatusUpdate,
+    current_user: dict = Depends(require_evaluasi_read_access()),
+    service: MatriksService = Depends(get_matriks_service)
+):
+    """
+    Update status tindak lanjut untuk item temuan tertentu.
+    
+    **Status Flow:**
+    - **DRAFTING** → **CHECKING**: Perwadag submit tindak lanjut
+    - **CHECKING** → **VALIDATING**: Ketua tim approve  
+    - **CHECKING** → **DRAFTING**: Ketua tim reject untuk revisi
+    - **VALIDATING** → **FINISHED**: Pengendali teknis final approve
+    - **VALIDATING** → **DRAFTING**: Pengendali teknis reject untuk revisi
+    
+    **Permissions:**
+    - **DRAFTING**: Perwadag bisa ubah ke CHECKING
+    - **CHECKING**: Ketua tim bisa ubah ke DRAFTING/VALIDATING
+    - **VALIDATING**: Pengendali teknis bisa ubah ke DRAFTING/FINISHED
+    - **FINISHED**: Hanya admin/pengedali mutu untuk emergency
+    """
+    return await service.update_tindak_lanjut_status(matriks_id, item_id, status_data, current_user)
 
 @router.post("/{matriks_id}/upload-file", response_model=MatriksFileUploadResponse)
 async def upload_matriks_file(

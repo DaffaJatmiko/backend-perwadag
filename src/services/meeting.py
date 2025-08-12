@@ -3,7 +3,7 @@
 
 import json
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import HTTPException, status, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import select, and_
@@ -679,3 +679,35 @@ class MeetingService:
             created_by=meeting_data.get('created_by'),
             updated_by=meeting_data.get('updated_by')
         )
+
+    def _convert_datetime_for_storage(self, dt: Optional[datetime]) -> Optional[datetime]:
+        """Convert datetime with timezone to UTC for storage."""
+        if dt is None:
+            return None
+            
+        # If timezone-aware, convert to UTC
+        if dt.tzinfo is not None:
+            return dt.astimezone(pytz.UTC).replace(tzinfo=None)
+        
+        # If naive datetime, assume it's already UTC
+        return dt
+
+    def _format_datetime_for_response(self, utc_dt: Optional[datetime]) -> Optional[datetime]:
+        """Format UTC datetime for API response."""
+        if utc_dt is None:
+            return None
+        
+        # Return UTC datetime with timezone info
+        return utc_dt.replace(tzinfo=pytz.UTC)
+
+    def _ensure_utc_datetime(self, dt: Optional[datetime]) -> Optional[datetime]:
+        """Ensure datetime is in UTC format for consistent response."""
+        if dt is None:
+            return None
+        
+        # If datetime has timezone, convert to UTC 
+        if dt.tzinfo is not None:
+            return dt.astimezone(timezone.utc).replace(tzinfo=None)
+        
+        # If naive datetime, assume it's already UTC
+        return dt

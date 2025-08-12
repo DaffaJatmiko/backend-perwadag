@@ -23,7 +23,7 @@ router = APIRouter()
 admin_required = require_roles(["ADMIN"])
 
 # Dependency for admin and inspektorat endpoints
-admin_or_inspektorat = require_roles(["ADMIN", "INSPEKTORAT"])
+admin_or_inspektorat = require_roles(["ADMIN", "INSPEKTORAT","PIMPINAN"])  
 
 
 async def get_user_service(session: AsyncSession = Depends(get_db)) -> UserService:

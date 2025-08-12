@@ -3,8 +3,10 @@
 from typing import Optional, List, Dict, Any
 from sqlmodel import Field, SQLModel
 import uuid as uuid_lib
+from sqlalchemy import Column, Enum as SQLEnum
 
 from src.models.base import BaseModel
+from src.models.evaluasi_enums import MatriksStatus, TindakLanjutStatus
 
 
 class Matriks(BaseModel, SQLModel, table=True):
@@ -39,6 +41,12 @@ class Matriks(BaseModel, SQLModel, table=True):
     temuan_version: int = Field(
         default=0,
         description="Version number untuk conflict detection pada temuan"
+    )
+
+    status: MatriksStatus = Field(
+        default=MatriksStatus.DRAFTING,
+        sa_column=Column(SQLEnum(MatriksStatus, name='matriks_status'), nullable=False, default='DRAFTING'),
+        description="Status flow evaluasi berjenjang"
     )
     
     def is_completed(self) -> bool:
@@ -155,6 +163,64 @@ class Matriks(BaseModel, SQLModel, table=True):
     def clear_temuan_rekomendasi(self) -> None:
         """Clear all kondisi-kriteria-rekomendasi data."""
         self.temuan_rekomendasi = None
+
+    def update_tindak_lanjut_item(
+        self, 
+        item_id: int, 
+        tindak_lanjut: Optional[str] = None,
+        dokumen_pendukung: Optional[str] = None,
+        catatan_evaluator: Optional[str] = None,
+        status_tindak_lanjut: Optional[str] = None
+    ) -> bool:
+        """Update tindak lanjut untuk item tertentu."""
+        items = self.get_temuan_rekomendasi_items()
+        
+        # Find item by ID
+        target_item = None
+        for item in items:
+            if item.get('id') == item_id:
+                target_item = item
+                break
+        
+        if not target_item:
+            return False
+        
+        # Update fields yang di-provide
+        if tindak_lanjut is not None:
+            target_item['tindak_lanjut'] = tindak_lanjut
+        if dokumen_pendukung is not None:
+            target_item['dokumen_pendukung_tindak_lanjut'] = dokumen_pendukung
+        if catatan_evaluator is not None:
+            target_item['catatan_evaluator'] = catatan_evaluator
+        if status_tindak_lanjut is not None:
+            target_item['status_tindak_lanjut'] = status_tindak_lanjut
+        
+        # Save back to JSON
+        import json
+        from datetime import datetime
+        
+        self.temuan_rekomendasi = json.dumps({
+            'items': items,
+            'total': len(items),
+            'last_updated': datetime.utcnow().isoformat(),
+            'structure_version': '3-field-with-followup'
+        }, ensure_ascii=False)
+        
+        self.temuan_version += 1
+        return True
+    
+    def get_tindak_lanjut_item(self, item_id: int) -> Optional[Dict[str, Any]]:
+        """Get tindak lanjut data untuk item tertentu."""
+        items = self.get_temuan_rekomendasi_items()
+        for item in items:
+            if item.get('id') == item_id:
+                return {
+                    'tindak_lanjut': item.get('tindak_lanjut'),
+                    'dokumen_pendukung_tindak_lanjut': item.get('dokumen_pendukung_tindak_lanjut'),
+                    'catatan_evaluator': item.get('catatan_evaluator'),
+                    'status_tindak_lanjut': item.get('status_tindak_lanjut')
+                }
+        return None
     
     def __repr__(self) -> str:
         return f"<Matriks(surat_tugas_id={self.surat_tugas_id}, completed={self.is_completed()})>"

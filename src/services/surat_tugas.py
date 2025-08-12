@@ -62,20 +62,21 @@ class SuratTugasService:
         Create surat tugas baru dengan auto-generate semua related records.
         
         Workflow:
-        1. Validate perwadag exists
-        2. Validate nomor surat unique
-        3. Upload file surat tugas
-        4. Create surat tugas record
-        5. AUTO-GENERATE 6 related records:
-           - 1x surat_pemberitahuan (empty)
-           - 3x meetings (entry, konfirmasi, exit - all empty)
-           - 1x matriks (empty)
-           - 1x laporan_hasil (empty)
-           - 1x kuisioner (empty)
-        6. Return complete response
+        1. Validate perwadag exists dan ambil inspektorat-nya
+        2. AUTO-DETECT pimpinan inspektorat berdasarkan inspektorat perwadag
+        3. Validate nomor surat unique
+        4. Upload file surat tugas
+        5. Create surat tugas record (dengan pimpinan_inspektorat_id otomatis)
+        6. AUTO-GENERATE 6 related records:
+        - 1x surat_pemberitahuan (empty)
+        - 3x meetings (entry, konfirmasi, exit - all empty)
+        - 1x matriks (empty)
+        - 1x laporan_hasil (empty)
+        - 1x kuisioner (empty)
+        7. Return complete response
         """
         
-        # 1. Validate perwadag exists
+        # 1. Validate perwadag exists DAN ambil inspektorat-nya
         perwadag = await self.surat_tugas_repo.get_perwadag_by_id(surat_tugas_data.user_perwadag_id)
         if not perwadag:
             raise HTTPException(
@@ -83,36 +84,63 @@ class SuratTugasService:
                 detail="Perwadag tidak ditemukan atau tidak aktif"
             )
         
-        # 2. Validate nomor surat unique
+        # 1.1 Pastikan perwadag punya inspektorat
+        inspektorat_perwadag = perwadag.inspektorat
+        if not inspektorat_perwadag:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User perwadag tidak memiliki inspektorat yang terdaftar"
+            )
+        
+        # 2. AUTO-DETECT PIMPINAN INSPEKTORAT
+        # Cari user dengan role "PIMPINAN" di inspektorat yang sama dengan perwadag
+        pimpinan_inspektorat = await self.user_repo.get_pimpinan_by_inspektorat(inspektorat_perwadag)
+        if not pimpinan_inspektorat:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Tidak ada pimpinan ditemukan di {inspektorat_perwadag}. "
+                    f"Silakan pastikan ada user dengan role PIMPINAN di inspektorat tersebut."
+            )
+        
+        # 2.1 Set pimpinan_inspektorat_id ke dalam surat_tugas_data
+        # PENTING: Tambahkan field ini ke data sebelum create
+        surat_tugas_data_with_pimpinan = surat_tugas_data.dict()
+        surat_tugas_data_with_pimpinan['pimpinan_inspektorat_id'] = pimpinan_inspektorat.id
+        
+        # 3. Validate nomor surat unique
         if await self.surat_tugas_repo.no_surat_exists(surat_tugas_data.no_surat):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Nomor surat sudah ada"
             )
         
-        # 3. Upload file surat tugas
+        # 4. Upload file surat tugas
         file_path = await evaluasi_file_manager.upload_surat_tugas_file(
             file, 
             surat_tugas_data.user_perwadag_id
         )
         
         try:
-            # 4. Create surat tugas record
-            surat_tugas = await self.surat_tugas_repo.create(surat_tugas_data, file_path)
+            # 5. Create surat tugas record DENGAN pimpinan_inspektorat_id otomatis
+            # Gunakan data yang sudah include pimpinan_inspektorat_id
+            surat_tugas = await self.surat_tugas_repo.create(surat_tugas_data_with_pimpinan, file_path)
             
-            # 5. AUTO-GENERATE related records
+            # 6. AUTO-GENERATE related records
             auto_generated_records = await self._auto_generate_related_records(surat_tugas.id)
             
-            # 6. Build response
+            # 7. Build response
             surat_tugas_response = await self._build_surat_tugas_response(surat_tugas)
             
             return SuratTugasCreateResponse(
                 success=True,
-                message="Surat tugas berhasil dibuat dengan auto-generate records",
+                message=f"Surat tugas berhasil dibuat dengan pimpinan inspektorat otomatis: {pimpinan_inspektorat.nama}",
                 surat_tugas=surat_tugas_response,
                 auto_generated_records=auto_generated_records,
                 data={
                     "surat_tugas_id": surat_tugas.id,
+                    "pimpinan_inspektorat_id": pimpinan_inspektorat.id,
+                    "pimpinan_inspektorat_nama": pimpinan_inspektorat.nama,
+                    "inspektorat": inspektorat_perwadag,
                     "auto_generated_count": len(auto_generated_records),
                     "auto_generated_records": auto_generated_records
                 }

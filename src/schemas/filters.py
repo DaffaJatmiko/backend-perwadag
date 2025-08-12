@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 from datetime import date
 
 from src.models.enums import UserRole
-from src.models.evaluasi_enums import MeetingType
+from src.models.evaluasi_enums import MeetingType, MatriksStatus
 from src.models.penilaian_enums import ProfilRisiko
 
 
@@ -336,6 +336,7 @@ class MatriksFilterParams(BaseModel):
     inspektorat: Optional[str] = Field(None, description="Filter by inspektorat")
     user_perwadag_id: Optional[str] = Field(None, description="Filter by specific perwadag")
     tahun_evaluasi: Optional[int] = Field(None, ge=2020, le=2030, description="Filter by tahun evaluasi")
+    status: Optional[MatriksStatus] = Field(None, description="Filter by matriks status")
     
     # Specific filters
     surat_tugas_id: Optional[str] = Field(None, description="Filter by surat tugas")

@@ -539,3 +539,59 @@ class UserRepository:
         
         result = await self.session.execute(query)
         return result.scalars().all()
+
+    async def count_pimpinan_in_inspektorat(self, inspektorat: str, exclude_user_id: Optional[str] = None) -> int:
+        """Count berapa pimpinan yang ada di inspektorat tertentu."""
+        query = select(func.count(User.id)).where(
+            and_(
+                User.role == UserRole.PIMPINAN,
+                User.inspektorat == inspektorat,
+                User.is_active == True,
+                User.deleted_at.is_(None)
+            )
+        )
+        
+        if exclude_user_id:
+            query = query.where(User.id != exclude_user_id)
+        
+        result = await self.session.execute(query)
+        return result.scalar() or 0
+
+    async def get_pimpinan_by_inspektorat(self, inspektorat: str) -> Optional[User]:
+        """
+        Cari user dengan role PIMPINAN di inspektorat tertentu.
+        
+        Args:
+            inspektorat: Nama inspektorat (contoh: "Inspektorat 1")
+        
+        Returns:
+            User dengan role PIMPINAN atau None jika tidak ditemukan
+            
+        Raises:
+            HTTPException jika ada lebih dari 1 pimpinan (data inconsistency)
+        """
+        query = select(User).where(
+            and_(
+                User.role == "PIMPINAN",
+                User.inspektorat == inspektorat,
+                User.is_active == True,
+                User.deleted_at.is_(None)
+            )
+        )
+        
+        result = await self.session.execute(query)
+        pimpinan_list = result.scalars().all()
+        
+        if len(pimpinan_list) == 0:
+            return None
+        elif len(pimpinan_list) == 1:
+            return pimpinan_list[0]
+        else:
+            # Edge case: Ada lebih dari 1 pimpinan di inspektorat yang sama
+            # Ini seharusnya tidak terjadi di data yang benar
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Ditemukan {len(pimpinan_list)} pimpinan di {inspektorat}. "
+                    f"Seharusnya hanya ada 1 pimpinan per inspektorat. "
+                    f"Silakan hubungi administrator untuk memperbaiki data."
+            )
