@@ -141,14 +141,11 @@ def _get_admin_permissions_by_status(matrix_status: MatriksStatus) -> UserPermis
     elif matrix_status == MatriksStatus.FINISHED:
         return UserPermissions(
             can_edit_temuan=False,  # ❌ LOCKED! Admin juga tidak bisa edit temuan
-            can_change_matrix_status=True,  # Emergency reopen (admin special privilege)
-            can_edit_tindak_lanjut=True,  # Emergency tindak lanjut edit
-            can_change_tindak_lanjut_status=True,  # Emergency status change
-            allowed_matrix_status_changes=[MatriksStatus.VALIDATING],  # Emergency reopen
-            allowed_tindak_lanjut_status_changes=[
-                TindakLanjutStatus.DRAFTING, TindakLanjutStatus.CHECKING, 
-                TindakLanjutStatus.VALIDATING, TindakLanjutStatus.FINISHED
-            ]
+            can_change_matrix_status=False,  # Emergency reopen (admin special privilege)
+            can_edit_tindak_lanjut=False,  # Emergency tindak lanjut edit
+            can_change_tindak_lanjut_status=False,  # Emergency status change
+            allowed_matrix_status_changes=[],  # Emergency reopen
+            allowed_tindak_lanjut_status_changes=[]
         )
     
     return UserPermissions()  # Default no permissions
@@ -320,9 +317,9 @@ def get_tindak_lanjut_permissions(
             )
         elif global_tindak_lanjut_status == TindakLanjutStatus.FINISHED:
             return UserPermissions(
-                can_edit_tindak_lanjut=True,  # Emergency edit
-                can_change_tindak_lanjut_status=True,  # Emergency reopen
-                allowed_tindak_lanjut_status_changes=[TindakLanjutStatus.VALIDATING]  # Emergency reopen
+                can_edit_tindak_lanjut=False,  # Emergency edit
+                can_change_tindak_lanjut_status=False,  # Emergency reopen
+                allowed_tindak_lanjut_status_changes=[]  # Emergency reopen
             )
     
     # ===== REGULAR USERS =====
