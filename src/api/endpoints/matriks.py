@@ -190,6 +190,20 @@ async def update_matrix_status(
     """
     return await service.update_matrix_status(matriks_id, status_data, current_user)
 
+@router.put("/{matriks_id}/tindak-lanjut/status", response_model=MatriksResponse)
+async def update_global_tindak_lanjut_status(
+    matriks_id: str,
+    status_data: TindakLanjutStatusUpdate,
+    current_user: dict = Depends(require_evaluasi_read_access()),
+    service: MatriksService = Depends(get_matriks_service)
+):
+    """
+    Update GLOBAL tindak lanjut status for entire matrix.
+    
+    **Single Button**: One status change affects all items.
+    **Workflow**: DRAFTING → CHECKING → VALIDATING → FINISHED
+    """
+    return await service.update_global_tindak_lanjut_status(matriks_id, status_data, current_user)
 
 @router.put("/{matriks_id}/tindak-lanjut/{item_id}", response_model=MatriksResponse) 
 async def update_tindak_lanjut(
@@ -220,20 +234,6 @@ async def update_tindak_lanjut(
     return await service.update_tindak_lanjut_content(matriks_id, item_id, tindak_lanjut_data, current_user)
 
 
-@router.put("/{matriks_id}/tindak-lanjut/status", response_model=MatriksResponse)
-async def update_global_tindak_lanjut_status(
-    matriks_id: str,
-    status_data: TindakLanjutStatusUpdate,
-    current_user: dict = Depends(require_evaluasi_read_access()),
-    service: MatriksService = Depends(get_matriks_service)
-):
-    """
-    Update GLOBAL tindak lanjut status for entire matrix.
-    
-    **Single Button**: One status change affects all items.
-    **Workflow**: DRAFTING → CHECKING → VALIDATING → FINISHED
-    """
-    return await service.update_global_tindak_lanjut_status(matriks_id, status_data, current_user)
 
 @router.post("/{matriks_id}/upload-file", response_model=MatriksFileUploadResponse)
 async def upload_matriks_file(

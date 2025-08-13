@@ -22,27 +22,39 @@ def get_user_assignment_role(current_user: Dict, surat_tugas_data: Dict) -> Set[
     user_id = current_user.get('id')
     user_roles = set()
     
+    print(f"🔍 DEBUG get_user_assignment_role:")
+    print(f"   user_id: {user_id}")
+    print(f"   surat_tugas_data keys: {list(surat_tugas_data.keys())}")
+    
     # Check primary role assignments
     if surat_tugas_data.get('user_perwadag_id') == user_id:
         user_roles.add('PERWADAG')
+        print(f"   ✅ Found PERWADAG role")
         
     if surat_tugas_data.get('ketua_tim_id') == user_id:
         user_roles.add('KETUA_TIM')
+        print(f"   ✅ Found KETUA_TIM role")
         
     if surat_tugas_data.get('pengendali_teknis_id') == user_id:
         user_roles.add('PENGENDALI_TEKNIS')
+        print(f"   ✅ Found PENGENDALI_TEKNIS role")
         
     if surat_tugas_data.get('pengedali_mutu_id') == user_id:
         user_roles.add('PENGEDALI_MUTU')
+        print(f"   ✅ Found PENGEDALI_MUTU role")
         
     if surat_tugas_data.get('pimpinan_inspektorat_id') == user_id:
         user_roles.add('PIMPINAN_INSPEKTORAT')
+        print(f"   ✅ Found PIMPINAN_INSPEKTORAT role")
     
     # Check anggota tim (array)
     anggota_tim_ids = surat_tugas_data.get('anggota_tim_ids', [])
+    print(f"   anggota_tim_ids: {anggota_tim_ids}")
     if anggota_tim_ids and user_id in anggota_tim_ids:
         user_roles.add('ANGGOTA_TIM')
+        print(f"   ✅ Found ANGGOTA_TIM role")
     
+    print(f"   🎯 Final user_roles: {user_roles}")
     return user_roles
 
 
@@ -262,6 +274,11 @@ def get_tindak_lanjut_permissions(
     matrix_status: MatriksStatus
 ) -> UserPermissions:
     """Get tindak lanjut permissions berdasarkan GLOBAL status dan assignments."""
+  
+    print(f"🔍 DEBUG get_tindak_lanjut_permissions:")
+    print(f"   global_tindak_lanjut_status: {global_tindak_lanjut_status}")
+    print(f"   matrix_status: {matrix_status}")
+    print(f"   user_role: {current_user.get('role')}")
     
     # Prerequisite: Matrix harus FINISHED dulu
     if matrix_status != MatriksStatus.FINISHED:
@@ -312,12 +329,17 @@ def get_tindak_lanjut_permissions(
     permissions_list = []
     
     for role in assignment_roles:
+        print(f"   🔍 Checking permissions for role: {role}")
         role_perms = _get_tindak_lanjut_role_permissions(role, global_tindak_lanjut_status)
+        print(f"   📋 Role {role} permissions: {role_perms}")
         permissions_list.append(role_perms)
     
     if permissions_list:
-        return _combine_permissions(permissions_list)
+        final_perms = _combine_permissions(permissions_list)
+        print(f"   🎯 Final combined permissions: {final_perms}")
+        return final_perms
     
+    print(f"   ❌ No permissions found")
     return UserPermissions()
 
 
