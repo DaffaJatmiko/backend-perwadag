@@ -1,7 +1,7 @@
 # ===== src/api/endpoints/matriks.py =====
 """Enhanced API endpoints untuk matriks evaluasi."""
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Path
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Path, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,9 +22,19 @@ router = APIRouter()
 
 
 async def get_matriks_service(session: AsyncSession = Depends(get_db)) -> MatriksService:
-    """Dependency untuk MatriksService."""
+    """Dependency untuk MatriksService dengan semua repo yang dibutuhkan."""
+    from src.repositories.surat_tugas import SuratTugasRepository
+    from src.repositories.meeting import MeetingRepository
+    
     matriks_repo = MatriksRepository(session)
-    return MatriksService(matriks_repo)
+    surat_tugas_repo = SuratTugasRepository(session)
+    meeting_repo = MeetingRepository(session)
+    
+    return MatriksService(
+        matriks_repo=matriks_repo,
+        surat_tugas_repo=surat_tugas_repo,
+        meeting_repo=meeting_repo
+    )
 
 
 @router.get("/", response_model=MatriksListResponse)
@@ -296,3 +306,44 @@ async def view_matriks_file(
     **Use Case**: Preview file tanpa download untuk supported file types
     """
     return await service.download_file(matriks_id, download_type="view")
+
+@router.get("/{matriks_id}/pdf", response_class=Response)
+async def generate_matriks_pdf(
+    matriks_id: str,
+    current_user: dict = Depends(require_evaluasi_read_access()),
+    service: MatriksService = Depends(get_matriks_service)
+):
+    """
+    Generate PDF matriks evaluasi.
+    
+    **Response**: Binary PDF data untuk download atau preview
+    **Access Control**: Sama dengan read access - semua yang terlibat di evaluasi
+    """
+    try:
+        # Generate PDF
+        pdf_bytes = await service.generate_pdf(matriks_id, current_user)
+        
+        # Get matriks info for filename
+        matriks = await service.get_matriks_or_404(matriks_id, current_user)
+        
+        # Create filename
+        nama_perwadag = matriks.nama_perwadag.replace(' ', '_').replace('/', '_')
+        tahun = matriks.tahun_evaluasi
+        filename = f"matriks_evaluasi_{nama_perwadag}_{tahun}.pdf"
+        
+        # Return PDF response
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Gagal generate PDF: {str(e)}"
+        )

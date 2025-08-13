@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any
 from fastapi import HTTPException, status, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import select, and_ 
+from src.services.pdf_generator import MatriksPDFGenerator
 
 from src.repositories.matriks import MatriksRepository
 from src.schemas.matriks import (
@@ -28,13 +29,22 @@ from src.services.matriks_permissions import (
     get_matrix_permissions, get_tindak_lanjut_permissions, 
     should_hide_temuan_for_perwadag, get_user_assignment_role
 )
+from src.repositories.surat_tugas import SuratTugasRepository
+from src.repositories.meeting import MeetingRepository
 
 
 class MatriksService:
     """Enhanced service untuk matriks operations."""
     
-    def __init__(self, matriks_repo: MatriksRepository):
+    def __init__(
+        self, 
+        matriks_repo: MatriksRepository,
+        surat_tugas_repo: Optional[SuratTugasRepository] = None,
+        meeting_repo: Optional[MeetingRepository] = None
+    ):
         self.matriks_repo = matriks_repo
+        self.surat_tugas_repo = surat_tugas_repo
+        self.meeting_repo = meeting_repo
 
     async def get_all_matriks(
         self,
@@ -587,6 +597,154 @@ class MatriksService:
         await self.matriks_repo.session.commit()
         
         return await self.get_matriks_or_404(matrix_id, current_user)
+
+    async def generate_pdf(
+        self, 
+        matriks_id: str, 
+        current_user: Dict[str, Any]
+    ) -> bytes:
+        """Generate PDF untuk matriks evaluasi."""
+        
+        # Get matriks data
+        matriks = await self.matriks_repo.get_by_id(matriks_id)
+        if not matriks:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Matriks tidak ditemukan"
+            )
+        
+        # Get surat tugas data
+        if not self.surat_tugas_repo:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Surat tugas repository tidak tersedia"
+            )
+        
+        surat_tugas = await self.surat_tugas_repo.get_by_id(matriks.surat_tugas_id)
+        if not surat_tugas:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Surat tugas tidak ditemukan"
+            )
+        
+        # Simple permission check - Admin atau yang terlibat di surat tugas ini
+        user_roles = get_user_assignment_role(current_user, surat_tugas.__dict__)
+        is_admin = current_user.get('role') == 'ADMIN'
+        
+        if not (is_admin or user_roles):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tidak ada akses untuk generate PDF matriks ini"
+            )
+        
+        # Get exit meeting data for date (optional)
+        exit_meeting = None
+        if self.meeting_repo:
+            try:
+                exit_meeting = await self.meeting_repo.get_by_surat_tugas_and_type(
+                    matriks.surat_tugas_id,
+                    "EXIT"
+                )
+            except Exception:
+                # Exit meeting belum ada, tidak masalah
+                pass
+        
+        # Prepare data for PDF
+        matriks_data = {
+            'id': matriks.id,
+            'temuan_rekomendasi_summary': matriks.get_temuan_rekomendasi_summary(),
+            'status': matriks.status.value,
+            'created_at': matriks.created_at,
+            'updated_at': matriks.updated_at
+        }
+        
+        surat_tugas_data = {
+            'nama_perwadag': surat_tugas.nama_perwadag,
+            'tanggal_evaluasi_mulai': surat_tugas.tanggal_evaluasi_mulai,
+            'tanggal_evaluasi_selesai': surat_tugas.tanggal_evaluasi_selesai,
+            'no_surat': surat_tugas.no_surat,
+            'assignment_info': await self._get_assignment_info_dict(surat_tugas)
+        }
+        
+        exit_meeting_data = None
+        if exit_meeting:
+            exit_meeting_data = {
+                'tanggal_meeting': exit_meeting.tanggal_meeting,
+                'tempat': getattr(exit_meeting, 'tempat', '')
+            }
+        
+        # Generate PDF
+        pdf_generator = MatriksPDFGenerator()
+        pdf_bytes = pdf_generator.generate_matriks_pdf(
+            matriks_data,
+            surat_tugas_data, 
+            exit_meeting_data
+        )
+        
+        return pdf_bytes
+
+    async def _get_assignment_info_dict(self, surat_tugas) -> Dict[str, Any]:
+        """Helper untuk get assignment info as dict."""
+        assignment_info = {}
+        
+        # Helper function untuk create user dict
+        def create_user_dict(user) -> Dict[str, Any]:
+            return {
+                "id": user.id,
+                "nama": user.nama,
+                "username": user.username,
+                "jabatan": getattr(user, 'jabatan', ''),
+                "role": user.role.value if hasattr(user.role, 'value') else str(user.role),
+                "inspektorat": user.inspektorat,
+            }
+        
+        # Get pengedali mutu
+        if surat_tugas.pengedali_mutu_id:
+            query = select(User).where(User.id == surat_tugas.pengedali_mutu_id)
+            result = await self.matriks_repo.session.execute(query)
+            user = result.scalar_one_or_none()
+            if user:
+                assignment_info["pengedali_mutu"] = create_user_dict(user)
+        
+        # Get pengendali teknis
+        if surat_tugas.pengendali_teknis_id:
+            query = select(User).where(User.id == surat_tugas.pengendali_teknis_id)
+            result = await self.matriks_repo.session.execute(query)
+            user = result.scalar_one_or_none()
+            if user:
+                assignment_info["pengendali_teknis"] = create_user_dict(user)
+        
+        # Get ketua tim
+        if surat_tugas.ketua_tim_id:
+            query = select(User).where(User.id == surat_tugas.ketua_tim_id)
+            result = await self.matriks_repo.session.execute(query)
+            user = result.scalar_one_or_none()
+            if user:
+                assignment_info["ketua_tim"] = create_user_dict(user)
+        
+        # Get pimpinan inspektorat
+        if surat_tugas.pimpinan_inspektorat_id:
+            query = select(User).where(User.id == surat_tugas.pimpinan_inspektorat_id)
+            result = await self.matriks_repo.session.execute(query)
+            user = result.scalar_one_or_none()
+            if user:
+                assignment_info["pimpinan_inspektorat"] = create_user_dict(user)
+        
+        # Get anggota tim
+        anggota_tim_list = []
+        if hasattr(surat_tugas, 'get_anggota_tim_list'):
+            anggota_tim_ids = surat_tugas.get_anggota_tim_list()
+            if anggota_tim_ids:
+                for user_id in anggota_tim_ids:
+                    query = select(User).where(User.id == user_id)
+                    result = await self.matriks_repo.session.execute(query)
+                    user = result.scalar_one_or_none()
+                    if user:
+                        anggota_tim_list.append(create_user_dict(user))
+        
+        assignment_info["anggota_tim"] = anggota_tim_list
+        
+        return assignment_info
     
     async def _build_enriched_response(
         self, 

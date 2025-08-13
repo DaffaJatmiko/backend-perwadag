@@ -88,31 +88,32 @@ class EvaluationDateValidator:
             "status_message": f"Periode evaluasi masih berlaku sampai {tanggal_evaluasi_selesai.strftime('%d %B %Y')}" if is_editable else f"Periode evaluasi sudah berakhir pada {tanggal_evaluasi_selesai.strftime('%d %B %Y')}"
         }
 
-    def _is_deadline_passed_wib(tanggal_evaluasi_selesai: date) -> bool:
-        """
-        Check apakah deadline sudah terlewat berdasarkan jam 23:59 WIB.
+def _is_deadline_passed_wib(tanggal_evaluasi_selesai: date) -> bool:
+    """
+    Check apakah deadline sudah terlewat berdasarkan jam 23:59 WIB.
+    
+    Args:
+        tanggal_evaluasi_selesai: Tanggal deadline dari database
         
-        Args:
-            tanggal_evaluasi_selesai: Tanggal deadline dari database
-            
-        Returns:
-            bool: True jika sudah terlewat, False jika masih bisa
-        """
-        from datetime import datetime, time, timedelta
-        
-        # Step 1: Create deadline jam 23:59:59 WIB
-        deadline_wib = datetime.combine(
-            tanggal_evaluasi_selesai,
-            time(23, 59, 59)
-        )
-        
-        # Step 2: Convert ke UTC (WIB = UTC+7)
-        deadline_utc = deadline_wib - timedelta(hours=7)
-        
-        # Step 3: Compare dengan current UTC
-        current_utc = datetime.utcnow()
-        
-        return current_utc > deadline_utc
+    Returns:
+        bool: True jika sudah terlewat, False jika masih bisa
+    """
+    from datetime import datetime, time, timedelta
+    
+    # Step 1: Create deadline jam 23:59:59 WIB
+    deadline_wib = datetime.combine(
+        tanggal_evaluasi_selesai,
+        time(23, 59, 59)
+    )
+    
+    # Step 2: Convert ke UTC (WIB = UTC+7)
+    deadline_utc = deadline_wib - timedelta(hours=7)
+    
+    # Step 3: Compare dengan current UTC
+    current_utc = datetime.utcnow()
+    
+    return current_utc > deadline_utc
+
 
 
 # Convenience functions untuk berbagai modules
