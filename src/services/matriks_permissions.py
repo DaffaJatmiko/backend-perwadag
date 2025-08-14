@@ -215,13 +215,10 @@ def _get_role_permissions_by_status(assignment_role: str, matrix_status: Matriks
             return UserPermissions(
                 can_edit_temuan=False,  # Tidak bisa edit temuan
                 can_change_matrix_status=False,  # Tidak bisa ubah matrix status
-                can_edit_tindak_lanjut=True,  # Bisa edit tindak lanjut
-                can_change_tindak_lanjut_status=True,  # Bisa ubah status tindak lanjut
+                can_edit_tindak_lanjut=False,  # Bisa edit tindak lanjut
+                can_change_tindak_lanjut_status=False,  # Bisa ubah status tindak lanjut
                 allowed_matrix_status_changes=[],
-                allowed_tindak_lanjut_status_changes=[
-                    TindakLanjutStatus.DRAFTING, TindakLanjutStatus.CHECKING,
-                    TindakLanjutStatus.VALIDATING, TindakLanjutStatus.FINISHED
-                ]
+                allowed_tindak_lanjut_status_changes=[]
             )
         else:
             return UserPermissions()
@@ -389,12 +386,9 @@ def _get_tindak_lanjut_role_permissions(
     elif assignment_role == 'PENGEDALI_MUTU':
         # Pengedali mutu bisa emergency access
         return UserPermissions(
-            can_edit_tindak_lanjut=True,
-            can_change_tindak_lanjut_status=True,
-            allowed_tindak_lanjut_status_changes=[
-                TindakLanjutStatus.DRAFTING, TindakLanjutStatus.CHECKING,
-                TindakLanjutStatus.VALIDATING, TindakLanjutStatus.FINISHED
-            ]
+            can_edit_tindak_lanjut=False,
+            can_change_tindak_lanjut_status=False,
+            allowed_tindak_lanjut_status_changes=[]
         )
     
     return UserPermissions()
