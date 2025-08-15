@@ -87,7 +87,8 @@ class SuratTugas(BaseModel, SQLModel, table=True):
     )
     
     # File surat tugas
-    file_surat_tugas: str = Field(
+    file_surat_tugas: Optional[str] = Field(
+        default=None,
         max_length=500,
         description="Path file surat tugas yang diupload"
     )
@@ -109,7 +110,22 @@ class SuratTugas(BaseModel, SQLModel, table=True):
     def tahun_evaluasi(self) -> int:
         """Get tahun evaluasi dari tanggal mulai."""
         return self.tanggal_evaluasi_mulai.year
-    
+
+    def is_completed(self) -> bool:
+        """Check apakah surat tugas sudah completed."""
+        return (
+            self.file_surat_tugas is not None and
+            self.file_surat_tugas.strip() != ""
+        )
+
+    def has_file(self) -> bool:
+        """Check apakah sudah ada file yang diupload."""
+        return self.file_surat_tugas is not None and self.file_surat_tugas.strip() != ""
+
+    def get_completion_percentage(self) -> int:
+        """Get completion percentage (0-100)."""
+        return 100 if self.is_completed() else 0
+        
     @property
     def durasi_evaluasi(self) -> int:
         """Get durasi evaluasi dalam hari."""

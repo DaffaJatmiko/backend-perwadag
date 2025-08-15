@@ -63,16 +63,18 @@ async def create_surat_tugas(
     tanggal_evaluasi_selesai: str = Form(..., description="Tanggal selesai (YYYY-MM-DD)"),
     no_surat: str = Form(..., description="Nomor surat tugas"),
     
-    # UBAH: Jadikan optional
+    # Tim evaluasi - optional
     pengedali_mutu_id: Optional[str] = Form(None, description="ID pengedali mutu"),
     pengendali_teknis_id: Optional[str] = Form(None, description="ID pengendali teknis"),
     ketua_tim_id: Optional[str] = Form(None, description="ID ketua tim"),
     anggota_tim_ids: Optional[str] = Form(None, description="Comma-separated anggota tim IDs"),    
-    file: UploadFile = File(..., description="File surat tugas"),
+    
+    # File optional
+    file: Optional[UploadFile] = File(None, description="File surat tugas (optional)"),
     current_user: dict = Depends(require_surat_tugas_create_access()),
     surat_tugas_service: SuratTugasService = Depends(get_surat_tugas_service)
 ):
-    """Create surat tugas dengan field tim evaluasi optional."""
+    """Create surat tugas dengan file optional dan tim evaluasi optional."""
     
     # Parse dates
     try:
@@ -84,10 +86,27 @@ async def create_surat_tugas(
             detail="Invalid date format. Use YYYY-MM-DD"
         )
     
-    # Parse anggota tim IDs
+    # Validate tanggal
+    if tanggal_selesai < tanggal_mulai:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tanggal selesai evaluasi harus setelah tanggal mulai"
+        )
+    
+    # Parse anggota tim IDs - handle empty string
     anggota_tim_list = None
-    if anggota_tim_ids:
+    if anggota_tim_ids and anggota_tim_ids.strip():
         anggota_tim_list = [uid.strip() for uid in anggota_tim_ids.split(',') if uid.strip()]
+    
+    # Handle empty form fields - convert empty strings to None
+    pengedali_mutu_clean = pengedali_mutu_id if pengedali_mutu_id and pengedali_mutu_id.strip() else None
+    pengendali_teknis_clean = pengendali_teknis_id if pengendali_teknis_id and pengendali_teknis_id.strip() else None
+    ketua_tim_clean = ketua_tim_id if ketua_tim_id and ketua_tim_id.strip() else None
+    
+    # Handle file - jika tidak ada filename maka set None
+    file_to_upload = None
+    if file and hasattr(file, 'filename') and file.filename and file.filename.strip():
+        file_to_upload = file
     
     # Build create data
     surat_tugas_data = SuratTugasCreate(
@@ -95,14 +114,17 @@ async def create_surat_tugas(
         tanggal_evaluasi_mulai=tanggal_mulai,
         tanggal_evaluasi_selesai=tanggal_selesai,
         no_surat=no_surat,
-        pengedali_mutu_id=pengedali_mutu_id,
-        pengendali_teknis_id=pengendali_teknis_id,
-        ketua_tim_id=ketua_tim_id,
+        pengedali_mutu_id=pengedali_mutu_clean,
+        pengendali_teknis_id=pengendali_teknis_clean,
+        ketua_tim_id=ketua_tim_clean,
         anggota_tim_ids=anggota_tim_list
     )
     
+    # PERBAIKAN: Urutan parameter sesuai dengan signature service
     return await surat_tugas_service.create_surat_tugas(
-        surat_tugas_data, file, current_user["id"]
+        surat_tugas_data, 
+        current_user["id"],
+        file_to_upload  # Bisa None
     )
 # ===== READ OPERATIONS =====
 

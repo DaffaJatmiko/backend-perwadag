@@ -55,8 +55,8 @@ class SuratTugasService:
     async def create_surat_tugas(
         self, 
         surat_tugas_data: SuratTugasCreate,
-        file: UploadFile,
-        current_user_id: str
+        current_user_id: str,
+        file: Optional[UploadFile] = None
     ) -> SuratTugasCreateResponse:
         """
         Create surat tugas baru dengan auto-generate semua related records.
@@ -65,7 +65,7 @@ class SuratTugasService:
         1. Validate perwadag exists dan ambil inspektorat-nya
         2. AUTO-DETECT pimpinan inspektorat berdasarkan inspektorat perwadag
         3. Validate nomor surat unique
-        4. Upload file surat tugas
+        4. Upload file surat tugas (OPTIONAL)
         5. Create surat tugas record (dengan pimpinan_inspektorat_id otomatis)
         6. AUTO-GENERATE 6 related records:
         - 1x surat_pemberitahuan (empty)
@@ -114,11 +114,13 @@ class SuratTugasService:
                 detail="Nomor surat sudah ada"
             )
         
-        # 4. Upload file surat tugas
-        file_path = await evaluasi_file_manager.upload_surat_tugas_file(
-            file, 
-            surat_tugas_data.user_perwadag_id
-        )
+        # 4. Upload file surat tugas (UBAH: Handle optional)
+        file_path = None
+        if file and file.filename:
+            file_path = await evaluasi_file_manager.upload_surat_tugas_file(
+                file, 
+                surat_tugas_data.user_perwadag_id
+            )
         
         try:
             # 5. Create surat tugas record DENGAN pimpinan_inspektorat_id otomatis
@@ -142,13 +144,15 @@ class SuratTugasService:
                     "pimpinan_inspektorat_nama": pimpinan_inspektorat.nama,
                     "inspektorat": inspektorat_perwadag,
                     "auto_generated_count": len(auto_generated_records),
-                    "auto_generated_records": auto_generated_records
+                    "auto_generated_records": auto_generated_records,
+                    "file_uploaded": file_path is not None  # TAMBAH: Info apakah file diupload
                 }
             )
             
         except Exception as e:
-            # Cleanup uploaded file if database operations fail
-            evaluasi_file_manager.delete_file(file_path)
+            # Cleanup uploaded file if database operations fail (UBAH: Hanya jika ada file)
+            if file_path:
+                evaluasi_file_manager.delete_file(file_path)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Gagal membuat surat tugas: {str(e)}"
@@ -666,7 +670,7 @@ class SuratTugasService:
                     konfirmasi_meeting_completed = True
                 elif meeting.meeting_type == MeetingType.EXIT and meeting.is_completed():
                     exit_meeting_completed = True
-            
+
             matriks_completed = matriks.is_completed() if matriks else False
             laporan_completed = laporan_hasil.is_completed() if laporan_hasil else False
             kuisioner_completed = kuisioner.is_completed() if kuisioner else False
@@ -809,9 +813,10 @@ class SuratTugasService:
                 inspektorat=surat_tugas.inspektorat
             )
         
-        # Build file information
+        # Build file information (UBAH: Handle file bisa None)
         file_urls = None
         file_metadata = None
+        file_surat_tugas_url = ""  # UBAH: Default empty string jika tidak ada file
         
         if surat_tugas.file_surat_tugas:
             file_urls = FileUrls(
@@ -834,6 +839,8 @@ class SuratTugasService:
                     uploaded_by=surat_tugas.updated_by,
                     is_viewable=file_info.get('content_type', '').startswith(('image/', 'application/pdf'))
                 )
+            
+            file_surat_tugas_url = evaluasi_file_manager.get_file_url(surat_tugas.file_surat_tugas)
 
         assignment_info = await self._get_assignment_info(surat_tugas)
 
@@ -850,9 +857,14 @@ class SuratTugasService:
 
             assignment_info=assignment_info,
             
-            # TAMBAHAN BARU:
+            # File information
             file_urls=file_urls,
             file_metadata=file_metadata,
+            
+            # TAMBAH: Status information
+            is_completed=surat_tugas.is_completed(),
+            has_file=surat_tugas.has_file(),
+            completion_percentage=surat_tugas.get_completion_percentage(),
             
             tahun_evaluasi=surat_tugas.tahun_evaluasi,
             durasi_evaluasi=surat_tugas.durasi_evaluasi,
@@ -860,7 +872,7 @@ class SuratTugasService:
             evaluation_status=surat_tugas.get_evaluation_status(),
             progress=progress,
             perwadag_info=perwadag_info,
-            file_surat_tugas_url=evaluasi_file_manager.get_file_url(surat_tugas.file_surat_tugas),
+            file_surat_tugas_url=file_surat_tugas_url,  # UBAH: bisa empty string
             created_at=surat_tugas.created_at,
             updated_at=surat_tugas.updated_at,
             created_by=surat_tugas.created_by,
@@ -934,9 +946,12 @@ class SuratTugasService:
                     assignment_info.anggota_tim.append(create_user_summary(user))
         
         return assignment_info
-    
+        
     async def _calculate_progress(self, surat_tugas_id: str) -> EvaluasiProgress:
         """Calculate progress evaluasi berdasarkan completion status semua related records."""
+        
+        # TAMBAH: Get surat tugas untuk check completion
+        surat_tugas = await self.surat_tugas_repo.get_by_id(surat_tugas_id)
         
         # Get all related data dengan error handling
         surat_pemberitahuan = await self.surat_pemberitahuan_repo.get_by_surat_tugas_id(surat_tugas_id)
@@ -946,6 +961,7 @@ class SuratTugasService:
         kuisioner = await self.kuisioner_repo.get_by_surat_tugas_id(surat_tugas_id)
         
         # Check completion status
+        surat_tugas_completed = surat_tugas.is_completed() if surat_tugas else False  # TAMBAH
         surat_pemberitahuan_completed = surat_pemberitahuan.is_completed() if surat_pemberitahuan else False
         
         # Check meetings completion
@@ -965,8 +981,9 @@ class SuratTugasService:
         laporan_completed = laporan_hasil.is_completed() if laporan_hasil else False
         kuisioner_completed = kuisioner.is_completed() if kuisioner else False
         
-        # Calculate overall percentage
+        # Calculate overall percentage (UBAH: tambah surat_tugas_completed dan ubah total jadi 8)
         completed_stages = sum([
+            surat_tugas_completed,              # TAMBAH
             surat_pemberitahuan_completed,
             entry_meeting_completed,
             konfirmasi_meeting_completed,
@@ -976,9 +993,10 @@ class SuratTugasService:
             kuisioner_completed
         ])
         
-        overall_percentage = int((completed_stages / 7) * 100)
+        overall_percentage = int((completed_stages / 8) * 100)  # UBAH: dari 7 ke 8
         
         return EvaluasiProgress(
+            surat_tugas_completed=surat_tugas_completed,  # TAMBAH
             surat_pemberitahuan_completed=surat_pemberitahuan_completed,
             entry_meeting_completed=entry_meeting_completed,
             konfirmasi_meeting_completed=konfirmasi_meeting_completed,

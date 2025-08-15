@@ -170,7 +170,10 @@ class SuratTugasResponse(BaseModel):
     tanggal_evaluasi_selesai: date
     no_surat: str
     assignment_info: AssignmentInfo
-    file_surat_tugas: str
+    file_surat_tugas: Optional[str]
+    is_completed: bool
+    has_file: bool
+    completion_percentage: int = Field(ge=0, le=100)
 
     file_urls: Optional[FileUrls] = None
     file_metadata: Optional[FileMetadata] = None

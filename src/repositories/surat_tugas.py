@@ -19,13 +19,15 @@ class SuratTugasRepository:
     
     # ===== CREATE OPERATIONS =====
     
-    async def create(self, surat_tugas_data: Union[SuratTugasCreate, dict], file_path: str) -> SuratTugas:
+# src/repositories/surat_tugas.py - Method create yang sudah diperbaiki
+
+    async def create(self, surat_tugas_data: Union[SuratTugasCreate, dict], file_path: Optional[str] = None) -> SuratTugas:
         """
-        Create surat tugas baru dengan assignment fields.
+        Create surat tugas baru dengan file optional.
         
         Args:
             surat_tugas_data: SuratTugasCreate object atau dict (yang sudah include pimpinan_inspektorat_id)
-            file_path: Path file surat tugas
+            file_path: Path file surat tugas (OPTIONAL - bisa None)
         """
         
         # Convert to dict if it's SuratTugasCreate object
@@ -57,13 +59,14 @@ class SuratTugasRepository:
             no_surat=data_dict['no_surat'],
             
             # GUNAKAN field ID baru:
-            pengedali_mutu_id=data_dict['pengedali_mutu_id'],
-            pengendali_teknis_id=data_dict['pengendali_teknis_id'],
-            ketua_tim_id=data_dict['ketua_tim_id'],
+            pengedali_mutu_id=data_dict.get('pengedali_mutu_id'),
+            pengendali_teknis_id=data_dict.get('pengendali_teknis_id'),
+            ketua_tim_id=data_dict.get('ketua_tim_id'),
             anggota_tim_ids=anggota_tim_ids_str,
-            pimpinan_inspektorat_id=data_dict['pimpinan_inspektorat_id'],  # Ini sekarang ada dari service
+            pimpinan_inspektorat_id=data_dict.get('pimpinan_inspektorat_id'),  # Ini sekarang ada dari service
             
-            file_surat_tugas=file_path
+            # UBAH: file_surat_tugas sekarang optional - bisa None
+            file_surat_tugas=file_path  # Bisa None
         )
         
         self.session.add(surat_tugas)
