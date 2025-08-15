@@ -164,19 +164,24 @@ Buat file `.env` dengan konfigurasi berikut:
 # Database
 DATABASE_URL=postgresql://username:password@localhost/sielangmerah_db
 
-# JWT
-SECRET_KEY=your-secret-key-here
+# JWT & Security
+JWT_SECRET_KEY=your-secret-key-here
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
+
+# Enhanced JWT Security
+ENABLE_JWT_ENCRYPTION=true
+JWT_ENCRYPTION_SALT="your_unique_salt_minimum_32_chars_production"
+JWT_ENCRYPTION_ITERATIONS=100000
 
 # CORS
 CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 
 # Email (untuk password reset)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
+EMAIL_SMTP_HOST=smtp.gmail.com
+EMAIL_SMTP_PORT=587
+EMAIL_SMTP_USERNAME=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
 
 # File Upload
@@ -248,7 +253,7 @@ backend/
 │   │   │   └── files.py         # File upload/download
 │   │   └── router.py            # Main API router
 │   ├── auth/
-│   │   ├── jwt.py              # JWT utilities
+│   │   ├── jwt.py              # JWT utilities with encryption
 │   │   └── permissions.py       # Role-based permissions
 │   ├── core/
 │   │   ├── config.py           # Application configuration
@@ -256,6 +261,8 @@ backend/
 │   ├── middleware/
 │   │   ├── error_handler.py    # Global error handling
 │   │   ├── rate_limiting.py    # Rate limiting
+│   │   ├── security_headers.py # Security headers (CSP, HSTS, etc)
+│   │   ├── activity_logger.py  # Activity logging
 │   │   └── logging.py          # Request logging
 │   ├── models/                 # SQLAlchemy models
 │   │   ├── user.py            # User model
@@ -522,17 +529,51 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 
 ## 🔒 Security Features
 
+### Core Security
 - **Password Hashing** - bcrypt dengan salt
-- **JWT Security** - Secure token generation dan validation
-- **CORS Configuration** - Configurable CORS origins
 - **Input Validation** - Pydantic schema validation
 - **SQL Injection Protection** - SQLAlchemy ORM
+- **CORS Configuration** - Configurable CORS origins
 - **Rate Limiting** - Prevent abuse dan DDoS
-- **🆕 reCAPTCHA v3 Bot Protection** - Invisible CAPTCHA dengan score-based validation (threshold: 0.5)
+
+### 🆕 Enhanced JWT Security
+- **JWT Payload Encryption** - Sensitive data (username, nama, email) terenkripsi dalam token
+- **Configurable Encryption** - Salt dan iterations dapat dikonfigurasi per environment
+- **Clean Cookie Storage** - Token disimpan tanpa Bearer prefix untuk efisiensi
+- **Backward Compatibility** - Support format lama dan baru
+
+### 🛡️ Security Headers
+- **X-Frame-Options: DENY** - Clickjacking protection
+- **X-Content-Type-Options: nosniff** - MIME sniffing protection
+- **X-XSS-Protection** - Cross-site scripting protection
+- **Strict-Transport-Security** - Force HTTPS (production)
+- **Content-Security-Policy** - Comprehensive CSP rules
+- **Permissions-Policy** - Browser feature restrictions
+
+### 🍪 Secure Cookie Configuration
+- **HttpOnly** - Prevent XSS attacks
+- **Secure** - HTTPS only in production
+- **SameSite: Strict** - Maximum CSRF protection
+- **Proper Expiry** - Configurable token lifetimes
+
+### 🤖 Bot Protection
+- **reCAPTCHA v3** - Invisible CAPTCHA dengan score-based validation (threshold: 0.5)
   - Automatic bot detection tanpa mengganggu user experience
   - Real-time scoring dari Google (0.0 = bot, 1.0 = human)
   - Comprehensive logging untuk monitoring dan debugging
   - Graceful fallback jika service tidak tersedia
+
+### Configuration
+```bash
+# JWT Encryption Settings
+ENABLE_JWT_ENCRYPTION=true
+JWT_ENCRYPTION_SALT="your_unique_salt_minimum_32_chars_production"
+JWT_ENCRYPTION_ITERATIONS=100000
+
+# Security Settings
+MAX_LOGIN_ATTEMPTS_PER_IP=10
+IP_BLOCK_DURATION_MINUTES=60
+```
 
 ## 🤝 Contributing
 
