@@ -137,27 +137,9 @@ async def login(
         return result
         
     except HTTPException as e:
-        # 🔥 TAMBAH: Log failed login attempt
-        try:
-            from src.core.config import settings
-            base_url = settings.API_BASE_URL.rstrip('/')
-            full_url = f"{base_url}{request.url.path}"
-            
-            log_repo = LogActivityRepository(session)
-            log_data = LogActivityCreate(
-                user_id=None,  # No user for failed login
-                method="POST", 
-                url=full_url,
-                activity="Failed login attempt",
-                date=datetime.utcnow(),
-                user_name=f"Failed login: {login_data.nama}",
-                ip_address=ip_address,
-                response_status=e.status_code
-            )
-            await log_repo.create(log_data)
-            await session.commit()
-        except Exception as log_error:
-            logger.error(f"Failed to log failed login: {log_error}")
+        # Failed login attempts are not logged to avoid user_id=None issues
+        # Only successful logins with valid user_id are logged
+        logger.warning(f"Failed login attempt for username: {login_data.username} from IP: {ip_address}")
         
         # Re-raise original exception
         raise e

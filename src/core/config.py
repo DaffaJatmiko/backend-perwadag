@@ -123,6 +123,13 @@ class Settings(BaseSettings):
     RECAPTCHA_THRESHOLD: float = 0.5  # Score threshold (0.0-1.0, higher = more human-like)
     RECAPTCHA_ENABLED: bool = True
     RECAPTCHA_TIMEOUT_SECONDS: int = 10
+    
+    # Enhanced Security Settings
+    ENABLE_JWT_ENCRYPTION: bool = True
+    JWT_ENCRYPTION_SALT: str = "perwadag_default_salt_change_in_production"
+    JWT_ENCRYPTION_ITERATIONS: int = 100000
+    MAX_LOGIN_ATTEMPTS_PER_IP: int = 10
+    IP_BLOCK_DURATION_MINUTES: int = 60
 
     @field_validator("DATABASE_URI", mode="before")
     def assemble_db_connection(cls, v: Optional[str], info: Dict[str, Any]) -> Any:

@@ -13,6 +13,7 @@ from src.core.redis import init_redis
 from src.api.router import api_router
 from src.middleware.error_handler import add_error_handlers
 from src.middleware.rate_limiting import add_rate_limiting
+from src.middleware.security_headers import add_security_headers
 from src.utils.logging import setup_logging
 from src.middleware.activity_logger import ActivityLoggingMiddleware
 
@@ -127,9 +128,13 @@ def create_application() -> FastAPI:
         expose_headers=["*"],
     )
 
+    # Add security headers middleware (first for all responses)
+    add_security_headers(app)
+    
     # Add rate limiting middleware
-    # add_rate_limiting(app)
+    add_rate_limiting(app)
 
+    # Add activity logging middleware (last to capture all requests)
     app.add_middleware(ActivityLoggingMiddleware)
 
     # Di dalam create_application()

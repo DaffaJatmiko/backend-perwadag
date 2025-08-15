@@ -23,25 +23,25 @@ def set_auth_cookies(
     if access_token_expires_minutes is None:
         access_token_expires_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
     
-    # Set access token cookie
+    # Set access token cookie (without Bearer prefix for cleaner storage)
     response.set_cookie(
         key="access_token",
-        value=f"Bearer {access_token}",
+        value=access_token,  # Store token directly without Bearer prefix
         max_age=access_token_expires_minutes * 60,  # Convert to seconds
         httponly=True,  # Prevent XSS attacks
         secure=not settings.DEBUG,    # Only send over HTTPS in production (HTTP allowed in dev)
-        samesite="lax" if settings.DEBUG else "strict",  # Less strict in development
+        samesite="strict",  # Always strict for maximum CSRF protection
         path="/"
     )
     
     # Set refresh token cookie (longer expiry)
     response.set_cookie(
         key="refresh_token", 
-        value=f"Bearer {refresh_token}",
+        value=refresh_token,  # Store token directly without Bearer prefix
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,  # Convert to seconds
         httponly=True,  # Prevent XSS attacks
         secure=not settings.DEBUG,    # Only send over HTTPS in production (HTTP allowed in dev)
-        samesite="lax" if settings.DEBUG else "strict",  # Less strict in development
+        samesite="strict",  # Always strict for maximum CSRF protection
         path="/"
     )
 
@@ -60,7 +60,7 @@ def clear_auth_cookies(response: Response) -> None:
         max_age=0,
         httponly=True,
         secure=not settings.DEBUG,
-        samesite="lax" if settings.DEBUG else "strict",
+        samesite="strict",  
         path="/"
     )
     
@@ -71,7 +71,7 @@ def clear_auth_cookies(response: Response) -> None:
         max_age=0,
         httponly=True,
         secure=not settings.DEBUG,
-        samesite="lax" if settings.DEBUG else "strict",
+        samesite="strict", 
         path="/"
     )
 
@@ -88,8 +88,11 @@ def get_token_from_cookie(request: Request, cookie_name: str) -> Optional[str]:
         Token string without Bearer prefix, or None if not found
     """
     cookie_value = request.cookies.get(cookie_name)
-    if cookie_value and cookie_value.startswith("Bearer "):
-        return cookie_value[7:]  # Remove "Bearer " prefix
+    if cookie_value:
+        # Handle both old format (with Bearer) and new format (without Bearer)
+        if cookie_value.startswith("Bearer "):
+            return cookie_value[7:]  # Remove "Bearer " prefix (backward compatibility)
+        return cookie_value  # Direct token value
     return None
 
 
