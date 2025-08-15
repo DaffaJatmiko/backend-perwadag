@@ -55,7 +55,7 @@ class EmailService:
             # Send email
             with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
                 server.starttls()
-                server.login(self.smtp_username, self.smtp_password)
+                # server.login(self.smtp_username, self.smtp_password)
                 server.send_message(message)
             
             logger.info(f"Email berhasil dikirim ke {mask_email(to_email)}")
