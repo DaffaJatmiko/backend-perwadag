@@ -658,14 +658,14 @@ class SuratTugasService:
             entry_meeting_completed = False
             konfirmasi_meeting_completed = False
             exit_meeting_completed = False
-            
+
             for meeting in meetings:
-                if meeting.meeting_type == MeetingType.ENTRY:
-                    entry_meeting_completed = meeting.is_completed()
-                elif meeting.meeting_type == MeetingType.KONFIRMASI:
-                    konfirmasi_meeting_completed = meeting.is_completed()
-                elif meeting.meeting_type == MeetingType.EXIT:
-                    exit_meeting_completed = meeting.is_completed()
+                if meeting.meeting_type == MeetingType.ENTRY and meeting.is_completed():
+                    entry_meeting_completed = True
+                elif meeting.meeting_type == MeetingType.KONFIRMASI and meeting.is_completed():
+                    konfirmasi_meeting_completed = True
+                elif meeting.meeting_type == MeetingType.EXIT and meeting.is_completed():
+                    exit_meeting_completed = True
             
             matriks_completed = matriks.is_completed() if matriks else False
             laporan_completed = laporan_hasil.is_completed() if laporan_hasil else False

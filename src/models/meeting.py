@@ -99,8 +99,11 @@ class Meeting(BaseModel, SQLModel, table=True):
         return utc_dt.isoformat()
 
     def is_completed(self) -> bool:
-        """Check apakah meeting sudah completed (minimal ada tanggal)."""
-        return self.tanggal_meeting is not None
+        """Check apakah meeting sudah completed (ada tanggal, files, dan links)."""
+        has_date = self.tanggal_meeting is not None
+        has_files = self.has_files()
+        has_links = self.has_zoom_link() or self.has_daftar_hadir_link()
+        return has_date and has_files and has_links
     
     def has_files(self) -> bool:
         """Check apakah sudah ada file yang diupload."""

@@ -340,12 +340,26 @@ class SuratTugasRepository:
         # Build base query berdasarkan role
         query = select(SuratTugas).where(SuratTugas.deleted_at.is_(None))
         
-        # Apply role-based filtering (sama seperti get_all_filtered)
-        if user_role == "PERWADAG":
+        # Apply role-based filtering dengan assignment-based untuk INSPEKTORAT
+        if user_role == "ADMIN":
+            # Admin bisa lihat semua - no additional filtering
+            pass
+        elif user_role == "PERWADAG":
+            # Perwadag hanya bisa lihat evaluasi milik sendiri
             query = query.where(SuratTugas.user_perwadag_id == user_id)
-        elif user_role == "INSPEKTORAT" and user_inspektorat:
+        elif user_role == "INSPEKTORAT" and user_id:
+            # FIXED: Assignment-based filtering (konsisten dengan module lain)
+            assignment_conditions = or_(
+                SuratTugas.ketua_tim_id == user_id,
+                SuratTugas.pengendali_teknis_id == user_id,
+                SuratTugas.pengedali_mutu_id == user_id,
+                SuratTugas.pimpinan_inspektorat_id == user_id,
+                SuratTugas.anggota_tim_ids.like(f"%{user_id}%")
+            )
+            query = query.where(assignment_conditions)
+        elif user_role == "PIMPINAN" and user_inspektorat:
+            # Pimpinan bisa lihat semua di inspektoratnya
             query = query.where(SuratTugas.inspektorat == user_inspektorat)
-        # Admin bisa lihat semua
         
         # Apply year filter jika ada (sama seperti get_all_filtered)
         if year:
