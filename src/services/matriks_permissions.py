@@ -134,7 +134,7 @@ def _get_admin_permissions_by_status(matrix_status: MatriksStatus) -> UserPermis
             can_change_matrix_status=True,  # Admin bisa final approve seperti pengendali teknis
             can_edit_tindak_lanjut=False,  # Belum waktunya
             can_change_tindak_lanjut_status=False,
-            allowed_matrix_status_changes=[MatriksStatus.DRAFTING, MatriksStatus.FINISHED],  # Follow pengendali teknis flow
+            allowed_matrix_status_changes=[MatriksStatus.DRAFTING, MatriksStatus.APPROVING],  # Follow pengendali teknis flow
             allowed_tindak_lanjut_status_changes=[]
         )
         
