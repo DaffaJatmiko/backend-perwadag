@@ -360,9 +360,9 @@ class AuthService:
                 if success:
                     logger.info(f"Token ({token_type}) blacklisted for {remaining_seconds} seconds for user {user_id}")
             
-            # 🔥 TAMBAHAN: Invalidate SEMUA tokens user (access + refresh)
-            await redis_mark_role_changed(user_id, ttl_seconds=86400)
-            logger.info(f"All tokens invalidated for user {user_id}")
+            # Note: Only blacklist current token, don't mark role as changed
+            # Role change marking should only happen when role actually changes
+            logger.info(f"Token {token_type} invalidated for user {user_id}")
             
             # ✅ CLEAR COOKIES
             clear_auth_cookies(response)
@@ -391,17 +391,11 @@ class AuthService:
                 return MessageResponse(message="User berhasil di-force logout")
             else:
                 logger.error(f"Failed to force logout user {user_id}")
-                return MessageResponse(
-                    message="Gagal memproses force logout",
-                    success=False
-                )
+                return MessageResponse(message="Failed to force logout user")
                 
         except Exception as e:
-            logger.error(f"Error forcing logout for user {user_id}: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Gagal memproses force logout"
-            )
+            logger.error(f"Error during force logout: {e}")
+            return MessageResponse(message="Failed to force logout user")
     
     async def get_current_user_info(self, user_id: str) -> UserResponse:
         """Get current user information."""
