@@ -19,6 +19,28 @@ class MatriksPDFGenerator:
         self.page_width, self.page_height = landscape(A4)
         self.styles = getSampleStyleSheet()
         self._setup_custom_styles()
+
+    def _format_date_indonesia(self, date_obj) -> str:
+        """Format tanggal ke format Indonesia: 15 Agustus 2025"""
+        if not date_obj:
+            return "-"
+            
+        try:
+            # Konversi string ke date object jika perlu
+            if isinstance(date_obj, str):
+                date_obj = datetime.fromisoformat(date_obj.replace('Z', '+00:00')).date()
+            
+            # Array nama bulan Indonesia
+            months = [
+                '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+            ]
+            
+            month_name = months[date_obj.month]
+            return f"{date_obj.day} {month_name} {date_obj.year}"
+            
+        except Exception:
+            return str(date_obj) if date_obj else "-"
     
     def _setup_custom_styles(self):
         """Setup custom styles untuk PDF landscape."""
@@ -77,8 +99,8 @@ class MatriksPDFGenerator:
             buffer,
             pagesize=landscape(A4),
             rightMargin=1.5*cm,
-            leftMargin=1.5*cm,
-            topMargin=2*cm,
+            leftMargin=2.5*cm,
+            topMargin=1.5*cm,
             bottomMargin=2*cm
         )
         
@@ -120,7 +142,8 @@ class MatriksPDFGenerator:
             ]
         ]
         
-        header_table = Table(header_data, colWidths=[12*cm, 12*cm])
+        # OPTIMIZED: Perbesar column widths untuk mengisi ruang
+        header_table = Table(header_data, colWidths=[12*cm, 13*cm])  # Total 28cm
         header_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('ALIGN', (0, 0), (0, -1), 'LEFT'),
@@ -149,26 +172,21 @@ class MatriksPDFGenerator:
         periode_selesai = surat_tugas_data.get('tanggal_evaluasi_selesai', '')
         no_surat = surat_tugas_data.get('no_surat', '') or '-'
         
-        # Format periode
+        # Format periode dengan format Indonesia
         periode_text = "-"
         if periode_mulai and periode_selesai:
             try:
-                if isinstance(periode_mulai, str):
-                    periode_mulai = datetime.fromisoformat(periode_mulai.replace('Z', '+00:00')).date()
-                if isinstance(periode_selesai, str):
-                    periode_selesai = datetime.fromisoformat(periode_selesai.replace('Z', '+00:00')).date()
-                periode_text = f"{periode_mulai.strftime('%d/%m/%Y')} - {periode_selesai.strftime('%d/%m/%Y')}"
+                tanggal_mulai_formatted = self._format_date_indonesia(periode_mulai)
+                tanggal_selesai_formatted = self._format_date_indonesia(periode_selesai)
+                periode_text = f"{tanggal_mulai_formatted} - {tanggal_selesai_formatted}"
             except:
                 periode_text = f"{periode_mulai} - {periode_selesai}" if periode_mulai and periode_selesai else "-"
-        
-        # Exit briefing date
+
+        # Exit briefing date dengan format Indonesia
         exit_date = "-"
         if exit_meeting_data and exit_meeting_data.get('tanggal_meeting'):
             try:
-                exit_date_obj = exit_meeting_data['tanggal_meeting']
-                if isinstance(exit_date_obj, str):
-                    exit_date_obj = datetime.fromisoformat(exit_date_obj.replace('Z', '+00:00')).date()
-                exit_date = exit_date_obj.strftime('%d/%m/%Y')
+                exit_date = self._format_date_indonesia(exit_meeting_data['tanggal_meeting'])
             except:
                 exit_date = str(exit_meeting_data.get('tanggal_meeting', '')) or "-"
         
@@ -180,7 +198,8 @@ class MatriksPDFGenerator:
             ['Exit Briefing Tanggal', ':', exit_date]
         ]
         
-        info_table = Table(info_data, colWidths=[5*cm, 0.5*cm, 15*cm])
+        # OPTIMIZED: Perbesar column widths untuk mengisi ruang
+        info_table = Table(info_data, colWidths=[5*cm, 0.5*cm, 19.5*cm])  # Total 28cm
         info_table.setStyle(TableStyle([
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -226,8 +245,8 @@ class MatriksPDFGenerator:
                 empty_cell = Paragraph("&nbsp;<br/>&nbsp;<br/>&nbsp;", ParagraphStyle(name='EmptyCell', fontSize=8))
                 table_data.append([str(i), empty_cell, empty_cell, empty_cell])
         
-        # Column widths untuk landscape (total ~25cm)
-        col_widths = [2*cm, 7*cm, 7*cm, 8*cm]
+        # OPTIMIZED: Perbesar column widths untuk mengisi ruang - Total ~28cm
+        col_widths = [1.5*cm, 7.5*cm, 7.5*cm, 8.5*cm]
         
         # Create table
         main_table = Table(table_data, colWidths=col_widths, repeatRows=1)
@@ -268,16 +287,23 @@ class MatriksPDFGenerator:
         # Get assignment info
         assignment_info = surat_tugas_data.get('assignment_info', {})
         
-        # Extract names dengan fallback ke placeholder
+        # Extract names dan jabatan dengan fallback ke placeholder
         inspektur_name = "................................"
+        inspektur_jabatan = "Inspektur"  # default fallback
         pengedali_mutu_name = "................................"
         pengedali_teknis_name = "................................"
         ketua_tim_name = "................................"
-        
+
         if assignment_info.get('pimpinan_inspektorat'):
-            name = assignment_info['pimpinan_inspektorat'].get('nama', '')
+            pimpinan_data = assignment_info['pimpinan_inspektorat']
+            name = pimpinan_data.get('nama', '')
             if name and name != '-':
                 inspektur_name = name
+            
+            # Ambil jabatan dari user pimpinan inspektorat
+            jabatan = pimpinan_data.get('jabatan', '')
+            if jabatan and jabatan != '-':
+                inspektur_jabatan = jabatan
         
         if assignment_info.get('pengedali_mutu'):
             name = assignment_info['pengedali_mutu'].get('nama', '')
@@ -294,23 +320,20 @@ class MatriksPDFGenerator:
             if name and name != '-':
                 ketua_tim_name = name
         
-        # Tanggal Jakarta hari ini
+        # Tanggal Jakarta hari ini dengan format yang konsisten
         try:
             jakarta_tz = ZoneInfo('Asia/Jakarta')
             today = datetime.now(jakarta_tz).date()
         except:
             today = datetime.now().date()
-        
-        months = [
-            '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-        ]
-        month_name = months[today.month]
-        location_date = f"Jakarta, {today.day} {month_name} {today.year}"
+
+        # Gunakan helper function untuk konsistensi
+        formatted_today = self._format_date_indonesia(today)
+        location_date = f"Jakarta, {formatted_today}"
         
         # ===== TABEL UTAMA DENGAN ROW STRUCTURE YANG BENAR =====
         
-        # Buat tabel untuk kolom kanan (tim evaluasi) dulu dengan Paragraph untuk wrapping
+        # OPTIMIZED: Perbesar column widths untuk tim evaluasi
         nama_tim_paragraphs = [
             Paragraph(f"({pengedali_mutu_name})", ParagraphStyle(
                 name='NamaTim', fontSize=10, fontName='Helvetica', alignment=TA_CENTER, leading=12)),
@@ -320,7 +343,7 @@ class MatriksPDFGenerator:
                 name='NamaTim', fontSize=10, fontName='Helvetica', alignment=TA_CENTER, leading=12))
         ]
         
-        nama_tim_table = Table([nama_tim_paragraphs], colWidths=[6*cm, 6*cm, 6*cm])
+        nama_tim_table = Table([nama_tim_paragraphs], colWidths=[7*cm, 7*cm, 7*cm])  # Total 21cm
         nama_tim_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('LEFTPADDING', (0, 0), (-1, -1), 2),
@@ -330,7 +353,7 @@ class MatriksPDFGenerator:
         ]))
         
         jabatan_tim_table = Table([["Pengendali Mutu", "Pengendali Teknis", "Ketua Tim"]], 
-                                colWidths=[6*cm, 6*cm, 6*cm])
+                                colWidths=[7*cm, 7*cm, 7*cm])  # Total 21cm
         jabatan_tim_table.setStyle(TableStyle([
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
@@ -355,8 +378,8 @@ class MatriksPDFGenerator:
             # Row 1: Header
             ["Menyetujui,", location_date],
             
-            # Row 2: Title
-            ["Inspektur,", "Tim Evaluasi,"],
+            # Row 2: Title - jabatan dinamis
+            [f"{inspektur_jabatan},", "Tim Evaluasi,"],
             
             # Row 3: Jabatan (kiri kosong, kanan ada jabatan)
             ["", jabatan_tim_table],
@@ -370,8 +393,8 @@ class MatriksPDFGenerator:
             [nama_inspektur_para, nama_tim_table]
         ]
         
-        # Column widths
-        signature_table = Table(signature_data, colWidths=[6*cm, 18*cm])
+        # OPTIMIZED: Perbesar column widths untuk mengisi ruang
+        signature_table = Table(signature_data, colWidths=[6*cm, 19*cm])  # Total 28cm
         
         # PERBAIKAN: Tambahkan KeepTogether untuk memastikan signature tidak terpotong
         from reportlab.platypus import KeepTogether

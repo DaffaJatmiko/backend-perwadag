@@ -202,6 +202,7 @@ class MatriksStatus(str, Enum):
     DRAFTING = "DRAFTING"
     CHECKING = "CHECKING" 
     VALIDATING = "VALIDATING"
+    APPROVING = "APPROVING" 
     FINISHED = "FINISHED"
     
     @classmethod
@@ -211,33 +212,33 @@ class MatriksStatus(str, Enum):
     
     @classmethod
     def get_allowed_transitions(cls, current_status: str) -> list:
-        """Get allowed status transitions dari status saat ini."""
         transitions = {
             cls.DRAFTING.value: [cls.CHECKING.value],
             cls.CHECKING.value: [cls.DRAFTING.value, cls.VALIDATING.value],
-            cls.VALIDATING.value: [cls.DRAFTING.value, cls.FINISHED.value],
-            cls.FINISHED.value: []  # No more transitions
+            cls.VALIDATING.value: [cls.DRAFTING.value, cls.APPROVING.value],  # ← CHANGE
+            cls.APPROVING.value: [cls.DRAFTING.value, cls.FINISHED.value],    # ← NEW
+            cls.FINISHED.value: []
         }
         return transitions.get(current_status, [])
     
     @classmethod
     def get_display_name(cls, status: str) -> str:
-        """Get display name untuk status."""
         display_map = {
             cls.DRAFTING.value: "Penyusunan Temuan",
             cls.CHECKING.value: "Pemeriksaan Ketua Tim",
             cls.VALIDATING.value: "Validasi Pengendali Teknis",
+            cls.APPROVING.value: "Persetujuan Pengedali Mutu",     # ← NEW
             cls.FINISHED.value: "Selesai"
         }
         return display_map.get(status, status)
     
     @classmethod
     def get_description(cls, status: str) -> str:
-        """Get description untuk status."""
         description_map = {
             cls.DRAFTING.value: "Anggota tim sedang menyusun temuan dan rekomendasi",
             cls.CHECKING.value: "Ketua tim sedang memeriksa hasil temuan",
             cls.VALIDATING.value: "Pengendali teknis sedang memvalidasi hasil",
+            cls.APPROVING.value: "Pengedali mutu sedang melakukan persetujuan akhir",  # ← NEW
             cls.FINISHED.value: "Matriks telah selesai dan siap untuk tindak lanjut"
         }
         return description_map.get(status, status)

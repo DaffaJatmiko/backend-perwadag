@@ -184,19 +184,22 @@ async def update_matrix_status(
 ):
     """
     Update status flow matriks evaluasi.
-    
+
     **Status Flow:**
     - **DRAFTING** → **CHECKING**: Anggota tim selesai input temuan
     - **CHECKING** → **VALIDATING**: Ketua tim approve
     - **CHECKING** → **DRAFTING**: Ketua tim reject untuk revisi
-    - **VALIDATING** → **FINISHED**: Pengendali teknis final approve  
-    - **VALIDATING** → **DRAFTING**: Pengendali teknis reject untuk revisi
-    
+    - **VALIDATING** → **APPROVING**: Pengendali teknis approve
+    - **VALIDATING** → **DRAFTING**: Pengendali teknis reject untuk revisi  
+    - **APPROVING** → **FINISHED**: Pengedali mutu final approve
+    - **APPROVING** → **DRAFTING**: Pengedali mutu reject untuk revisi
+
     **Permissions:**
-    - **DRAFTING**: Ketua tim bisa ubah ke CHECKING
-    - **CHECKING**: Ketua tim bisa ubah ke DRAFTING/VALIDATING
-    - **VALIDATING**: Pengendali teknis bisa ubah ke DRAFTING/FINISHED
-    - **FINISHED**: Hanya admin/pengedali mutu untuk emergency
+    - **DRAFTING**: Anggota tim bisa ubah ke CHECKING
+    - **CHECKING**: Ketua tim bisa edit temuan + ubah ke DRAFTING/VALIDATING
+    - **VALIDATING**: Pengendali teknis bisa edit temuan + ubah ke DRAFTING/APPROVING
+    - **APPROVING**: Pengedali mutu bisa ubah ke DRAFTING/FINISHED
+    - **FINISHED**: Hanya admin untuk emergency
     """
     return await service.update_matrix_status(matriks_id, status_data, current_user)
 

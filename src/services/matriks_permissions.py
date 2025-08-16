@@ -120,7 +120,7 @@ def _get_admin_permissions_by_status(matrix_status: MatriksStatus) -> UserPermis
         
     elif matrix_status == MatriksStatus.CHECKING:
         return UserPermissions(
-            can_edit_temuan=False,  # ❌ Admin juga tidak bisa edit temuan di checking!
+            can_edit_temuan=True,  
             can_change_matrix_status=True,  # Admin bisa approve/reject seperti ketua tim
             can_edit_tindak_lanjut=False,  # Belum waktunya
             can_change_tindak_lanjut_status=False,
@@ -130,7 +130,7 @@ def _get_admin_permissions_by_status(matrix_status: MatriksStatus) -> UserPermis
         
     elif matrix_status == MatriksStatus.VALIDATING:
         return UserPermissions(
-            can_edit_temuan=False,  # ❌ Tidak bisa edit temuan
+            can_edit_temuan=True,  # ❌ Tidak bisa edit temuan
             can_change_matrix_status=True,  # Admin bisa final approve seperti pengendali teknis
             can_edit_tindak_lanjut=False,  # Belum waktunya
             can_change_tindak_lanjut_status=False,
@@ -145,6 +145,15 @@ def _get_admin_permissions_by_status(matrix_status: MatriksStatus) -> UserPermis
             can_edit_tindak_lanjut=False,  # Emergency tindak lanjut edit
             can_change_tindak_lanjut_status=False,  # Emergency status change
             allowed_matrix_status_changes=[],  # Emergency reopen
+            allowed_tindak_lanjut_status_changes=[]
+        )
+    elif matrix_status == MatriksStatus.APPROVING:
+        return UserPermissions(
+            can_edit_temuan=False,  # ❌ Tidak bisa edit temuan
+            can_change_matrix_status=True,  # Admin bisa final approve seperti pengedali mutu
+            can_edit_tindak_lanjut=False,  # Belum waktunya
+            can_change_tindak_lanjut_status=False,
+            allowed_matrix_status_changes=[MatriksStatus.DRAFTING, MatriksStatus.FINISHED],  # Follow pengedali mutu flow
             allowed_tindak_lanjut_status_changes=[]
         )
     
@@ -176,16 +185,16 @@ def _get_role_permissions_by_status(assignment_role: str, matrix_status: Matriks
         if matrix_status == MatriksStatus.DRAFTING:
             return UserPermissions(
                 can_edit_temuan=True,  # Ketua tim bisa bantu edit temuan
-                can_change_matrix_status=False,  # ❌ FIXED! Ketua tim TIDAK bisa promote dari drafting
+                can_change_matrix_status=False,  # ❌ Harus tunggu anggota submit
                 can_edit_tindak_lanjut=False,
                 can_change_tindak_lanjut_status=False,
-                allowed_matrix_status_changes=[],  # ❌ Harus menunggu anggota tim selesai
+                allowed_matrix_status_changes=[],
                 allowed_tindak_lanjut_status_changes=[]
             )
         elif matrix_status == MatriksStatus.CHECKING:
             return UserPermissions(
-                can_edit_temuan=False,  # ❌ Tidak bisa edit temuan di checking
-                can_change_matrix_status=True,  # ✅ Bisa approve/reject (ini tugas ketua tim)
+                can_edit_temuan=True,   # ✅ NEW: Bisa edit temuan di checking
+                can_change_matrix_status=True,  # ✅ Bisa approve/reject
                 can_edit_tindak_lanjut=False,
                 can_change_tindak_lanjut_status=False,
                 allowed_matrix_status_changes=[MatriksStatus.DRAFTING, MatriksStatus.VALIDATING],
@@ -198,11 +207,11 @@ def _get_role_permissions_by_status(assignment_role: str, matrix_status: Matriks
     elif assignment_role == 'PENGENDALI_TEKNIS':
         if matrix_status == MatriksStatus.VALIDATING:
             return UserPermissions(
-                can_edit_temuan=False,  # Tidak bisa edit temuan
-                can_change_matrix_status=True,  # Final approve/reject
+                can_edit_temuan=True,   # ✅ NEW: Bisa edit temuan yang ada (tidak bisa tambah baru - handled di frontend)
+                can_change_matrix_status=True,  # Approve/reject
                 can_edit_tindak_lanjut=False,
                 can_change_tindak_lanjut_status=False,
-                allowed_matrix_status_changes=[MatriksStatus.DRAFTING, MatriksStatus.FINISHED],
+                allowed_matrix_status_changes=[MatriksStatus.DRAFTING, MatriksStatus.APPROVING],  # ← CHANGE: ke APPROVING
                 allowed_tindak_lanjut_status_changes=[]
             )
         else:
@@ -210,13 +219,21 @@ def _get_role_permissions_by_status(assignment_role: str, matrix_status: Matriks
     
     # ===== PENGEDALI MUTU =====
     elif assignment_role == 'PENGEDALI_MUTU':
-        # Pengedali mutu bisa emergency access tapi terbatas
-        if matrix_status == MatriksStatus.FINISHED:
+        if matrix_status == MatriksStatus.APPROVING:    # ← NEW: Handle APPROVING status
             return UserPermissions(
                 can_edit_temuan=False,  # Tidak bisa edit temuan
-                can_change_matrix_status=False,  # Tidak bisa ubah matrix status
-                can_edit_tindak_lanjut=False,  # Bisa edit tindak lanjut
-                can_change_tindak_lanjut_status=False,  # Bisa ubah status tindak lanjut
+                can_change_matrix_status=True,  # ✅ NEW: Bisa final approve/reject
+                can_edit_tindak_lanjut=False,
+                can_change_tindak_lanjut_status=False,
+                allowed_matrix_status_changes=[MatriksStatus.DRAFTING, MatriksStatus.FINISHED],  # ← NEW
+                allowed_tindak_lanjut_status_changes=[]
+            )
+        elif matrix_status == MatriksStatus.FINISHED:
+            return UserPermissions(
+                can_edit_temuan=False,  # Tidak bisa edit temuan
+                can_change_matrix_status=False,  # Emergency access terbatas
+                can_edit_tindak_lanjut=False,
+                can_change_tindak_lanjut_status=False,
                 allowed_matrix_status_changes=[],
                 allowed_tindak_lanjut_status_changes=[]
             )
@@ -370,11 +387,11 @@ def _get_tindak_lanjut_role_permissions(
             return UserPermissions()
     
     # ===== PENGENDALI TEKNIS =====
-    elif assignment_role == 'PENGENDALI_TEKNIS':
+    elif assignment_role in ['PENGENDALI_TEKNIS', 'PENGEDALI_MUTU']:  # ← NEW: Both can approve
         if tindak_lanjut_status == TindakLanjutStatus.VALIDATING:
             return UserPermissions(
                 can_edit_tindak_lanjut=False,  # Tidak edit content
-                can_change_tindak_lanjut_status=True,  # Final approve/reject
+                can_change_tindak_lanjut_status=True,  # ✅ Both can approve/reject
                 allowed_tindak_lanjut_status_changes=[
                     TindakLanjutStatus.DRAFTING, TindakLanjutStatus.FINISHED
                 ]
